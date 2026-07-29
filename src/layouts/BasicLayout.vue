@@ -584,6 +584,14 @@ export default {
           singleAsItem: true
         },
         {
+          name: 'MenuGroupCzsc',
+          path: '/menu-group/czsc-workbench',
+          title: this.$t('menu.dashboard.czscWorkbench') || 'CZSC',
+          icon: 'line-chart',
+          paths: ['/czsc-workbench'],
+          singleAsItem: true
+        },
+        {
           name: 'MenuGroupStrategy',
           path: '/menu-group/strategy-lab',
           title: this.$t('menu.group.strategyLab') || 'Strategy Lab',

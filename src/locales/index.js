@@ -10,6 +10,7 @@ import strategyV2Messages from './lang/strategy-v2'
 import strategyLiveRiskMessages from './lang/strategy-live-risk'
 import robotBuilderMessages from './lang/robot-builder-overrides'
 import strategyTradeRecordMessages from './lang/strategy-trade-records'
+import czscWorkbenchMessages from './lang/czsc-workbench'
 
 Vue.use(VueI18n)
 
@@ -24,7 +25,8 @@ const messages = {
     ...(strategyV2Messages[defaultLang] || {}),
     ...(strategyLiveRiskMessages[defaultLang] || {}),
     ...(robotBuilderMessages[defaultLang] || {}),
-    ...(strategyTradeRecordMessages[defaultLang] || {})
+    ...(strategyTradeRecordMessages[defaultLang] || {}),
+    ...(czscWorkbenchMessages[defaultLang] || {})
   }
 }
 
@@ -98,7 +100,8 @@ function mergeLocaleOverrides (lang) {
     ...(strategyV2Messages[lang] || {}),
     ...(strategyLiveRiskMessages[lang] || {}),
     ...(robotBuilderMessages[lang] || {}),
-    ...(strategyTradeRecordMessages[lang] || {})
+    ...(strategyTradeRecordMessages[lang] || {}),
+    ...(czscWorkbenchMessages[lang] || {})
   }
   i18n.setLocaleMessage(lang, {
     ...(i18n.getLocaleMessage(lang) || {}),
@@ -125,7 +128,8 @@ export async function loadLanguageAsync (lang = defaultLang) {
       ...(brokerAccountWorkspaceMessages[lang] || {}),
       ...(strategyLiveRiskMessages[lang] || {}),
       ...(robotBuilderMessages[lang] || {}),
-      ...(strategyTradeRecordMessages[lang] || {})
+      ...(strategyTradeRecordMessages[lang] || {}),
+      ...(czscWorkbenchMessages[lang] || {})
     })
     i18n.setLocaleMessage(lang, locale)
     loadedLanguages.push(lang)
