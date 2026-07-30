@@ -198,6 +198,15 @@
         />
       </a-tab-pane>
 
+      <a-tab-pane key="research-ops">
+        <span slot="tab"><a-icon type="control" />{{ $t('czsc.tabResearchOps') }}</span>
+        <research-ops-panel
+          :symbol="normalizedSymbol"
+          :timeframe="timeframe"
+          :limit="limit"
+        />
+      </a-tab-pane>
+
       <a-tab-pane key="strategy">
         <span slot="tab"><a-icon type="experiment" />{{ $t('czsc.tabStrategy') }}</span>
         <strategy-panel
@@ -268,6 +277,7 @@ import DashboardPanel from './components/DashboardPanel.vue'
 import FactorLabPanel from './components/FactorLabPanel.vue'
 import MultiPeriodPanel from './components/MultiPeriodPanel.vue'
 import QualityPanel from './components/QualityPanel.vue'
+import ResearchOpsPanel from './components/ResearchOpsPanel.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import ScanPanel from './components/ScanPanel.vue'
 import SmartWatchlistPanel from './components/SmartWatchlistPanel.vue'
@@ -277,7 +287,7 @@ const STORAGE_KEY = 'quantdinger.czsc.workbench.v2'
 
 export default {
   name: 'CzscWorkbench',
-  components: { BacktestPanel, CzscChart, DashboardPanel, FactorLabPanel, MultiPeriodPanel, QualityPanel, ReviewPanel, ScanPanel, SmartWatchlistPanel, StrategyPanel },
+  components: { BacktestPanel, CzscChart, DashboardPanel, FactorLabPanel, MultiPeriodPanel, QualityPanel, ResearchOpsPanel, ReviewPanel, ScanPanel, SmartWatchlistPanel, StrategyPanel },
   data () {
     return {
       activeTab: 'structure',

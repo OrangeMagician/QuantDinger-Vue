@@ -140,6 +140,58 @@ export function getCzscDashboard (data) {
   })
 }
 
+export function runCzscResearchOpsSuite (data) {
+  return request({
+    url: '/api/czsc/research-ops/suite',
+    method: 'post',
+    data,
+    timeout: 240000
+  })
+}
+
+export function getCzscResearchOpsAiConfig () {
+  return request({
+    url: '/api/czsc/research-ops/ai-config',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
+export function saveCzscResearchOpsAiConfig (data) {
+  return request({
+    url: '/api/czsc/research-ops/ai-config',
+    method: 'post',
+    data,
+    timeout: 15000
+  })
+}
+
+export function getCzscResearchOpsWorkflows () {
+  return request({
+    url: '/api/czsc/research-ops/workflows',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
+export function saveCzscResearchOpsWorkflow (data) {
+  return request({
+    url: '/api/czsc/research-ops/workflows',
+    method: 'post',
+    data,
+    timeout: 15000
+  })
+}
+
+export function addCzscSignalJournal (data) {
+  return request({
+    url: '/api/czsc/research-ops/signals/journal',
+    method: 'post',
+    data,
+    timeout: 15000
+  })
+}
+
 export function backtestCzsc (data) {
   return request({
     url: '/api/czsc/backtest',

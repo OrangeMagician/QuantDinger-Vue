@@ -11,7 +11,7 @@ async function source (path) {
 test('CZSC workbench exposes integrated cockpit, research and review views', async () => {
   const workbench = await source('views/czsc-workbench/index.vue')
 
-  for (const tab of ['structure', 'cockpit', 'multi-period', 'factor-lab', 'quality', 'watchlist', 'strategy', 'scan', 'backtest', 'review']) {
+  for (const tab of ['structure', 'cockpit', 'multi-period', 'factor-lab', 'quality', 'watchlist', 'research-ops', 'strategy', 'scan', 'backtest', 'review']) {
     assert.match(workbench, new RegExp(`key="${tab}"`))
   }
   assert.match(workbench, /<dashboard-panel/)
@@ -19,6 +19,7 @@ test('CZSC workbench exposes integrated cockpit, research and review views', asy
   assert.match(workbench, /<factor-lab-panel/)
   assert.match(workbench, /<quality-panel/)
   assert.match(workbench, /<smart-watchlist-panel/)
+  assert.match(workbench, /<research-ops-panel/)
   assert.match(workbench, /<strategy-panel/)
   assert.match(workbench, /<scan-panel/)
   assert.match(workbench, /<backtest-panel/)
@@ -49,10 +50,40 @@ test('CZSC API includes bounded research, TradingView, and Retraq endpoints', as
     '/api/czsc/tradingview/normalize',
     '/api/czsc/retraq/submit',
     '/api/czsc/retraq/submit-external',
-    '/api/czsc/retraq/status'
+    '/api/czsc/retraq/status',
+    '/api/czsc/research-ops/suite',
+    '/api/czsc/research-ops/ai-config',
+    '/api/czsc/research-ops/workflows',
+    '/api/czsc/research-ops/signals/journal'
   ]) {
     assert.match(api, new RegExp(endpoint.replaceAll('/', '\\/')))
   }
+})
+
+test('ResearchOps panel wires ten-direction suite, AI config, workflows and safe secret handling', async () => {
+  const panel = await source('views/czsc-workbench/components/ResearchOpsPanel.vue')
+
+  assert.match(panel, /runCzscResearchOpsSuite/)
+  assert.match(panel, /getCzscResearchOpsAiConfig/)
+  assert.match(panel, /saveCzscResearchOpsAiConfig/)
+  assert.match(panel, /saveCzscResearchOpsWorkflow/)
+  assert.match(panel, /quantdinger\.czsc\.research-ops\.v1/)
+  for (const key of [
+    'data_governance',
+    'signal_knowledge',
+    'factor_experiment',
+    'strategy_workflow',
+    'review_cockpit',
+    'smart_watchlist_v2',
+    'external_signal_center',
+    'pretrade_validation',
+    'ai_research_assistant',
+    'ops_dashboard'
+  ]) {
+    assert.match(panel, new RegExp(key))
+  }
+  assert.match(panel, /api_key_configured/)
+  assert.doesNotMatch(panel, /RETRAQ_SIGNAL_BRIDGE_SECRET/)
 })
 
 test('Retraq review requires confirmation and never exposes integration secrets', async () => {
