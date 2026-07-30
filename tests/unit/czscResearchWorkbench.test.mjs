@@ -37,6 +37,8 @@ test('CZSC API includes bounded research, TradingView, and Retraq endpoints', as
     '/api/czsc/evaluate',
     '/api/czsc/scan',
     '/api/czsc/screener',
+    '/api/czsc/signal-factors/catalog',
+    '/api/czsc/signal-factors/screener',
     '/api/czsc/factors/catalog',
     '/api/czsc/multi-period',
     '/api/czsc/factors/evaluate',
@@ -108,13 +110,29 @@ test('CZSC chart renders volume and MACD panes', async () => {
 test('CZSC scan panel supports factor screening persistence and result actions', async () => {
   const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
 
-  assert.match(scan, /screenCzscFactors/)
+  assert.match(scan, /screenCzscSignalFactors/)
+  assert.match(scan, /SignalFactorSelector/)
+  assert.match(scan, /signalFactorConditions/)
   assert.match(scan, /addCzscWatchlistItem/)
   assert.match(scan, /quantdinger\.czsc\.scan\.v2/)
   assert.match(scan, /saveFactorTemplate/)
   assert.match(scan, /exportResult/)
   assert.match(scan, /addWatchlist/)
   assert.match(scan, /factor_screener/)
+})
+
+test('Signal factor selector exposes all clickable condition sources', async () => {
+  const selector = await source('views/czsc-workbench/components/SignalFactorSelector.vue')
+  const researchOps = await source('views/czsc-workbench/components/ResearchOpsPanel.vue')
+  const watchlist = await source('views/czsc-workbench/components/SmartWatchlistPanel.vue')
+
+  assert.match(selector, /getCzscSignalFactorCatalog/)
+  for (const sourceKey of ['feature_conditions', 'enhanced_signals', 'factor_library', 'template_signals']) {
+    assert.match(selector, new RegExp(sourceKey))
+  }
+  assert.match(selector, /selectedConditions/)
+  assert.match(researchOps, /<signal-factor-selector/)
+  assert.match(watchlist, /<signal-factor-selector/)
 })
 
 test('New CZSC research panels wire to backend workflows and manual review only sources', async () => {

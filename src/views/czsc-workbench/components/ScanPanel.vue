@@ -72,26 +72,11 @@
         </div>
 
         <div class="factor-grid">
-          <a-checkbox-group v-model="enabledFactorKeys" class="factor-checkboxes" @change="persistState">
-            <a-checkbox v-for="item in factorOptions" :key="item.key" :value="item.key">
-              <strong>{{ item.label }}</strong>
-              <small>{{ item.desc }}</small>
-            </a-checkbox>
-          </a-checkbox-group>
-          <div class="threshold-grid">
-            <label class="field">
-              <span>{{ $t('czsc.maxDrawdownThreshold') }}</span>
-              <a-input-number v-model="maxDrawdownPct" :min="1" :max="80" :step="1" @change="persistState" />
-            </label>
-            <label class="field">
-              <span>{{ $t('czsc.recentReturnThreshold') }}</span>
-              <a-input-number v-model="recentReturnMinPct" :min="-80" :max="200" :step="1" @change="persistState" />
-            </label>
-            <label class="field">
-              <span>{{ $t('czsc.resultLimit') }}</span>
-              <a-input-number v-model="resultLimit" :min="1" :max="200" :step="5" @change="persistState" />
-            </label>
-          </div>
+          <signal-factor-selector v-model="signalFactorConditions" :logic.sync="screenLogic" @change="persistState" />
+          <label class="field result-limit-field">
+            <span>{{ $t('czsc.resultLimit') }}</span>
+            <a-input-number v-model="resultLimit" :min="1" :max="200" :step="5" @change="persistState" />
+          </label>
         </div>
 
         <a-alert v-if="error" type="error" show-icon :message="$t('czsc.scanFailed')" :description="error" />
@@ -161,12 +146,14 @@
 </template>
 
 <script>
-import { addCzscWatchlistItem, scanCzsc, screenCzscFactors, searchCzscSymbols } from '@/api/czsc'
+import { addCzscWatchlistItem, scanCzsc, screenCzscSignalFactors, searchCzscSymbols } from '@/api/czsc'
+import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.scan.v2'
 
 export default {
   name: 'CzscScanPanel',
+  components: { SignalFactorSelector },
   props: {
     timeframe: { type: String, required: true },
     limit: { type: Number, required: true },
@@ -180,9 +167,15 @@ export default {
       symbolOptions: [],
       symbolSearching: false,
       symbolSearchTimer: null,
-      enabledFactorKeys: ['czsc_direction_up', 'ma_bullish', 'volume_expand'],
+      enabledFactorKeys: [],
       maxDrawdownPct: 18,
       recentReturnMinPct: -5,
+      screenLogic: 'and',
+      signalFactorConditions: [
+        { source: 'feature', factor: 'czsc_direction', operator: 'eq', value: 'up', label: 'CZSC direction up' },
+        { source: 'feature', factor: 'ma_bullish', operator: 'truthy', value: true, label: 'Bullish MA' },
+        { source: 'feature', factor: 'volume_expand', operator: 'truthy', value: true, label: 'Volume expansion' }
+      ],
       resultLimit: 50,
       templateNameInput: '',
       savedTemplates: [],
@@ -207,16 +200,16 @@ export default {
     resultModeLabel () {
       return this.resultMode === 'screener' ? this.$t('czsc.factorScreener') : this.$t('czsc.templateScan')
     },
-    factorOptions () {
-      return [
-        { key: 'czsc_direction_up', label: this.$t('czsc.factorDirectionUp'), desc: this.$t('czsc.factorDirectionUpDesc') },
-        { key: 'macd_golden', label: this.$t('czsc.factorMacdGolden'), desc: this.$t('czsc.factorMacdGoldenDesc') },
-        { key: 'volume_expand', label: this.$t('czsc.factorVolumeExpand'), desc: this.$t('czsc.factorVolumeExpandDesc') },
-        { key: 'ma_bullish', label: this.$t('czsc.factorMaBullish'), desc: this.$t('czsc.factorMaBullishDesc') },
-        { key: 'breakout_high', label: this.$t('czsc.factorBreakout'), desc: this.$t('czsc.factorBreakoutDesc') },
-        { key: 'drawdown_range', label: this.$t('czsc.factorDrawdown'), desc: this.$t('czsc.factorDrawdownDesc') },
-        { key: 'recent_return', label: this.$t('czsc.factorRecentReturn'), desc: this.$t('czsc.factorRecentReturnDesc') }
-      ]
+    legacyConditions () {
+      const conditions = []
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('czsc_direction_up')) conditions.push({ source: 'feature', factor: 'czsc_direction', operator: 'eq', value: 'up' })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('macd_golden')) conditions.push({ source: 'feature', factor: 'macd_cross', operator: 'eq', value: 'golden' })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('volume_expand')) conditions.push({ source: 'feature', factor: 'volume_expand', operator: 'truthy', value: true })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('ma_bullish')) conditions.push({ source: 'feature', factor: 'ma_bullish', operator: 'truthy', value: true })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('breakout_high')) conditions.push({ source: 'feature', factor: 'breakout_high', operator: 'truthy', value: true })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('drawdown_range')) conditions.push({ source: 'feature', factor: 'drawdown_pct', operator: 'between', value: [-Number(this.maxDrawdownPct || 18) / 100, 0] })
+      if (this.enabledFactorKeys && this.enabledFactorKeys.includes('recent_return')) conditions.push({ source: 'feature', factor: 'recent_return_pct', operator: 'gte', value: Number(this.recentReturnMinPct || 0) / 100 })
+      return conditions
     }
   },
   created () {
@@ -230,13 +223,18 @@ export default {
       try {
         const raw = window.localStorage.getItem(STORAGE_KEY)
         const state = raw ? JSON.parse(raw) : null
-        if (state && typeof state === 'object') {
-          if (state.symbolsText) this.symbolsText = state.symbolsText
-          if (Array.isArray(state.enabledFactorKeys)) this.enabledFactorKeys = state.enabledFactorKeys
-          if (state.maxDrawdownPct !== undefined) this.maxDrawdownPct = Number(state.maxDrawdownPct)
-          if (state.recentReturnMinPct !== undefined) this.recentReturnMinPct = Number(state.recentReturnMinPct)
-          if (state.resultLimit !== undefined) this.resultLimit = Number(state.resultLimit)
-          if (state.result) this.result = state.result
+          if (state && typeof state === 'object') {
+            if (state.symbolsText) this.symbolsText = state.symbolsText
+            if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
+            else if (Array.isArray(state.enabledFactorKeys)) {
+              this.enabledFactorKeys = state.enabledFactorKeys
+              this.maxDrawdownPct = state.maxDrawdownPct
+              this.recentReturnMinPct = state.recentReturnMinPct
+              this.signalFactorConditions = this.legacyConditions()
+            }
+            if (state.screenLogic) this.screenLogic = state.screenLogic
+            if (state.resultLimit !== undefined) this.resultLimit = Number(state.resultLimit)
+            if (state.result) this.result = state.result
           if (state.resultMode) this.resultMode = state.resultMode
           if (Array.isArray(state.savedTemplates)) this.savedTemplates = state.savedTemplates
         }
@@ -246,9 +244,8 @@ export default {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
           symbolsText: this.symbolsText,
-          enabledFactorKeys: this.enabledFactorKeys,
-          maxDrawdownPct: this.maxDrawdownPct,
-          recentReturnMinPct: this.recentReturnMinPct,
+          signalFactorConditions: this.signalFactorConditions,
+          screenLogic: this.screenLogic,
           resultLimit: this.resultLimit,
           result: this.result,
           resultMode: this.resultMode,
@@ -296,29 +293,7 @@ export default {
       this.persistState()
     },
     conditionsForRequest () {
-      const conditions = []
-      if (this.enabledFactorKeys.includes('czsc_direction_up')) {
-        conditions.push({ factor: 'czsc_direction', operator: 'eq', value: 'up' })
-      }
-      if (this.enabledFactorKeys.includes('macd_golden')) {
-        conditions.push({ factor: 'macd_cross', operator: 'eq', value: 'golden' })
-      }
-      if (this.enabledFactorKeys.includes('volume_expand')) {
-        conditions.push({ factor: 'volume_expand', operator: 'truthy', value: true })
-      }
-      if (this.enabledFactorKeys.includes('ma_bullish')) {
-        conditions.push({ factor: 'ma_bullish', operator: 'truthy', value: true })
-      }
-      if (this.enabledFactorKeys.includes('breakout_high')) {
-        conditions.push({ factor: 'breakout_high', operator: 'truthy', value: true })
-      }
-      if (this.enabledFactorKeys.includes('drawdown_range')) {
-        conditions.push({ factor: 'drawdown_pct', operator: 'between', value: [-Number(this.maxDrawdownPct || 18) / 100, 0] })
-      }
-      if (this.enabledFactorKeys.includes('recent_return')) {
-        conditions.push({ factor: 'recent_return_pct', operator: 'gte', value: Number(this.recentReturnMinPct || 0) / 100 })
-      }
-      return conditions
+      return Array.isArray(this.signalFactorConditions) ? this.signalFactorConditions : []
     },
     validateSymbols (max) {
       const symbols = this.parsedSymbols()
@@ -359,11 +334,12 @@ export default {
       this.resultMode = 'screener'
       this.error = ''
       try {
-        const response = await screenCzscFactors({
+        const response = await screenCzscSignalFactors({
           symbols,
           timeframe: this.timeframe,
           limit: this.limit,
           result_limit: Number(this.resultLimit || 50),
+          logic: this.screenLogic,
           conditions: this.conditionsForRequest()
         })
         if (!response || response.code !== 1 || !response.data) {
@@ -383,9 +359,8 @@ export default {
       const item = {
         id: `factor-${Date.now()}`,
         name,
-        enabledFactorKeys: [...this.enabledFactorKeys],
-        maxDrawdownPct: Number(this.maxDrawdownPct || 18),
-        recentReturnMinPct: Number(this.recentReturnMinPct || 0),
+        signalFactorConditions: JSON.parse(JSON.stringify(this.signalFactorConditions || [])),
+        screenLogic: this.screenLogic,
         resultLimit: Number(this.resultLimit || 50)
       }
       this.savedTemplates = [item, ...this.savedTemplates.filter(template => template.name !== name)].slice(0, 20)
@@ -396,9 +371,14 @@ export default {
     applySavedTemplate (id) {
       const item = this.savedTemplates.find(template => template.id === id)
       if (!item) return
-      this.enabledFactorKeys = [...item.enabledFactorKeys]
-      this.maxDrawdownPct = Number(item.maxDrawdownPct)
-      this.recentReturnMinPct = Number(item.recentReturnMinPct)
+      this.signalFactorConditions = Array.isArray(item.signalFactorConditions) ? JSON.parse(JSON.stringify(item.signalFactorConditions)) : []
+      if (!this.signalFactorConditions.length && Array.isArray(item.enabledFactorKeys)) {
+        this.enabledFactorKeys = item.enabledFactorKeys
+        this.maxDrawdownPct = item.maxDrawdownPct
+        this.recentReturnMinPct = item.recentReturnMinPct
+        this.signalFactorConditions = this.legacyConditions()
+      }
+      this.screenLogic = item.screenLogic || 'and'
       this.resultLimit = Number(item.resultLimit)
       this.persistState()
     },

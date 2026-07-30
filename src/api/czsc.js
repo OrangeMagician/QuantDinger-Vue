@@ -61,6 +61,23 @@ export function screenCzscFactors (data) {
   })
 }
 
+export function getCzscSignalFactorCatalog () {
+  return request({
+    url: '/api/czsc/signal-factors/catalog',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
+export function screenCzscSignalFactors (data) {
+  return request({
+    url: '/api/czsc/signal-factors/screener',
+    method: 'post',
+    data,
+    timeout: 240000
+  })
+}
+
 export function getCzscFactorCatalog () {
   return request({
     url: '/api/czsc/factors/catalog',

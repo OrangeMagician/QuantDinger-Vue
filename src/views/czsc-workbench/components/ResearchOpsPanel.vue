@@ -49,12 +49,7 @@
           <span>{{ $t('czsc.workflowName') }}</span>
           <a-input v-model="workflow.name" />
         </label>
-        <a-checkbox-group v-model="workflowFactors" class="workflow-factors" @change="persistState">
-          <a-checkbox value="recent_return">{{ $t('czsc.factorRecentReturn') }}</a-checkbox>
-          <a-checkbox value="ma_bullish">{{ $t('czsc.factorMaBullish') }}</a-checkbox>
-          <a-checkbox value="volume_expand">{{ $t('czsc.factorVolumeExpand') }}</a-checkbox>
-          <a-checkbox value="breakout">{{ $t('czsc.factorBreakout') }}</a-checkbox>
-        </a-checkbox-group>
+        <signal-factor-selector v-model="signalFactorConditions" class="workflow-selector" :logic.sync="workflow.logic" @change="persistState" />
       </section>
     </div>
 
@@ -136,11 +131,13 @@ import {
   saveCzscResearchOpsAiConfig,
   saveCzscResearchOpsWorkflow
 } from '@/api/czsc'
+import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.research-ops.v1'
 
 export default {
   name: 'CzscResearchOpsPanel',
+  components: { SignalFactorSelector },
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
@@ -150,7 +147,11 @@ export default {
     return {
       symbolsText: '000333.SZ\n600519.SH\n000001.SZ\n300750.SZ\n301280.SZ',
       workflowFactors: ['recent_return', 'ma_bullish'],
-      workflow: { id: 'default_research_ops', name: 'ResearchOps 默认流程' },
+      workflow: { id: 'default_research_ops', name: 'ResearchOps 默认流程', logic: 'and' },
+      signalFactorConditions: [
+        { source: 'feature', factor: 'recent_return_pct', operator: 'gte', value: -1, label: 'Recent return' },
+        { source: 'feature', factor: 'ma_bullish', operator: 'truthy', value: true, label: 'Bullish MA' }
+      ],
       aiConfig: {},
       aiForm: { provider: 'sub2api', base_url: '', model: '', api_key: '' },
       result: null,
@@ -237,12 +238,15 @@ export default {
         const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
         if (state.symbolsText) this.symbolsText = state.symbolsText
         if (Array.isArray(state.workflowFactors)) this.workflowFactors = state.workflowFactors
+        if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
+        else if (Array.isArray(state.workflowFactors)) this.signalFactorConditions = this.legacyWorkflowConditions()
+        if (state.workflowLogic) this.workflow.logic = state.workflowLogic
         if (state.result) this.result = state.result
       } catch (error) {}
     },
     persistState () {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbolsText: this.symbolsText, workflowFactors: this.workflowFactors, result: this.result }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbolsText: this.symbolsText, workflowFactors: this.workflowFactors, signalFactorConditions: this.signalFactorConditions, workflowLogic: this.workflow.logic, result: this.result }))
       } catch (error) {}
     },
     parsedSymbols () {
@@ -279,13 +283,16 @@ export default {
         this.savingAi = false
       }
     },
-    workflowConditions () {
+    legacyWorkflowConditions () {
       const out = []
-      if (this.workflowFactors.includes('recent_return')) out.push({ factor: 'recent_return_pct', operator: 'gte', value: -1 })
-      if (this.workflowFactors.includes('ma_bullish')) out.push({ factor: 'ma_bullish', operator: 'truthy', value: true })
-      if (this.workflowFactors.includes('volume_expand')) out.push({ factor: 'volume_expand', operator: 'truthy', value: true })
-      if (this.workflowFactors.includes('breakout')) out.push({ factor: 'breakout_high', operator: 'truthy', value: true })
+      if (this.workflowFactors.includes('recent_return')) out.push({ source: 'feature', factor: 'recent_return_pct', operator: 'gte', value: -1 })
+      if (this.workflowFactors.includes('ma_bullish')) out.push({ source: 'feature', factor: 'ma_bullish', operator: 'truthy', value: true })
+      if (this.workflowFactors.includes('volume_expand')) out.push({ source: 'feature', factor: 'volume_expand', operator: 'truthy', value: true })
+      if (this.workflowFactors.includes('breakout')) out.push({ source: 'feature', factor: 'breakout_high', operator: 'truthy', value: true })
       return out
+    },
+    workflowConditions () {
+      return Array.isArray(this.signalFactorConditions) ? this.signalFactorConditions : this.legacyWorkflowConditions()
     },
     async saveWorkflow () {
       this.savingWorkflow = true
@@ -293,6 +300,7 @@ export default {
         await saveCzscResearchOpsWorkflow({
           ...this.workflow,
           conditions: this.workflowConditions(),
+          logic: this.workflow.logic || 'and',
           actions: ['watchlist', 'pretrade', 'review']
         })
         this.$message.success(this.$t('czsc.workflowSaved'))
@@ -315,6 +323,7 @@ export default {
           workflow: {
             ...this.workflow,
             conditions: this.workflowConditions(),
+            logic: this.workflow.logic || 'and',
             actions: ['watchlist', 'pretrade', 'review']
           },
           external_payloads: [
@@ -356,8 +365,7 @@ export default {
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
 .ai-config-card, .workflow-card { padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fbfbfc; }
 .ai-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
-.workflow-factors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.workflow-factors >>> .ant-checkbox-wrapper { margin-left: 0; }
+.workflow-selector { margin-top: 10px; }
 .ops-summary { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); margin: 14px 0; border-top: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
 .ops-summary > div { display: flex; min-height: 62px; flex-direction: column; justify-content: center; padding: 8px 14px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
 .ops-summary span, .direction-card dt { color: #8c8c8c; font-size: 10px; }
@@ -387,6 +395,6 @@ export default {
 @media (max-width: 760px) {
   .ops-head, .section-heading { flex-direction: column; }
   .ops-summary, .split { grid-template-columns: 1fr; }
-  .ai-grid, .workflow-factors { grid-template-columns: 1fr; }
+  .ai-grid { grid-template-columns: 1fr; }
 }
 </style>

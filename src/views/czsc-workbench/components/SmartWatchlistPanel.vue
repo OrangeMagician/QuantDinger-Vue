@@ -50,14 +50,11 @@
             <p>{{ $t('czsc.watchlistAutoScanDesc') }}</p>
           </div>
           <div class="panel-actions">
-            <a-select v-model="scanCondition" @change="persistScanState">
-              <a-select-option value="default">{{ $t('czsc.scanConditionDefault') }}</a-select-option>
-              <a-select-option value="volume">{{ $t('czsc.scanConditionVolume') }}</a-select-option>
-              <a-select-option value="breakout">{{ $t('czsc.scanConditionBreakout') }}</a-select-option>
-            </a-select>
             <a-button type="primary" icon="scan" :loading="scanning" @click="runScan">{{ $t('czsc.runWatchlistScan') }}</a-button>
           </div>
         </div>
+
+        <signal-factor-selector v-model="signalFactorConditions" class="watchlist-selector" :logic.sync="scanLogic" @change="persistScanState" />
 
         <a-alert v-if="error" type="error" show-icon :message="$t('czsc.watchlistScanFailed')" :description="error" />
 
@@ -103,11 +100,13 @@
 
 <script>
 import { addCzscWatchlistItem, getCzscSmartWatchlist, removeCzscWatchlistItem, scanCzscWatchlist } from '@/api/czsc'
+import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.watchlist-scan.v1'
 
 export default {
   name: 'CzscSmartWatchlistPanel',
+  components: { SignalFactorSelector },
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
@@ -120,6 +119,8 @@ export default {
       history: [],
       result: null,
       scanCondition: 'default',
+      scanLogic: 'and',
+      signalFactorConditions: [{ source: 'feature', factor: 'recent_return_pct', operator: 'gte', value: -1, label: 'Recent return' }],
       loadingList: false,
       saving: false,
       scanning: false,
@@ -141,12 +142,15 @@ export default {
       try {
         const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
         if (state.scanCondition) this.scanCondition = state.scanCondition
+        if (state.scanLogic) this.scanLogic = state.scanLogic
+        if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
+        else this.signalFactorConditions = this.legacyConditions()
         if (state.result) this.result = state.result
       } catch (error) {}
     },
     persistScanState () {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ scanCondition: this.scanCondition, result: this.result }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ scanCondition: this.scanCondition, scanLogic: this.scanLogic, signalFactorConditions: this.signalFactorConditions, result: this.result }))
       } catch (error) {}
     },
     async loadWatchlist () {
@@ -189,10 +193,13 @@ export default {
         this.$message.error(error.backendMessage || error.message || this.$t('czsc.watchlistFailed'))
       }
     },
-    conditions () {
+    legacyConditions () {
       if (this.scanCondition === 'volume') return [{ factor: 'volume_expand', operator: 'truthy', value: true }]
       if (this.scanCondition === 'breakout') return [{ factor: 'breakout_high', operator: 'truthy', value: true }]
       return [{ factor: 'recent_return_pct', operator: 'gte', value: -1 }]
+    },
+    conditions () {
+      return Array.isArray(this.signalFactorConditions) ? this.signalFactorConditions : this.legacyConditions()
     },
     async runScan () {
       this.scanning = true
@@ -201,6 +208,7 @@ export default {
         const response = await scanCzscWatchlist({
           timeframe: this.timeframe,
           limit: this.limit,
+          logic: this.scanLogic,
           conditions: this.conditions()
         })
         if (!response || response.code !== 1 || !response.data) {
@@ -243,7 +251,7 @@ export default {
         matched_factor_zh: signal.signal_type_label || this.$t('czsc.smartWatchlist'),
         matched_factor_en: signal.signal_type || 'smart_watchlist',
         external_source: 'smart_watchlist',
-        raw_payload: { row, scan_condition: this.scanCondition }
+        raw_payload: { row, scan_condition: this.scanCondition, logic: this.scanLogic, conditions: this.conditions() }
       })
     }
   }
@@ -260,6 +268,7 @@ export default {
 .panel-head h2 { margin: 0 0 4px; font-size: 15px; }
 .panel-head p { margin: 0; color: #8c8c8c; font-size: 12px; }
 .panel-actions { display: flex; align-items: center; gap: 10px; }
+.watchlist-selector { margin-bottom: 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
 .watchlist-items { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .watchlist-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid #eceef1; border-radius: 7px; background: #fff; }
