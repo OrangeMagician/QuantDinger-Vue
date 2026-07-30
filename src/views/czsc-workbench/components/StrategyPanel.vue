@@ -72,6 +72,23 @@
       </div>
 
       <div class="research-grid">
+        <section class="enhanced-section">
+          <h3>{{ $t('czsc.enhancedSignals') }}</h3>
+          <div v-if="evaluation.enhanced_signals && evaluation.enhanced_signals.length" class="enhanced-grid">
+            <article v-for="signal in evaluation.enhanced_signals.slice(0, 8)" :key="signal.id" class="enhanced-card">
+              <div>
+                <a-tag :color="signal.direction === 'bullish' ? 'green' : signal.direction === 'bearish' ? 'volcano' : ''">
+                  {{ signal.direction_label }}
+                </a-tag>
+                <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>
+              </div>
+              <p>{{ signal.explanation }}</p>
+              <small>{{ signal.risk_tip }}</small>
+            </article>
+          </div>
+          <a-empty v-else :image="simpleEmptyImage" :description="$t('czsc.none')" />
+        </section>
+
         <section>
           <h3>{{ $t('czsc.signalOutputs') }}</h3>
           <div class="signal-list">
@@ -225,6 +242,13 @@ export default {
 .result-status span, .result-status small { color: #8c8c8c; font-size: 10px; }
 .result-status strong { color: #262626; font-size: 17px; }
 .research-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; margin-top: 22px; }
+.enhanced-section { grid-column: 1 / -1; }
+.enhanced-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.enhanced-card { padding: 10px; border: 1px solid #eceef1; border-radius: 7px; background: #fbfbfc; }
+.enhanced-card > div { display: flex; align-items: center; gap: 6px; }
+.enhanced-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.enhanced-card p { margin: 6px 0 4px; color: #595959; font-size: 11px; }
+.enhanced-card small { color: #8c8c8c; font-size: 10px; }
 .research-grid h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: 0; }
 .signal-row { display: grid; grid-template-columns: minmax(0, 1fr) 78px 78px; gap: 8px; align-items: center; min-height: 46px; border-bottom: 1px solid #eceef1; font-size: 12px; }
 .signal-row > div { min-width: 0; }
@@ -241,9 +265,9 @@ export default {
 .theme-dark .template-definition h2, .theme-dark .template-definition dd, .theme-dark .result-status strong { color: #f3f4f6; }
 .theme-dark .template-definition p { color: #c5cad3; }
 .theme-dark .result-status { background: #1c2027; }
-.theme-dark .system-template-library, .theme-dark .system-template-card { border-color: #30343b; background: #1c2027; }
+.theme-dark .system-template-library, .theme-dark .system-template-card, .theme-dark .enhanced-card { border-color: #30343b; background: #1c2027; }
 .theme-dark .system-template-copy strong, .theme-dark .system-template-head h2 { color: #f3f4f6; }
-.theme-dark .system-template-copy p, .theme-dark .system-template-head p { color: #c5cad3; }
+.theme-dark .system-template-copy p, .theme-dark .system-template-head p, .theme-dark .enhanced-card p { color: #c5cad3; }
 @media (max-width: 760px) {
   .strategy-panel { padding: 14px 12px 24px; }
   .panel-controls { align-items: stretch; flex-direction: column; }

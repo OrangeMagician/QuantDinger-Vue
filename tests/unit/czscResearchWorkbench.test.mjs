@@ -30,9 +30,12 @@ test('CZSC API includes bounded research, TradingView, and Retraq endpoints', as
     '/api/czsc/symbols/search',
     '/api/czsc/evaluate',
     '/api/czsc/scan',
+    '/api/czsc/screener',
     '/api/czsc/backtest',
     '/api/czsc/tradingview/normalize',
-    '/api/czsc/retraq/submit'
+    '/api/czsc/retraq/submit',
+    '/api/czsc/retraq/submit-external',
+    '/api/czsc/retraq/status'
   ]) {
     assert.match(api, new RegExp(endpoint.replaceAll('/', '\\/')))
   }
@@ -43,6 +46,8 @@ test('Retraq review requires confirmation and never exposes integration secrets'
 
   assert.match(review, /this\.\$confirm/)
   assert.match(review, /submitCzscToRetraq/)
+  assert.match(review, /submitExternalSignalToRetraq/)
+  assert.match(review, /getRetraqSignalStatus/)
   assert.doesNotMatch(review, /RETRAQ_SIGNAL_BRIDGE_SECRET/)
   assert.doesNotMatch(review, /secret:/)
 })
@@ -52,4 +57,16 @@ test('CZSC chart renders volume and MACD panes', async () => {
 
   assert.match(chart, /createIndicator\('VOL'/)
   assert.match(chart, /createIndicator\('MACD'/)
+  assert.match(chart, /czscSignalMarker/)
+})
+
+test('CZSC scan panel supports factor screening persistence and result actions', async () => {
+  const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
+
+  assert.match(scan, /screenCzscFactors/)
+  assert.match(scan, /quantdinger\.czsc\.scan\.v2/)
+  assert.match(scan, /saveFactorTemplate/)
+  assert.match(scan, /exportResult/)
+  assert.match(scan, /addWatchlist/)
+  assert.match(scan, /factor_screener/)
 })

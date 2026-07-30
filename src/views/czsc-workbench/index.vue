@@ -70,6 +70,7 @@
           <a-checkbox v-model="visibility.fractals">{{ $t('czsc.fractals') }}</a-checkbox>
           <a-checkbox v-model="visibility.strokes">{{ $t('czsc.strokes') }}</a-checkbox>
           <a-checkbox v-model="visibility.unfinished">{{ $t('czsc.unfinished') }}</a-checkbox>
+          <a-checkbox v-model="visibility.signals">{{ $t('czsc.enhancedSignals') }}</a-checkbox>
           <span v-if="analysis" class="active-symbol">{{ analysis.symbol }} · {{ analysis.frequency }}</span>
         </div>
 
@@ -125,6 +126,23 @@
                 :description="$t('czsc.none')"
               />
             </div>
+
+            <div class="enhanced-signal-list">
+              <h2>{{ $t('czsc.enhancedSignals') }}</h2>
+              <div v-if="enhancedSignals.length" class="enhanced-signal-cards">
+                <article v-for="signal in enhancedSignals" :key="signal.id" class="enhanced-signal-card">
+                  <div>
+                    <a-tag :color="signal.direction === 'bullish' ? 'green' : signal.direction === 'bearish' ? 'volcano' : ''">
+                      {{ signal.direction_label }}
+                    </a-tag>
+                    <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>
+                  </div>
+                  <p>{{ signal.explanation }}</p>
+                  <small>{{ signal.risk_tip }}</small>
+                </article>
+              </div>
+              <a-empty v-else :image="simpleEmptyImage" :description="$t('czsc.none')" />
+            </div>
           </aside>
         </main>
       </a-tab-pane>
@@ -151,6 +169,8 @@
           :templates="templates"
           :template-id.sync="selectedTemplateId"
           @prepare-review="prepareReview"
+          @view-chart="viewChart"
+          @backtest-row="backtestRow"
         />
       </a-tab-pane>
 
@@ -197,6 +217,8 @@ import ReviewPanel from './components/ReviewPanel.vue'
 import ScanPanel from './components/ScanPanel.vue'
 import StrategyPanel from './components/StrategyPanel.vue'
 
+const STORAGE_KEY = 'quantdinger.czsc.workbench.v2'
+
 export default {
   name: 'CzscWorkbench',
   components: { BacktestPanel, CzscChart, ReviewPanel, ScanPanel, StrategyPanel },
@@ -213,7 +235,7 @@ export default {
         { value: '30m', label: '30m' },
         { value: '1d', label: '1D' }
       ],
-      visibility: { fractals: true, strokes: true, unfinished: true },
+      visibility: { fractals: true, strokes: true, unfinished: true, signals: true },
       workerOnline: false,
       loading: false,
       analysis: null,
@@ -249,6 +271,9 @@ export default {
     recentStrokes () {
       return this.analysis && Array.isArray(this.analysis.strokes) ? this.analysis.strokes.slice(-6).reverse() : []
     },
+    enhancedSignals () {
+      return this.analysis && Array.isArray(this.analysis.enhanced_signals) ? this.analysis.enhanced_signals.slice(0, 6) : []
+    },
     formattedRange () {
       if (!this.analysis || !this.analysis.range) return this.$t('czsc.none')
       return `${this.formatDate(this.analysis.range.start)} - ${this.formatDate(this.analysis.range.end)}`
@@ -259,16 +284,62 @@ export default {
     }
   },
   created () {
+    this.restoreWorkbenchState()
     this.checkHealth()
     this.loadSymbolOptions()
     this.loadTemplates()
     this.loadSystemTemplates()
     this.runAnalysis()
   },
+  watch: {
+    activeTab () {
+      this.persistWorkbenchState()
+    },
+    timeframe () {
+      this.persistWorkbenchState()
+    },
+    limit () {
+      this.persistWorkbenchState()
+    },
+    selectedTemplateId () {
+      this.persistWorkbenchState()
+    },
+    visibility: {
+      deep: true,
+      handler () {
+        this.persistWorkbenchState()
+      }
+    }
+  },
   beforeDestroy () {
     if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
   },
   methods: {
+    restoreWorkbenchState () {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY)
+        const state = raw ? JSON.parse(raw) : null
+        if (!state || typeof state !== 'object') return
+        if (state.activeTab) this.activeTab = state.activeTab
+        if (state.symbolInput) this.symbolInput = state.symbolInput
+        if (state.timeframe) this.timeframe = state.timeframe
+        if (state.limit) this.limit = Number(state.limit)
+        if (state.selectedTemplateId) this.selectedTemplateId = state.selectedTemplateId
+        if (state.visibility && typeof state.visibility === 'object') this.visibility = { ...this.visibility, ...state.visibility }
+      } catch (error) {}
+    },
+    persistWorkbenchState () {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          activeTab: this.activeTab,
+          symbolInput: this.symbolInput,
+          timeframe: this.timeframe,
+          limit: this.limit,
+          selectedTemplateId: this.selectedTemplateId,
+          visibility: this.visibility
+        }))
+      } catch (error) {}
+    },
     async checkHealth () {
       try {
         const response = await getCzscHealth()
@@ -314,6 +385,7 @@ export default {
     handleSymbolChange (value) {
       const normalized = this.normalizeCzscSymbol(value)
       this.symbolInput = normalized || String(value || '').trim().toUpperCase()
+      this.persistWorkbenchState()
     },
     async searchSymbols (keyword) {
       const kw = String(keyword || '').trim()
@@ -349,6 +421,7 @@ export default {
       return `${code}.BJ`
     },
     contextChanged () {
+      this.persistWorkbenchState()
       if (this.activeTab === 'structure') this.runAnalysis()
     },
     async runAnalysis () {
@@ -367,6 +440,7 @@ export default {
         }
         this.analysis = response.data
         this.workerOnline = true
+        this.persistWorkbenchState()
       } catch (error) {
         this.error = error.backendMessage || error.message || this.$t('czsc.loadFailed')
         if (error.response && error.response.status >= 500) this.workerOnline = false
@@ -377,12 +451,26 @@ export default {
     prepareReview (candidate) {
       this.reviewCandidate = candidate
       this.activeTab = 'review'
+      this.persistWorkbenchState()
+    },
+    viewChart (row) {
+      if (!row || !row.symbol) return
+      this.symbolInput = row.symbol
+      this.activeTab = 'structure'
+      this.$nextTick(() => this.runAnalysis())
+    },
+    backtestRow (row) {
+      if (!row || !row.symbol) return
+      this.symbolInput = row.symbol
+      this.activeTab = 'backtest'
+      this.persistWorkbenchState()
     },
     importTradingViewContext (context) {
       this.symbolInput = context.symbol
       this.timeframe = context.timeframe
       this.selectedTemplateId = context.template_id
       this.activeTab = 'strategy'
+      this.persistWorkbenchState()
       this.$nextTick(() => {
         if (this.$refs.strategyPanel) this.$refs.strategyPanel.runEvaluation()
       })
@@ -451,12 +539,22 @@ export default {
 .stroke-row { display: grid; grid-template-columns: 72px 84px minmax(0, 1fr); gap: 6px; align-items: center; min-height: 34px; border-bottom: 1px solid #ebedf0; color: #595959; font-size: 11px; font-variant-numeric: tabular-nums; }
 .stroke-row span:last-child { text-align: right; white-space: nowrap; }
 .direction-mark { font-weight: 600; }
+.enhanced-signal-list { margin-top: 18px; padding-top: 16px; border-top: 1px solid #d9dce1; }
+.enhanced-signal-cards { display: flex; flex-direction: column; gap: 8px; }
+.enhanced-signal-card { padding: 9px 10px; border: 1px solid #eceef1; border-radius: 7px; background: #fff; }
+.enhanced-signal-card > div { display: flex; align-items: center; gap: 6px; }
+.enhanced-signal-card strong { overflow: hidden; color: #262626; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.enhanced-signal-card p { margin: 6px 0 4px; color: #595959; font-size: 11px; line-height: 1.45; }
+.enhanced-signal-card small { display: block; color: #8c8c8c; font-size: 10px; line-height: 1.4; }
 .theme-dark { color: #e5e7eb; background: #111318; }
 .theme-dark .workbench-toolbar, .theme-dark .workbench-grid, .theme-dark .workbench-tabs { border-color: #30343b; background: #171a20; }
 .theme-dark .workbench-tabs >>> .ant-tabs-bar, .theme-dark .structure-controls, .theme-dark .summary-region { border-color: #30343b; background: #1c2027; }
 .theme-dark .toolbar-title h1, .theme-dark .summary-region h2, .theme-dark .summary-grid dd { color: #f3f4f6; }
 .theme-dark .control-field, .theme-dark .active-symbol, .theme-dark .metadata-list dd, .theme-dark .stroke-row { color: #c5cad3; }
-.theme-dark .summary-grid, .theme-dark .summary-grid > div, .theme-dark .metadata-list > div, .theme-dark .recent-strokes, .theme-dark .stroke-row { border-color: #30343b; }
+.theme-dark .summary-grid, .theme-dark .summary-grid > div, .theme-dark .metadata-list > div, .theme-dark .recent-strokes, .theme-dark .stroke-row, .theme-dark .enhanced-signal-list, .theme-dark .enhanced-signal-card { border-color: #30343b; }
+.theme-dark .enhanced-signal-card { background: #1c2027; }
+.theme-dark .enhanced-signal-card strong { color: #f3f4f6; }
+.theme-dark .enhanced-signal-card p { color: #c5cad3; }
 .theme-dark .loading-layer, .theme-dark .empty-layer { background: rgba(23, 26, 32, 0.76); }
 @media (max-width: 1100px) {
   .workbench-toolbar { align-items: flex-start; flex-direction: column; }

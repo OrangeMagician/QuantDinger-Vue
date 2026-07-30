@@ -68,6 +68,37 @@ function registerCzscOverlays () {
         ]
       }
     })
+    registerOverlay({
+      name: 'czscSignalMarker',
+      totalStep: 1,
+      lock: true,
+      needDefaultPointFigure: false,
+      needDefaultXAxisFigure: false,
+      needDefaultYAxisFigure: false,
+      checkEventOn: () => false,
+      createPointFigures: ({ coordinates, overlay }) => {
+        if (!coordinates[0]) return []
+        const point = coordinates[0]
+        const data = overlay.extendData || {}
+        const above = data.position === 'above'
+        const color = data.color || '#1677ff'
+        const y = point.y + (above ? -22 : 22)
+        return [
+          {
+            type: 'circle',
+            attrs: { x: point.x, y: point.y, r: 4.5 },
+            styles: { style: 'fill', color },
+            ignoreEvent: true
+          },
+          {
+            type: 'text',
+            attrs: { x: point.x, y, text: String(data.text || ''), align: 'center', baseline: 'middle' },
+            styles: { color, size: 10, weight: '600' },
+            ignoreEvent: true
+          }
+        ]
+      }
+    })
     overlaysRegistered = true
   } catch (error) {
     if (String(error && error.message).toLowerCase().includes('register')) overlaysRegistered = true
@@ -261,6 +292,23 @@ export default {
             lock: true
           })
         }
+      }
+
+      if (this.visibility.signals) {
+        ;(result.enhanced_signals || []).forEach(signal => {
+          const mark = signal.chart_mark || {}
+          if (!mark.timestamp || !mark.price) return
+          this.addOverlay({
+            name: 'czscSignalMarker',
+            points: [{ timestamp: Number(mark.timestamp), value: Number(mark.price) }],
+            extendData: {
+              text: mark.text || signal.signal_type_label || signal.signal_type,
+              color: mark.color,
+              position: mark.position
+            },
+            lock: true
+          })
+        })
       }
     }
   }

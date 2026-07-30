@@ -47,6 +47,9 @@
             <div><dt>{{ $t('czsc.signalId') }}</dt><dd>{{ submission.signal_id }}</dd></div>
             <div><dt>{{ $t('czsc.created') }}</dt><dd>{{ submission.created ? $t('czsc.yes') : $t('czsc.idempotent') }}</dd></div>
           </dl>
+          <a-button class="status-refresh" size="small" icon="sync" :loading="refreshingStatus" @click="refreshSubmissionStatus">
+            {{ $t('czsc.refreshReviewStatus') }}
+          </a-button>
           <div v-if="submission.risk_checks && submission.risk_checks.length" class="risk-checks">
             <h3>{{ $t('czsc.riskChecks') }}</h3>
             <div v-for="item in submission.risk_checks" :key="item.code" class="risk-row">
@@ -74,13 +77,25 @@
 
         <div v-if="normalized" class="normalized-result">
           <dl>
+            <div><dt>{{ $t('czsc.rawPayload') }}</dt><dd><code>{{ compactJson(normalized.raw_payload) }}</code></dd></div>
             <div><dt>{{ $t('czsc.symbol') }}</dt><dd>{{ normalized.symbol }}</dd></div>
             <div><dt>{{ $t('czsc.timeframe') }}</dt><dd>{{ normalized.timeframe }}</dd></div>
             <div><dt>{{ $t('czsc.currentEvent') }}</dt><dd>{{ actionLabel(normalized.action) }}</dd></div>
             <div><dt>{{ $t('czsc.reviewQuantity') }}</dt><dd>{{ normalized.quantity }}</dd></div>
+            <div><dt>{{ $t('czsc.submitReady') }}</dt><dd>{{ normalized.submit_ready ? $t('czsc.yes') : $t('czsc.no') }}</dd></div>
           </dl>
+          <div v-if="normalized.risk_checks && normalized.risk_checks.length" class="risk-checks">
+            <h3>{{ $t('czsc.riskChecks') }}</h3>
+            <div v-for="item in normalized.risk_checks" :key="item.code" class="risk-row">
+              <a-icon type="warning" />
+              <div><strong>{{ item.code }}</strong><span>{{ item.message }}</span></div>
+            </div>
+          </div>
           <a-button type="primary" icon="experiment" @click="$emit('import-context', normalized)">
             {{ $t('czsc.evaluateImportedContext') }}
+          </a-button>
+          <a-button icon="audit" :loading="submittingExternal" @click="submitNormalizedExternal">
+            {{ $t('czsc.submitExternalReview') }}
           </a-button>
         </div>
       </section>
@@ -89,7 +104,7 @@
 </template>
 
 <script>
-import { normalizeTradingViewSignal, submitCzscToRetraq } from '@/api/czsc'
+import { getRetraqSignalStatus, normalizeTradingViewSignal, submitCzscToRetraq, submitExternalSignalToRetraq } from '@/api/czsc'
 
 export default {
   name: 'CzscReviewPanel',
@@ -101,6 +116,8 @@ export default {
     return {
       quantity: 100,
       submitting: false,
+      submittingExternal: false,
+      refreshingStatus: false,
       submission: null,
       tradingViewJson: JSON.stringify({
         ticker: 'SZSE:000333',
@@ -158,14 +175,28 @@ export default {
     async submit () {
       this.submitting = true
       try {
-        const response = await submitCzscToRetraq({
-          symbol: this.candidate.symbol,
-          timeframe: this.candidate.timeframe,
-          template_id: this.candidateTemplate.id || this.candidate.template_id,
-          bar_time: this.candidate.bar.datetime,
-          action: this.candidate.action,
-          quantity: Number(this.quantity)
-        })
+        const response = this.candidate.external_source
+          ? await submitExternalSignalToRetraq({
+            source: this.candidate.external_source,
+            raw_payload: this.candidate.raw_payload || {},
+            normalized: {
+              symbol: this.candidate.symbol,
+              timeframe: this.candidate.timeframe,
+              bar_time: this.candidate.bar.datetime,
+              action: this.candidate.action,
+              reference_price: Number(this.candidate.bar.close),
+              quantity: Number(this.quantity),
+              reason: this.candidateFactor
+            }
+          })
+          : await submitCzscToRetraq({
+            symbol: this.candidate.symbol,
+            timeframe: this.candidate.timeframe,
+            template_id: this.candidateTemplate.id || this.candidate.template_id,
+            bar_time: this.candidate.bar.datetime,
+            action: this.candidate.action,
+            quantity: Number(this.quantity)
+          })
         if (!response || response.code !== 1 || !response.data) {
           throw new Error((response && response.msg) || this.$t('czsc.submitFailed'))
         }
@@ -194,6 +225,52 @@ export default {
       } finally {
         this.normalizing = false
       }
+    },
+    async submitNormalizedExternal () {
+      if (!this.normalized || this.submittingExternal) return
+      this.submittingExternal = true
+      try {
+        const response = await submitExternalSignalToRetraq({
+          source: 'tradingview',
+          raw_payload: this.normalized.raw_payload
+        })
+        if (!response || response.code !== 1 || !response.data) {
+          throw new Error((response && response.msg) || this.$t('czsc.submitFailed'))
+        }
+        this.submission = response.data
+        this.$message.success(this.$t(response.data.status === 'PENDING' ? 'czsc.submittedPending' : 'czsc.submittedBlocked'))
+      } catch (error) {
+        this.$message.error(error.backendMessage || error.message || this.$t('czsc.submitFailed'))
+      } finally {
+        this.submittingExternal = false
+      }
+    },
+    async refreshSubmissionStatus () {
+      if (!this.submission || !this.submission.signal_id || this.refreshingStatus) return
+      this.refreshingStatus = true
+      try {
+        const response = await getRetraqSignalStatus({ signal_id: this.submission.signal_id })
+        if (!response || response.code !== 1 || !response.data || !response.data.signal) {
+          throw new Error((response && response.msg) || this.$t('czsc.statusRefreshFailed'))
+        }
+        this.submission = {
+          ...this.submission,
+          status: response.data.signal.status,
+          signal: response.data.signal,
+          risk_checks: response.data.risk_checks || response.data.signal.risk_checks || []
+        }
+      } catch (error) {
+        this.$message.error(error.backendMessage || error.message || this.$t('czsc.statusRefreshFailed'))
+      } finally {
+        this.refreshingStatus = false
+      }
+    },
+    compactJson (value) {
+      try {
+        return JSON.stringify(value || {})
+      } catch (error) {
+        return '{}'
+      }
     }
   }
 }
@@ -217,6 +294,8 @@ export default {
 .adapter-error { margin-top: 12px; }
 .normalized-result, .submission-result { margin-top: 18px; padding-top: 14px; border-top: 1px solid #d9dce1; }
 .normalized-result .ant-btn { width: 100%; margin-top: 12px; }
+.status-refresh { margin-top: 10px; }
+.normalized-result code { display: block; max-height: 54px; overflow: auto; color: #595959; text-align: left; white-space: normal; word-break: break-all; }
 .risk-checks { margin-top: 16px; }
 .risk-checks h3 { margin: 0 0 8px; font-size: 12px; }
 .risk-row { display: grid; grid-template-columns: 18px 1fr; gap: 6px; padding: 8px; color: #cf1322; background: #fff1f0; }

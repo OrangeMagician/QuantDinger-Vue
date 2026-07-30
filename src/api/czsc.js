@@ -52,6 +52,15 @@ export function scanCzsc (data) {
   })
 }
 
+export function screenCzscFactors (data) {
+  return request({
+    url: '/api/czsc/screener',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
 export function backtestCzsc (data) {
   return request({
     url: '/api/czsc/backtest',
@@ -76,5 +85,23 @@ export function submitCzscToRetraq (data) {
     method: 'post',
     data,
     timeout: 30000
+  })
+}
+
+export function submitExternalSignalToRetraq (data) {
+  return request({
+    url: '/api/czsc/retraq/submit-external',
+    method: 'post',
+    data,
+    timeout: 30000
+  })
+}
+
+export function getRetraqSignalStatus (params) {
+  return request({
+    url: '/api/czsc/retraq/status',
+    method: 'get',
+    params,
+    timeout: 15000
   })
 }
