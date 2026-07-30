@@ -8,12 +8,17 @@ async function source (path) {
   return readFile(new URL(path, root), 'utf8')
 }
 
-test('CZSC workbench exposes all five integrated views', async () => {
+test('CZSC workbench exposes integrated cockpit, research and review views', async () => {
   const workbench = await source('views/czsc-workbench/index.vue')
 
-  for (const tab of ['structure', 'strategy', 'scan', 'backtest', 'review']) {
+  for (const tab of ['structure', 'cockpit', 'multi-period', 'factor-lab', 'quality', 'watchlist', 'strategy', 'scan', 'backtest', 'review']) {
     assert.match(workbench, new RegExp(`key="${tab}"`))
   }
+  assert.match(workbench, /<dashboard-panel/)
+  assert.match(workbench, /<multi-period-panel/)
+  assert.match(workbench, /<factor-lab-panel/)
+  assert.match(workbench, /<quality-panel/)
+  assert.match(workbench, /<smart-watchlist-panel/)
   assert.match(workbench, /<strategy-panel/)
   assert.match(workbench, /<scan-panel/)
   assert.match(workbench, /<backtest-panel/)
@@ -31,6 +36,15 @@ test('CZSC API includes bounded research, TradingView, and Retraq endpoints', as
     '/api/czsc/evaluate',
     '/api/czsc/scan',
     '/api/czsc/screener',
+    '/api/czsc/factors/catalog',
+    '/api/czsc/multi-period',
+    '/api/czsc/factors/evaluate',
+    '/api/czsc/signal-quality',
+    '/api/czsc/watchlist',
+    '/api/czsc/watchlist/add',
+    '/api/czsc/watchlist/remove',
+    '/api/czsc/watchlist/scan',
+    '/api/czsc/dashboard',
     '/api/czsc/backtest',
     '/api/czsc/tradingview/normalize',
     '/api/czsc/retraq/submit',
@@ -64,9 +78,31 @@ test('CZSC scan panel supports factor screening persistence and result actions',
   const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
 
   assert.match(scan, /screenCzscFactors/)
+  assert.match(scan, /addCzscWatchlistItem/)
   assert.match(scan, /quantdinger\.czsc\.scan\.v2/)
   assert.match(scan, /saveFactorTemplate/)
   assert.match(scan, /exportResult/)
   assert.match(scan, /addWatchlist/)
   assert.match(scan, /factor_screener/)
+})
+
+test('New CZSC research panels wire to backend workflows and manual review only sources', async () => {
+  const panels = {
+    dashboard: await source('views/czsc-workbench/components/DashboardPanel.vue'),
+    multi: await source('views/czsc-workbench/components/MultiPeriodPanel.vue'),
+    factor: await source('views/czsc-workbench/components/FactorLabPanel.vue'),
+    quality: await source('views/czsc-workbench/components/QualityPanel.vue'),
+    watchlist: await source('views/czsc-workbench/components/SmartWatchlistPanel.vue')
+  }
+
+  assert.match(panels.dashboard, /getCzscDashboard/)
+  assert.match(panels.dashboard, /operation_cockpit/)
+  assert.match(panels.multi, /analyzeCzscMultiPeriod/)
+  assert.match(panels.multi, /czsc_multi_period/)
+  assert.match(panels.factor, /getCzscFactorCatalog/)
+  assert.match(panels.factor, /evaluateCzscFactors/)
+  assert.match(panels.quality, /getCzscSignalQuality/)
+  assert.match(panels.watchlist, /getCzscSmartWatchlist/)
+  assert.match(panels.watchlist, /scanCzscWatchlist/)
+  assert.match(panels.watchlist, /smart_watchlist/)
 })

@@ -147,6 +147,57 @@
         </main>
       </a-tab-pane>
 
+      <a-tab-pane key="cockpit">
+        <span slot="tab"><a-icon type="dashboard" />{{ $t('czsc.tabCockpit') }}</span>
+        <dashboard-panel
+          :symbol="normalizedSymbol"
+          :timeframe="timeframe"
+          :limit="limit"
+          @prepare-review="prepareReview"
+          @view-chart="viewChart"
+          @backtest-row="backtestRow"
+        />
+      </a-tab-pane>
+
+      <a-tab-pane key="multi-period">
+        <span slot="tab"><a-icon type="branches" />{{ $t('czsc.tabMultiPeriod') }}</span>
+        <multi-period-panel
+          :symbol="normalizedSymbol"
+          :limit="limit"
+          @prepare-review="prepareReview"
+        />
+      </a-tab-pane>
+
+      <a-tab-pane key="factor-lab">
+        <span slot="tab"><a-icon type="function" />{{ $t('czsc.tabFactorLab') }}</span>
+        <factor-lab-panel
+          :symbol="normalizedSymbol"
+          :timeframe="timeframe"
+          :limit="limit"
+        />
+      </a-tab-pane>
+
+      <a-tab-pane key="quality">
+        <span slot="tab"><a-icon type="area-chart" />{{ $t('czsc.tabQuality') }}</span>
+        <quality-panel
+          :symbol="normalizedSymbol"
+          :timeframe="timeframe"
+          :limit="limit"
+        />
+      </a-tab-pane>
+
+      <a-tab-pane key="watchlist">
+        <span slot="tab"><a-icon type="star" />{{ $t('czsc.tabWatchlist') }}</span>
+        <smart-watchlist-panel
+          :symbol="normalizedSymbol"
+          :timeframe="timeframe"
+          :limit="limit"
+          @prepare-review="prepareReview"
+          @view-chart="viewChart"
+          @backtest-row="backtestRow"
+        />
+      </a-tab-pane>
+
       <a-tab-pane key="strategy">
         <span slot="tab"><a-icon type="experiment" />{{ $t('czsc.tabStrategy') }}</span>
         <strategy-panel
@@ -213,15 +264,20 @@ import { analyzeCzsc, getCzscHealth, getCzscTemplates, searchCzscSymbols } from 
 import { getScriptTemplateList } from '@/api/strategy'
 import BacktestPanel from './components/BacktestPanel.vue'
 import CzscChart from './components/CzscChart.vue'
+import DashboardPanel from './components/DashboardPanel.vue'
+import FactorLabPanel from './components/FactorLabPanel.vue'
+import MultiPeriodPanel from './components/MultiPeriodPanel.vue'
+import QualityPanel from './components/QualityPanel.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import ScanPanel from './components/ScanPanel.vue'
+import SmartWatchlistPanel from './components/SmartWatchlistPanel.vue'
 import StrategyPanel from './components/StrategyPanel.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.workbench.v2'
 
 export default {
   name: 'CzscWorkbench',
-  components: { BacktestPanel, CzscChart, ReviewPanel, ScanPanel, StrategyPanel },
+  components: { BacktestPanel, CzscChart, DashboardPanel, FactorLabPanel, MultiPeriodPanel, QualityPanel, ReviewPanel, ScanPanel, SmartWatchlistPanel, StrategyPanel },
   data () {
     return {
       activeTab: 'structure',

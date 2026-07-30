@@ -161,10 +161,9 @@
 </template>
 
 <script>
-import { scanCzsc, screenCzscFactors, searchCzscSymbols } from '@/api/czsc'
+import { addCzscWatchlistItem, scanCzsc, screenCzscFactors, searchCzscSymbols } from '@/api/czsc'
 
 const STORAGE_KEY = 'quantdinger.czsc.scan.v2'
-const WATCHLIST_KEY = 'quantdinger.czsc.watchlist.v1'
 
 export default {
   name: 'CzscScanPanel',
@@ -426,16 +425,20 @@ export default {
       link.click()
       URL.revokeObjectURL(url)
     },
-    addWatchlist (row) {
+    async addWatchlist (row) {
       if (!row || !row.symbol) return
       try {
-        const raw = window.localStorage.getItem(WATCHLIST_KEY)
-        const list = raw ? JSON.parse(raw) : []
-        const next = [{ symbol: row.symbol, name: row.name || '', added_at: new Date().toISOString() }, ...(Array.isArray(list) ? list : []).filter(item => item.symbol !== row.symbol)].slice(0, 200)
-        window.localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next))
+        await addCzscWatchlistItem({
+          symbol: row.symbol,
+          name: row.name || '',
+          group: this.resultModeLabel,
+          tags: [this.timeframe],
+          reason: this.factorLabel(row),
+          invalidation_condition: ''
+        })
         this.$message.success(this.$t('czsc.watchlistAdded'))
       } catch (error) {
-        this.$message.error(this.$t('czsc.watchlistFailed'))
+        this.$message.error(error.backendMessage || error.message || this.$t('czsc.watchlistFailed'))
       }
     },
     prepare (row) {

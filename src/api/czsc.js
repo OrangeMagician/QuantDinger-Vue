@@ -61,6 +61,85 @@ export function screenCzscFactors (data) {
   })
 }
 
+export function getCzscFactorCatalog () {
+  return request({
+    url: '/api/czsc/factors/catalog',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
+export function analyzeCzscMultiPeriod (data) {
+  return request({
+    url: '/api/czsc/multi-period',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
+export function evaluateCzscFactors (data) {
+  return request({
+    url: '/api/czsc/factors/evaluate',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
+export function getCzscSignalQuality (data) {
+  return request({
+    url: '/api/czsc/signal-quality',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
+export function getCzscSmartWatchlist () {
+  return request({
+    url: '/api/czsc/watchlist',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
+export function addCzscWatchlistItem (data) {
+  return request({
+    url: '/api/czsc/watchlist/add',
+    method: 'post',
+    data,
+    timeout: 15000
+  })
+}
+
+export function removeCzscWatchlistItem (data) {
+  return request({
+    url: '/api/czsc/watchlist/remove',
+    method: 'post',
+    data,
+    timeout: 15000
+  })
+}
+
+export function scanCzscWatchlist (data) {
+  return request({
+    url: '/api/czsc/watchlist/scan',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
+export function getCzscDashboard (data) {
+  return request({
+    url: '/api/czsc/dashboard',
+    method: 'post',
+    data,
+    timeout: 180000
+  })
+}
+
 export function backtestCzsc (data) {
   return request({
     url: '/api/czsc/backtest',
