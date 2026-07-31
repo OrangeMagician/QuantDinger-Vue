@@ -245,6 +245,7 @@ export default {
     }
   },
   computed: {
+    marketColorConvention () { return this.$store.state.app.marketColorConvention },
     auditPassed () { return Boolean(this.result.audit && this.result.audit.passed) },
     legacyBackfilled () { return Boolean(this.result.compatibility && this.result.compatibility.legacyBackfill) },
     initialCapital () {
@@ -407,7 +408,8 @@ export default {
   },
   watch: {
     result: { deep: true, handler () { this.$nextTick(this.renderChart) } },
-    isDark () { this.$nextTick(this.renderChart) }
+    isDark () { this.$nextTick(this.renderChart) },
+    marketColorConvention () { this.$nextTick(this.renderReviewMarkers) }
   },
   mounted () { this.renderChart(); window.addEventListener('resize', this.resizeChart) },
   beforeDestroy () {
@@ -501,7 +503,7 @@ export default {
             price: entryPrice,
             text: this.$t('strategyV2.backtest.entryMarker'),
             side: isShort ? 'sell' : 'buy',
-            color: isShort ? '#389e0d' : '#cf1322'
+            color: this.$marketColor(isShort ? 'sell' : 'buy')
           }))
         }
         if (Number.isFinite(exitPrice)) {
@@ -510,7 +512,7 @@ export default {
             price: exitPrice,
             text: this.$t('strategyV2.backtest.exitMarker'),
             side: isShort ? 'buy' : 'sell',
-            color: isShort ? '#cf1322' : '#389e0d'
+            color: this.$marketColor(isShort ? 'buy' : 'sell')
           }))
         }
         this.focusReviewRange(chart, entryTime, exitTime)

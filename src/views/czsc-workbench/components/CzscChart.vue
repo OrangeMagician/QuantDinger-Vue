@@ -48,7 +48,8 @@ function registerCzscOverlays () {
         const point = coordinates[0]
         const data = overlay.extendData || {}
         const top = data.kind === 'top'
-        const color = data.color || (top ? '#389e0d' : '#cf1322')
+        const market = marketPalette(false)
+        const color = data.color || (top ? market.fall : market.rise)
         const confirmed = data.confirmed !== false
         const textY = point.y + (top ? -13 : 13)
         return [
@@ -131,6 +132,11 @@ export default {
       resizeObserver: null
     }
   },
+  computed: {
+    marketColorConvention () {
+      return this.$store.state.app.marketColorConvention
+    }
+  },
   watch: {
     analysis: {
       handler () {
@@ -146,6 +152,10 @@ export default {
     },
     dark () {
       this.applyTheme()
+    },
+    marketColorConvention () {
+      this.applyTheme()
+      this.renderOverlays()
     }
   },
   mounted () {
@@ -176,7 +186,7 @@ export default {
     applyTheme () {
       if (!this.chart) return
       const dark = this.dark
-      const market = marketPalette(dark)
+      const market = marketPalette(dark, this.marketColorConvention)
       this.chart.setStyles({
         grid: {
           horizontal: { color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(31,41,55,0.08)', style: 'dashed' },
@@ -233,7 +243,7 @@ export default {
       this.clearOverlays()
       const result = this.analysis
       if (!result) return
-      const market = marketPalette(this.dark)
+      const market = marketPalette(this.dark, this.marketColorConvention)
 
       if (this.visibility.strokes) {
         ;(result.strokes || []).forEach(stroke => {
@@ -260,7 +270,8 @@ export default {
             extendData: {
               kind: fractal.kind,
               text: fractal.kind === 'top' ? this.$t('czsc.top') : this.$t('czsc.bottom'),
-              confirmed: true
+              confirmed: true,
+              color: fractal.kind === 'top' ? market.fall : market.rise
             },
             lock: true
           })

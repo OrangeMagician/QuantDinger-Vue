@@ -2936,8 +2936,8 @@ export default {
         '    {\'name\': \'EMA Slow\', \'data\': ema_slow.fillna(0).tolist(), \'color\': \'#1890ff\', \'overlay\': True}\n' +
         '  ],\n' +
         '  \'signals\': [\n' +
-        '    {\'type\': \'buy\', \'text\': \'Golden\', \'data\': buy_marks, \'color\': \'#f5222d\'},\n' +
-        '    {\'type\': \'sell\', \'text\': \'Death\', \'data\': sell_marks, \'color\': \'#52c41a\'}\n' +
+        '    {\'type\': \'buy\', \'text\': \'Golden\', \'data\': buy_marks},\n' +
+        '    {\'type\': \'sell\', \'text\': \'Death\', \'data\': sell_marks}\n' +
         '  ],\n' +
         '  \'layers\': []\n' +
         '}\n'

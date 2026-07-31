@@ -132,7 +132,7 @@
               <div v-if="enhancedSignals.length" class="enhanced-signal-cards">
                 <article v-for="signal in enhancedSignals" :key="signal.id" class="enhanced-signal-card">
                   <div>
-                    <a-tag :color="signal.direction === 'bullish' ? '#cf1322' : signal.direction === 'bearish' ? '#389e0d' : ''">
+                    <a-tag :color="['bullish', 'bearish'].includes(signal.direction) ? $marketColor(signal.direction) : ''">
                       {{ signal.direction_label }}
                     </a-tag>
                     <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>

@@ -12,6 +12,17 @@
   --market-neutral-color: #8c8c8c;
 }
 
+:root[data-market-color-convention='rise-green-fall-red'] {
+  --market-rise-color: #389e0d;
+  --market-rise-strong: #52c41a;
+  --market-rise-soft: rgba(82, 196, 26, 0.12);
+  --market-rise-border: rgba(82, 196, 26, 0.3);
+  --market-fall-color: #cf1322;
+  --market-fall-strong: #f5222d;
+  --market-fall-soft: rgba(245, 34, 45, 0.12);
+  --market-fall-border: rgba(245, 34, 45, 0.3);
+}
+
 html,
 body,
 #app,
@@ -326,4 +337,16 @@ body.realdark {
       &-selected { background: var(--primary-color-soft, rgba(24, 144, 255, 0.1)) !important; color: var(--primary-color, #1890ff) !important; }
     }
   }
+}
+
+html[data-market-color-convention='rise-green-fall-red'] body.dark,
+html[data-market-color-convention='rise-green-fall-red'] body.realdark {
+  --market-rise-color: #95de64;
+  --market-rise-strong: #0ecb81;
+  --market-rise-soft: rgba(14, 203, 129, 0.16);
+  --market-rise-border: rgba(14, 203, 129, 0.36);
+  --market-fall-color: #ff7875;
+  --market-fall-strong: #f6465d;
+  --market-fall-soft: rgba(246, 70, 93, 0.16);
+  --market-fall-border: rgba(246, 70, 93, 0.36);
 }

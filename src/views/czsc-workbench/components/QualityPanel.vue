@@ -56,7 +56,7 @@
         <h3>{{ $t('czsc.recentSignalSamples') }}</h3>
         <div class="sample-grid">
           <article v-for="event in recentEvents" :key="event.datetime + event.signal_type" class="sample-card">
-            <a-tag :color="event.direction === 'bullish' ? '#cf1322' : '#389e0d'">{{ directionLabel(event.direction) }}</a-tag>
+            <a-tag :color="$marketColor(event.direction)">{{ directionLabel(event.direction) }}</a-tag>
             <strong>{{ event.signal_type }}</strong>
             <span>{{ formatDate(event.datetime) }} · {{ $t('czsc.score') }} {{ formatNumber(event.score) }}</span>
           </article>

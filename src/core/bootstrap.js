@@ -7,7 +7,7 @@ import {
   TOGGLE_FIXED_HEADER,
   TOGGLE_FIXED_SIDEBAR, TOGGLE_HIDE_HEADER,
   TOGGLE_LAYOUT, TOGGLE_NAV_THEME, TOGGLE_WEAK,
-  TOGGLE_COLOR, TOGGLE_MULTI_TAB
+  TOGGLE_COLOR, TOGGLE_MULTI_TAB, TOGGLE_MARKET_COLOR_CONVENTION
 } from '@/store/mutation-types'
 import { printANSI } from '@/utils/screenLog'
 import defaultSettings from '@/config/defaultSettings'
@@ -35,6 +35,7 @@ export default function Initializer () {
   store.commit(TOGGLE_WEAK, storage.get(TOGGLE_WEAK, defaultSettings.colorWeak))
   store.commit(TOGGLE_COLOR, nextColor)
   store.commit(TOGGLE_MULTI_TAB, storage.get(TOGGLE_MULTI_TAB, defaultSettings.multiTab))
+  store.commit(TOGGLE_MARKET_COLOR_CONVENTION, storage.get(TOGGLE_MARKET_COLOR_CONVENTION))
   let token = storage.get(ACCESS_TOKEN)
   if (token && typeof token !== 'string') {
     token = token.token || token.value || (typeof token === 'object' ? null : token)

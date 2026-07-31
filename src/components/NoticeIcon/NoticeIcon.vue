@@ -121,7 +121,7 @@
               </div>
               <div v-if="detailNotice.payload.action" class="extra-item">
                 <span class="label">{{ $t('notice.action') }}:</span>
-                <a-tag :color="detailNotice.payload.action === 'BUY' ? '#cf1322' : '#389e0d'">
+                <a-tag :color="$marketColor(detailNotice.payload.action)">
                   {{ detailNotice.payload.action }}
                 </a-tag>
               </div>
@@ -299,8 +299,8 @@ export default {
         price_alert: '#faad14',
         signal: 'var(--primary-color, #1890ff)',
         indicator_signal: '#ff4d4f',
-        buy: '#cf1322',
-        sell: '#389e0d',
+        buy: this.$marketColor('buy'),
+        sell: this.$marketColor('sell'),
         hold: '#faad14',
         trade: '#13c2c2',
         security_login: '#fa541c',
@@ -322,8 +322,8 @@ export default {
     },
     getDecisionColor (decision) {
       const colorMap = {
-        BUY: '#cf1322',
-        SELL: '#389e0d',
+        BUY: this.$marketColor('buy'),
+        SELL: this.$marketColor('sell'),
         HOLD: 'orange'
       }
       return colorMap[decision] || 'blue'
@@ -751,8 +751,8 @@ export default {
   --qd-report-soft-text: #334155;
   --qd-report-header-bg: linear-gradient(135deg, #ffffff 0%, #f6f8fb 100%);
   --qd-report-panel-bg: #ffffff;
-  --qd-report-buy-bg: linear-gradient(180deg, rgba(239, 68, 68, 0.13), #ffffff 74%);
-  --qd-report-sell-bg: linear-gradient(180deg, rgba(34, 197, 94, 0.13), #ffffff 74%);
+  --qd-report-buy-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-rise-color) 13%, transparent), #ffffff 74%);
+  --qd-report-sell-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-fall-color) 13%, transparent), #ffffff 74%);
   --qd-report-hold-bg: linear-gradient(180deg, rgba(234, 179, 8, 0.16), #ffffff 74%);
   --qd-report-focus-bg: rgba(239, 68, 68, 0.07);
   --qd-report-focus-text: #991b1b;
@@ -1454,8 +1454,8 @@ body.realdark,
     --qd-report-soft-text: #c7d0df;
     --qd-report-header-bg: linear-gradient(135deg, #191e28 0%, #121722 100%);
     --qd-report-panel-bg: #10151d;
-    --qd-report-buy-bg: linear-gradient(180deg, rgba(239, 68, 68, 0.13), #10151d 70%);
-    --qd-report-sell-bg: linear-gradient(180deg, rgba(34, 197, 94, 0.12), #10151d 70%);
+    --qd-report-buy-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-rise-color) 13%, transparent), #10151d 70%);
+    --qd-report-sell-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-fall-color) 13%, transparent), #10151d 70%);
     --qd-report-hold-bg: linear-gradient(180deg, rgba(234, 179, 8, 0.13), #10151d 70%);
     --qd-report-focus-bg: rgba(239, 68, 68, 0.08);
     --qd-report-focus-text: #fecaca;

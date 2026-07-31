@@ -363,7 +363,7 @@ class="analyze-button">
                       <polyline
                         :points="getSparklinePoints(stock)"
                         fill="none"
-                        :stroke="(watchlistPrices[`${stock.market}:${stock.symbol}`]?.change || 0) >= 0 ? '#cf1322' : '#389e0d'"
+                        :stroke="$signedMarketColor(watchlistPrices[`${stock.market}:${stock.symbol}`]?.change || 0)"
                         stroke-width="1.5"
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -756,7 +756,7 @@ class="analyze-button">
                     </a-tag>
                     <strong>{{ item.symbol }}</strong>
                     <a-tag
-                      :color="item.decision === 'BUY' ? '#cf1322' : (item.decision === 'SELL' ? '#389e0d' : 'blue')"
+                      :color="item.decision === 'BUY' || item.decision === 'SELL' ? $marketColor(item.decision) : 'blue'"
                       style="margin-left: 12px;"
                     >
                       {{ formatDecisionLabel(item.decision) }}

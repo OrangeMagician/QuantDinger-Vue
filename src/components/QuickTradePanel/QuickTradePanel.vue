@@ -326,7 +326,7 @@
               >
                 <div class="qt-pos-row">
                   <span>{{ $t('quickTrade.side') }}</span>
-                  <a-tag :color="pos.side === 'long' ? '#cf1322' : '#389e0d'" size="small">
+                  <a-tag :color="$marketColor(pos.side)" size="small">
                     {{ pos.side === 'long'
                       ? (isSwapMode ? $t('quickTrade.long') : $t('quickTrade.spotHold'))
                       : $t('quickTrade.short') }}
@@ -390,7 +390,7 @@
                 <div class="qt-trade-list">
                   <div class="qt-trade-item" v-for="t in recentTrades" :key="t.id">
                     <div class="qt-trade-main">
-                      <a-tag :color="t.side === 'buy' ? '#cf1322' : '#389e0d'" size="small">
+                      <a-tag :color="$marketColor(t.side)" size="small">
                         {{ t.side === 'buy' ? 'LONG' : 'SHORT' }}
                       </a-tag>
                       <span class="qt-trade-symbol">{{ t.symbol }}</span>
@@ -2513,7 +2513,7 @@ export default {
     color: #73d13d;
   }
   .qt-tp-label {
-    color: #ff7875 !important;
+    color: var(--market-rise-color) !important;
   }
   .qt-sl-label {
     color: #ff7875 !important;

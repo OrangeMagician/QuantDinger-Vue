@@ -599,7 +599,7 @@
             <a-tag :color="text === 'add' ? 'blue' : 'green'">{{ actionText(text) }}</a-tag>
           </template>
           <template slot="side" slot-scope="text">
-            <a-tag :color="text === 'short' ? '#389e0d' : '#cf1322'">{{ sideText(text) }}</a-tag>
+            <a-tag :color="$marketColor(text)">{{ sideText(text) }}</a-tag>
           </template>
           <template slot="money" slot-scope="text">
             <span class="mono">{{ fmtWeight(text) }}</span>

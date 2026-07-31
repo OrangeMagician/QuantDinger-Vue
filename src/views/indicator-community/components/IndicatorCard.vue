@@ -733,8 +733,8 @@ export default {
       .kpi-value {
         color: rgba(255, 255, 255, 0.82);
 
-        &.kpi-pos { color: #ff7875; }
-        &.kpi-neg { color: #95de64; }
+        &.kpi-pos { color: var(--market-rise-color); }
+        &.kpi-neg { color: var(--market-fall-color); }
         &.kpi-dd { color: #ff4d4f; }
       }
     }

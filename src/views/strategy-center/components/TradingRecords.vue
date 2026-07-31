@@ -405,23 +405,23 @@ export default {
     getTradeTypeColor (type) {
       const ty = String(type || '').toLowerCase()
       const colorMap = {
-        buy: '#cf1322',
-        sell: '#389e0d',
+        buy: this.$marketColor('buy'),
+        sell: this.$marketColor('sell'),
         liquidation: 'volcano',
-        open_long: '#cf1322',
-        add_long: '#cf1322',
-        close_long: '#389e0d',
+        open_long: this.$marketColor('open_long'),
+        add_long: this.$marketColor('add_long'),
+        close_long: this.$marketColor('close_long'),
         close_long_stop: 'red',
-        close_long_profit: '#389e0d',
-        close_long_trailing: '#389e0d',
-        reduce_long: '#389e0d',
-        open_short: '#389e0d',
-        add_short: '#389e0d',
-        close_short: '#cf1322',
+        close_long_profit: this.$marketColor('close_long'),
+        close_long_trailing: this.$marketColor('close_long'),
+        reduce_long: this.$marketColor('reduce_long'),
+        open_short: this.$marketColor('open_short'),
+        add_short: this.$marketColor('add_short'),
+        close_short: this.$marketColor('close_short'),
         close_short_stop: 'red',
-        close_short_profit: '#cf1322',
-        close_short_trailing: '#cf1322',
-        reduce_short: '#cf1322'
+        close_short_profit: this.$marketColor('close_short'),
+        close_short_trailing: this.$marketColor('close_short'),
+        reduce_short: this.$marketColor('reduce_short')
       }
       return colorMap[ty] || 'default'
     },
@@ -1560,10 +1560,10 @@ body.realdark .trading-records * {
   }
 
   ::v-deep .ant-table-tbody > tr > td .ta-pnl-pos {
-    color: #ff6b7a !important;
+    color: var(--market-rise-color) !important;
   }
   ::v-deep .ant-table-tbody > tr > td .ta-pnl-neg {
-    color: #49c292 !important;
+    color: var(--market-fall-color) !important;
   }
 
   ::v-deep .ant-tag {

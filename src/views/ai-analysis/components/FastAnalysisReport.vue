@@ -744,14 +744,14 @@ export default {
       if (sig.derivatives_bias) {
         items.push({
           key: 'derivatives_bias',
-          color: sig.derivatives_bias === 'bullish' ? '#cf1322' : (sig.derivatives_bias === 'bearish' ? '#389e0d' : 'blue'),
+          color: ['bullish', 'bearish'].includes(sig.derivatives_bias) ? this.$marketColor(sig.derivatives_bias) : 'blue',
           label: `${localZh ? '衍生品' : 'Derivatives'}: ${sig.derivatives_bias}`
         })
       }
       if (sig.flow_bias) {
         items.push({
           key: 'flow_bias',
-          color: sig.flow_bias === 'bullish' ? '#cf1322' : (sig.flow_bias === 'bearish' ? '#389e0d' : 'blue'),
+          color: ['bullish', 'bearish'].includes(sig.flow_bias) ? this.$marketColor(sig.flow_bias) : 'blue',
           label: `${localZh ? '资金流' : 'Flow'}: ${sig.flow_bias}`
         })
       }
@@ -1023,8 +1023,8 @@ export default {
 @rpt-text3: #999;
 @rpt-green: #10b981;
 @rpt-red: #ef4444;
-@market-rise: #cf1322;
-@market-fall: #389e0d;
+@market-rise: var(--market-rise-color);
+@market-fall: var(--market-fall-color);
 @rpt-amber: #f59e0b;
 @rpt-pink: #ec4899;
 @rpt-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
@@ -1201,8 +1201,8 @@ export default {
         content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
         background: var(--primary-color, #1890ff);
       }
-      &.decision-buy::after  { background: linear-gradient(90deg, @market-rise, #f87171); }
-      &.decision-sell::after { background: linear-gradient(90deg, @market-fall, #34d399); }
+      &.decision-buy::after  { background: linear-gradient(90deg, @market-rise, color-mix(in srgb, @market-rise 72%, #fff)); }
+      &.decision-sell::after { background: linear-gradient(90deg, @market-fall, color-mix(in srgb, @market-fall 72%, #fff)); }
       &.decision-hold::after { background: linear-gradient(90deg, @rpt-amber, #fbbf24); }
 
       .decision-main {
@@ -1523,7 +1523,7 @@ export default {
     background: @dk-surface;
     .perf-item {
       &:not(:last-child)::after { background: @dk-border; }
-      .perf-value { color: #f0f0f2; &.positive { color: #f87171; } &.negative { color: #34d399; } &.quality-positive { color: #34d399; } &.quality-negative { color: #f87171; } }
+      .perf-value { color: #f0f0f2; &.positive { color: @market-rise; } &.negative { color: @market-fall; } &.quality-positive { color: #34d399; } &.quality-negative { color: #f87171; } }
       .perf-label { color: @dk-text3; }
     }
   }
@@ -1555,14 +1555,14 @@ export default {
     .decision-card {
       background: @dk-surface;
       &.decision-buy  {
-        background: linear-gradient(135deg, rgba(248,113,113,0.06) 0%, @dk-surface 100%);
-        .decision-badge .anticon { color: #f87171; }
-        .decision-text { color: #f87171; }
+        background: linear-gradient(135deg, color-mix(in srgb, @market-rise 6%, transparent) 0%, @dk-surface 100%);
+        .decision-badge .anticon { color: @market-rise; }
+        .decision-text { color: @market-rise; }
       }
       &.decision-sell {
-        background: linear-gradient(135deg, rgba(52,211,153,0.06) 0%, @dk-surface 100%);
-        .decision-badge .anticon { color: #34d399; }
-        .decision-text { color: #34d399; }
+        background: linear-gradient(135deg, color-mix(in srgb, @market-fall 6%, transparent) 0%, @dk-surface 100%);
+        .decision-badge .anticon { color: @market-fall; }
+        .decision-text { color: @market-fall; }
       }
       &.decision-hold {
         background: linear-gradient(135deg, rgba(245,158,11,0.06) 0%, @dk-surface 100%);
@@ -1586,13 +1586,13 @@ export default {
       .price-card {
         &:not(:last-child)::after { background: @dk-border; }
         .price-label { color: @dk-text2; }
-        .price-value { color: #f0f0f2; &.positive { color: #f87171; } &.negative { color: #34d399; } &.risk-negative { color: #f87171; } }
+        .price-value { color: #f0f0f2; &.positive { color: @market-rise; } &.negative { color: @market-fall; } &.risk-negative { color: #f87171; } }
         .price-hint { color: #555; }
-        .price-change { &.positive { color: #f87171; } &.negative { color: #34d399; } }
+        .price-change { &.positive { color: @market-rise; } &.negative { color: @market-fall; } }
         &.current .price-label { color: #60a5fa; }
         &.entry .price-label { color: var(--primary-color, #1890ff); }
         &.stop .price-label { color: #f87171; }
-        &.target .price-label { color: #34d399; }
+        &.target .price-label { color: @market-rise; }
       }
     }
 
@@ -1600,7 +1600,7 @@ export default {
       background: @dk-surface;
       .trend-outlook-header { color: @dk-text; .anticon { color: var(--primary-color, #1890ff); } }
       .trend-outlook-summary { background: @dk-surface2; color: @dk-text2; }
-      .trend-outlook-item { background: @dk-surface2; .to-label, .to-meta { color: @dk-text3; } .to-trend { &.trend-bull { color: #f87171; } &.trend-bear { color: #34d399; } &.trend-neutral { color: #fbbf24; } } }
+      .trend-outlook-item { background: @dk-surface2; .to-label, .to-meta { color: @dk-text3; } .to-trend { &.trend-bull { color: @market-rise; } &.trend-bear { color: @market-fall; } &.trend-neutral { color: #fbbf24; } } }
     }
 
     .scores-row {
@@ -1639,7 +1639,7 @@ export default {
         background: @dk-surface2;
         &:hover { background: rgba(255,255,255,0.05); }
         .indicator-name { color: @dk-text2; }
-        .indicator-value { color: #f0f0f2; &.bullish, &.oversold { color: #f87171; } &.bearish, &.overbought { color: #34d399; } &.high-volatility { color: #f87171; } &.low-volatility { color: #34d399; } }
+        .indicator-value { color: #f0f0f2; &.bullish, &.oversold { color: @market-rise; } &.bearish, &.overbought { color: @market-fall; } &.high-volatility { color: #f87171; } &.low-volatility { color: #34d399; } }
         .indicator-signal { color: @dk-text3; }
       }
       .indicators-pro-wrap {
@@ -1653,8 +1653,8 @@ export default {
           .ant-descriptions-item-label { background: @dk-surface2; border-color: @dk-border; color: @dk-text3; }
           .ant-descriptions-item-content { background: @dk-surface; border-color: @dk-border; color: @dk-text2; }
           .ant-descriptions-item-content > span { color: @dk-text2; }
-          .bullish { color: #f87171 !important; }
-          .bearish { color: #34d399 !important; }
+          .bullish { color: @market-rise !important; }
+          .bearish { color: @market-fall !important; }
         }
       }
     }

@@ -562,6 +562,7 @@ export default {
     }
 
     const { proxy } = getCurrentInstance()
+    const marketColorConvention = computed(() => proxy.$store.state.app.marketColorConvention)
 
     const drawingTools = computed(() => [
       {
@@ -2001,8 +2002,9 @@ registerOverlay({
 
       const isUp = priceChange >= 0
       const isDark = chartTheme.value === 'dark'
-      const accentColor = isUp ? '#26a69a' : '#ef5350'
-      const accentSoft = isUp ? 'rgba(38, 166, 154, 0.55)' : 'rgba(239, 83, 80, 0.55)'
+      const market = marketPalette(isDark, marketColorConvention.value)
+      const accentColor = isUp ? market.rise : market.fall
+      const accentSoft = withAlpha(accentColor, 0.55)
       const labelBg = isDark ? 'rgba(22, 26, 35, 0.94)' : 'rgba(255, 255, 255, 0.96)'
       const labelBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'
       const labelText = isDark ? 'rgba(236, 240, 245, 0.92)' : 'rgba(38, 44, 52, 0.88)'
@@ -3211,7 +3213,7 @@ registerOverlay({
 
       const theme = themeConfig.value
       const isDark = chartTheme.value === 'dark'
-      const market = marketPalette(isDark)
+      const market = marketPalette(isDark, marketColorConvention.value)
 
       chartRef.value.setStyles({
         grid: {
@@ -4219,6 +4221,7 @@ registerOverlay({
       const renderCycleId = ++indicatorRenderSeq
       const previousSignalOverlayIds = [...addedSignalOverlayIds.value]
       const previousIndicatorIds = [...addedIndicatorIds.value]
+      const market = marketPalette(chartTheme.value === 'dark', marketColorConvention.value)
       addedSignalOverlayIds.value = []
       addedIndicatorIds.value = []
       try {
@@ -4480,8 +4483,8 @@ registerOverlay({
           })
           const buildBarFigure = (key, title, {
             baseValue = 0,
-            upColor = '#ef5350',
-            downColor = '#26a69a'
+            upColor = market.rise,
+            downColor = market.fall
           } = {}) => ({
             key,
             title,
@@ -4993,6 +4996,12 @@ registerOverlay({
         updateIndicators()
       }
       nextTick(() => _ensureWmLayer())
+    })
+
+    watch(marketColorConvention, () => {
+      if (!chartRef.value) return
+      updateChartTheme()
+      updateIndicators()
     })
 
     watch(() => props.activeIndicators, (newVal, oldVal) => {

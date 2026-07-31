@@ -77,7 +77,7 @@
           <div v-if="evaluation.enhanced_signals && evaluation.enhanced_signals.length" class="enhanced-grid">
             <article v-for="signal in evaluation.enhanced_signals.slice(0, 8)" :key="signal.id" class="enhanced-card">
               <div>
-                <a-tag :color="signal.direction === 'bullish' ? '#cf1322' : signal.direction === 'bearish' ? '#389e0d' : ''">
+                <a-tag :color="['bullish', 'bearish'].includes(signal.direction) ? $marketColor(signal.direction) : ''">
                   {{ signal.direction_label }}
                 </a-tag>
                 <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>
@@ -107,7 +107,7 @@
           <h3>{{ $t('czsc.factorEvents') }}</h3>
           <div v-for="(event, action) in evaluation.events" :key="action" class="event-group">
             <div class="event-heading">
-              <a-tag :color="event.matched ? (action === 'open_long' ? '#cf1322' : '#389e0d') : ''">
+              <a-tag :color="event.matched ? $marketColor(action) : ''">
                 {{ actionLabel(action) }}
               </a-tag>
               <span>{{ event.operate }}</span>

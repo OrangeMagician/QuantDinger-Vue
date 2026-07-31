@@ -54,7 +54,7 @@
 <script>
 import * as echarts from 'echarts'
 import moment from 'moment'
-import { marketPalette } from '@/utils/marketColors'
+import { marketColorWithAlpha, marketPalette } from '@/utils/marketColors'
 
 export default {
   name: 'FactorResearchResult',
@@ -64,6 +64,7 @@ export default {
   },
   data () { return { chart: null, resizeObserver: null } },
   computed: {
+    marketColorConvention () { return this.$store.state.app.marketColorConvention },
     stability () { return this.result.stability || {} },
     correlation () { return this.result.factorCorrelation || {} },
     correlationStyle () { return { gridTemplateColumns: `minmax(120px, 1.3fr) repeat(${(this.correlation.factors || []).length}, minmax(90px, 1fr))` } },
@@ -108,7 +109,7 @@ export default {
       ]
     }
   },
-  watch: { result: { deep: true, handler () { this.$nextTick(this.renderChart) } }, isDark () { this.$nextTick(this.renderChart) } },
+  watch: { result: { deep: true, handler () { this.$nextTick(this.renderChart) } }, isDark () { this.$nextTick(this.renderChart) }, marketColorConvention () { this.$nextTick(this.renderChart) } },
   mounted () { this.renderChart(); window.addEventListener('resize', this.resizeChart) },
   beforeDestroy () { window.removeEventListener('resize', this.resizeChart); if (this.resizeObserver) this.resizeObserver.disconnect(); if (this.chart) this.chart.dispose() },
   methods: {
@@ -120,7 +121,7 @@ export default {
       }
       const text = this.isDark ? '#8c8c8c' : '#64748b'
       const grid = this.isDark ? '#242424' : '#e8edf3'
-      const market = marketPalette(this.isDark)
+      const market = marketPalette(this.isDark, this.marketColorConvention)
       const groupSeries = (this.result.groupCurves || []).map(item => ({ name: `Q${item.group}`, type: 'line', data: (item.points || []).map(point => [moment(point.time).valueOf(), Number(point.net)]), showSymbol: false, xAxisIndex: 0, yAxisIndex: 0 }))
       const longShort = (this.result.longShortCurve || []).map(point => [moment(point.time).valueOf(), Number(point.net)])
       const ic = (this.result.icSeries || []).map(point => [moment(point.time).valueOf(), Number(point.value)])
@@ -153,7 +154,7 @@ export default {
     tone (value) { const number = Number(value || 0); return number > 0 ? 'positive' : number < 0 ? 'negative' : '' },
     signedCell (value, digits = 2) { return this.$createElement('span', { class: this.tone(value) }, `${Number(value) > 0 ? '+' : ''}${this.formatNumber(value, digits)}`) },
     percentCell (value) { return this.$createElement('span', { class: this.tone(value) }, `${Number(value) > 0 ? '+' : ''}${this.formatRate(value)}`) },
-    correlationCellStyle (value) { const alpha = Math.min(0.8, Math.abs(Number(value || 0)) * 0.75 + 0.08); return { background: Number(value) >= 0 ? `rgba(245,34,45,${alpha})` : `rgba(82,196,26,${alpha})` } }
+    correlationCellStyle (value) { const alpha = Math.min(0.8, Math.abs(Number(value || 0)) * 0.75 + 0.08); return { background: marketColorWithAlpha(Number(value) >= 0 ? 'rise' : 'fall', alpha, this.isDark, this.marketColorConvention) } }
   }
 }
 </script>

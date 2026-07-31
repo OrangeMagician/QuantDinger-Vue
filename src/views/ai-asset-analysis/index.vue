@@ -206,10 +206,10 @@ export default {
     },
     getSignalColor (signal) {
       const map = {
-        overbought: '#389e0d',
-        oversold: '#cf1322',
-        bullish_momentum: '#cf1322',
-        bearish_momentum: '#389e0d'
+        overbought: this.$marketColor('fall'),
+        oversold: this.$marketColor('rise'),
+        bullish_momentum: this.$marketColor('rise'),
+        bearish_momentum: this.$marketColor('fall')
       }
       return map[signal] || 'default'
     },

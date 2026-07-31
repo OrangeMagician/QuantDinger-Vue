@@ -26,7 +26,7 @@
 
       <section class="signal-callout">
         <div>
-          <a-tag :color="result.resonance_signal.direction === 'bullish' ? '#cf1322' : result.resonance_signal.direction === 'bearish' ? '#389e0d' : 'blue'">
+          <a-tag :color="['bullish', 'bearish'].includes(result.resonance_signal.direction) ? $marketColor(result.resonance_signal.direction) : 'blue'">
             {{ directionLabel(result.resonance_signal.direction) }}
           </a-tag>
           <strong>{{ $t('czsc.multiPeriodSignal') }}</strong>
@@ -42,7 +42,7 @@
         <article v-for="row in result.signal_tree" :key="row.timeframe" class="period-card">
           <header>
             <strong>{{ row.timeframe }}</strong>
-            <a-tag :color="row.direction === 'up' || row.direction === 'bullish' ? '#cf1322' : row.direction === 'down' || row.direction === 'bearish' ? '#389e0d' : ''">
+            <a-tag :color="['up', 'bullish', 'down', 'bearish'].includes(row.direction) ? $marketColor(row.direction) : ''">
               {{ directionLabel(row.direction) }}
             </a-tag>
           </header>
