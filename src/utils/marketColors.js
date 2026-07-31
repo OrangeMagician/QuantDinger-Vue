@@ -8,21 +8,21 @@ export const MARKET_COLOR_CONVENTION_EVENT = 'market-color-convention-change'
 
 const RED_GREEN_COLORS = Object.freeze({
   light: Object.freeze({
-    rise: '#cf1322',
-    riseStrong: '#f5222d',
-    riseSoft: 'rgba(245, 34, 45, 0.12)',
-    fall: '#389e0d',
-    fallStrong: '#52c41a',
-    fallSoft: 'rgba(82, 196, 26, 0.12)',
+    rise: '#f92855',
+    riseStrong: '#f92855',
+    riseSoft: 'rgba(249, 40, 85, 0.12)',
+    fall: '#2dc08e',
+    fallStrong: '#2dc08e',
+    fallSoft: 'rgba(45, 192, 142, 0.12)',
     neutral: '#8c8c8c'
   }),
   dark: Object.freeze({
-    rise: '#ff7875',
-    riseStrong: '#f6465d',
-    riseSoft: 'rgba(246, 70, 93, 0.16)',
-    fall: '#95de64',
-    fallStrong: '#0ecb81',
-    fallSoft: 'rgba(14, 203, 129, 0.16)',
+    rise: '#f92855',
+    riseStrong: '#f92855',
+    riseSoft: 'rgba(249, 40, 85, 0.16)',
+    fall: '#2dc08e',
+    fallStrong: '#2dc08e',
+    fallSoft: 'rgba(45, 192, 142, 0.16)',
     neutral: '#8c8c8c'
   })
 })

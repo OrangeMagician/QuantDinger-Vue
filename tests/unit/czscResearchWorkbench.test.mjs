@@ -107,6 +107,17 @@ test('CZSC chart renders volume and MACD panes', async () => {
   assert.match(chart, /czscSignalMarker/)
 })
 
+test('CZSC structure chart follows viewport height and summary details remain scrollable', async () => {
+  const workbench = await source('views/czsc-workbench/index.vue')
+  const chart = await source('views/czsc-workbench/components/CzscChart.vue')
+
+  assert.match(workbench, /height: clamp\(440px, calc\(100dvh - 224px\), 720px\)/)
+  assert.match(workbench, /\.summary-region \{[^}]*overflow-y: auto/)
+  assert.match(workbench, /\.workbench-grid \{ grid-template-columns: 1fr; height: auto; overflow: visible; \}/)
+  assert.doesNotMatch(workbench, /\$t\('czsc\.(?:source|engine)'\)/)
+  assert.match(chart, /min-height: 0/)
+})
+
 test('CZSC scan panel supports factor screening persistence and result actions', async () => {
   const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
 

@@ -464,9 +464,9 @@ export default {
       }
 
       .rise-red,
-      .fall-red { background: #f5222d; }
+      .fall-red { background: #f92855; }
       .rise-green,
-      .fall-green { background: #52c41a; }
+      .fall-green { background: #2dc08e; }
     }
 
     .setting-drawer-theme-color-colorBlock {

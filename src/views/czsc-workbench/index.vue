@@ -102,8 +102,6 @@
             <dl class="metadata-list">
               <div><dt>{{ $t('czsc.lastClose') }}</dt><dd>{{ formatPrice(summary.last_close) }}</dd></div>
               <div><dt>{{ $t('czsc.dataRange') }}</dt><dd>{{ formattedRange }}</dd></div>
-              <div><dt>{{ $t('czsc.source') }}</dt><dd>{{ analysis && analysis.source ? analysis.source.data_source : $t('czsc.none') }}</dd></div>
-              <div><dt>{{ $t('czsc.engine') }}</dt><dd>{{ engineLabel }}</dd></div>
             </dl>
 
             <div class="recent-strokes">
@@ -343,10 +341,6 @@ export default {
     formattedRange () {
       if (!this.analysis || !this.analysis.range) return this.$t('czsc.none')
       return `${this.formatDate(this.analysis.range.start)} - ${this.formatDate(this.analysis.range.end)}`
-    },
-    engineLabel () {
-      if (!this.analysis || !this.analysis.engine) return this.$t('czsc.none')
-      return `${this.analysis.engine.name} ${this.analysis.engine.version}`
     }
   },
   created () {
@@ -586,10 +580,10 @@ export default {
 .active-symbol { margin-left: auto; color: #595959; font-variant-numeric: tabular-nums; font-size: 12px; }
 .analysis-error, .template-error { margin: 12px 20px 0; }
 .template-error { position: fixed; right: 16px; bottom: 16px; z-index: 20; width: min(520px, calc(100vw - 32px)); }
-.workbench-grid { display: grid; grid-template-columns: minmax(0, 1fr) 318px; min-height: 650px; background: #fff; }
-.chart-region { position: relative; min-width: 0; min-height: 650px; padding: 10px 8px 4px 12px; border-right: 1px solid #e5e7eb; }
+.workbench-grid { display: grid; grid-template-columns: minmax(0, 1fr) 318px; height: clamp(440px, calc(100vh - 224px), 720px); height: clamp(440px, calc(100dvh - 224px), 720px); min-height: 0; overflow: hidden; background: #fff; }
+.chart-region { position: relative; min-width: 0; min-height: 0; height: 100%; overflow: hidden; padding: 10px 8px 4px 12px; border-right: 1px solid #e5e7eb; }
 .loading-layer, .empty-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.72); }
-.summary-region { min-width: 0; padding: 18px 18px 28px; overflow: hidden; background: #fbfbfc; }
+.summary-region { min-width: 0; min-height: 0; padding: 18px 18px 28px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: #fbfbfc; }
 .summary-region h2 { margin: 0 0 12px; color: #262626; font-size: 14px; line-height: 22px; font-weight: 650; letter-spacing: 0; }
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 18px; border-top: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
 .summary-grid > div { min-width: 0; padding: 10px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
@@ -625,6 +619,7 @@ export default {
 @media (max-width: 1100px) {
   .workbench-toolbar { align-items: flex-start; flex-direction: column; }
   .toolbar-controls { justify-content: flex-start; width: 100%; }
+  .workbench-grid { height: clamp(420px, calc(100vh - 292px), 640px); height: clamp(420px, calc(100dvh - 292px), 640px); }
 }
 @media (max-width: 760px) {
   .workbench-toolbar { padding: 12px; }
@@ -635,8 +630,8 @@ export default {
   .workbench-tabs >>> .ant-tabs-nav { white-space: nowrap; }
   .structure-controls { flex-wrap: wrap; gap: 10px 16px; padding: 8px 12px; }
   .active-symbol { width: 100%; margin-left: 0; }
-  .workbench-grid { grid-template-columns: 1fr; }
-  .chart-region { min-height: 520px; border-right: 0; border-bottom: 1px solid #e5e7eb; }
-  .summary-region { padding: 16px 12px 24px; }
+  .workbench-grid { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .chart-region { height: clamp(400px, 58vh, 520px); height: clamp(400px, 58dvh, 520px); border-right: 0; border-bottom: 1px solid #e5e7eb; }
+  .summary-region { padding: 16px 12px 24px; overflow: visible; }
 }
 </style>

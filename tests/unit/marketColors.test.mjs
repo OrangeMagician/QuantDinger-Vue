@@ -19,6 +19,8 @@ const riseRed = MARKET_COLOR_CONVENTIONS.RISE_RED_FALL_GREEN
 const riseGreen = MARKET_COLOR_CONVENTIONS.RISE_GREEN_FALL_RED
 
 test('uses Chinese market convention for price direction', () => {
+  assert.equal(MARKET_COLORS[riseRed].light.rise, '#f92855')
+  assert.equal(MARKET_COLORS[riseRed].light.fall, '#2dc08e')
   assert.equal(marketDirectionColor('up'), MARKET_COLORS[riseRed].light.rise)
   assert.equal(marketDirectionColor('bullish'), MARKET_COLORS[riseRed].light.rise)
   assert.equal(marketDirectionColor('down'), MARKET_COLORS[riseRed].light.fall)
@@ -48,7 +50,7 @@ test('swaps rise and fall palettes for the international convention', () => {
   assert.equal(marketDirectionColor('fall', false, riseGreen), MARKET_COLORS[riseRed].light.rise)
   assert.equal(signedMarketColor(1, true, riseGreen), MARKET_COLORS[riseRed].dark.fall)
   assert.equal(signedMarketColor(-1, true, riseGreen), MARKET_COLORS[riseRed].dark.rise)
-  assert.equal(marketColorWithAlpha('rise', 0.25, false, riseGreen), 'rgba(56, 158, 13, 0.25)')
+  assert.equal(marketColorWithAlpha('rise', 0.25, false, riseGreen), 'rgba(45, 192, 142, 0.25)')
 })
 
 test('normalizes, applies, and exposes the persisted convention on the root element', () => {
@@ -63,8 +65,8 @@ test('normalizes, applies, and exposes the persisted convention on the root elem
 
   const cssSource = readFileSync(fileURLToPath(new URL('../../src/global.less', import.meta.url)), 'utf8')
   assert.match(cssSource, /data-market-color-convention='rise-green-fall-red'/)
-  assert.match(cssSource, /--market-rise-color: #389e0d/)
-  assert.match(cssSource, /--market-fall-color: #cf1322/)
+  assert.match(cssSource, /--market-rise-color: #2dc08e/)
+  assert.match(cssSource, /--market-fall-color: #f92855/)
 })
 
 test('localized indicator examples defer default signal colors to the selected convention', () => {
