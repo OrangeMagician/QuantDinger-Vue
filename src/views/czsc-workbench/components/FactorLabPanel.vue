@@ -24,7 +24,7 @@
 
     <template v-if="result">
       <div class="metric-grid">
-        <div><span>{{ $t('czsc.symbol') }}</span><strong>{{ result.symbol }}</strong></div>
+        <div><span>{{ $t('czsc.symbol') }}</span><strong>{{ formatSymbolLabel(result) }}</strong></div>
         <div><span>{{ $t('czsc.timeframe') }}</span><strong>{{ result.timeframe }}</strong></div>
         <div><span>{{ $t('czsc.factorCount') }}</span><strong>{{ result.factors.length }}</strong></div>
         <div><span>{{ $t('czsc.lastClose') }}</span><strong>{{ result.bar ? formatNumber(result.bar.close) : '-' }}</strong></div>
@@ -64,6 +64,7 @@
 
 <script>
 import { evaluateCzscFactors, getCzscFactorCatalog } from '@/api/czsc'
+import { formatCzscSymbolLabel } from '@/utils/czscSymbols'
 
 const STORAGE_KEY = 'quantdinger.czsc.factor-lab.v1'
 
@@ -154,6 +155,9 @@ export default {
     },
     riskTip (factor) {
       return this.isChinese ? factor.risk_tip_zh : factor.risk_tip_en
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item)
     },
     formatNumber (value) {
       const number = Number(value)

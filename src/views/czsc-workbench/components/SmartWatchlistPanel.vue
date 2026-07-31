@@ -12,7 +12,7 @@
 
         <label class="field">
           <span>{{ $t('czsc.currentSymbol') }}</span>
-          <a-input :value="symbol" disabled />
+          <a-input :value="formatSymbolLabel(symbol)" disabled />
         </label>
         <label class="field">
           <span>{{ $t('czsc.watchlistGroup') }}</span>
@@ -33,8 +33,8 @@
         <div class="watchlist-items">
           <article v-for="item in watchlist" :key="item.symbol" class="watchlist-item">
             <div>
-              <strong>{{ item.symbol }}</strong>
-              <span>{{ item.name || item.group }}</span>
+              <strong>{{ symbolCode(item.symbol) }}</strong>
+              <span v-if="symbolName(item)">{{ symbolName(item) }}</span>
               <small>{{ item.reason }}</small>
             </div>
             <a-button size="small" icon="delete" @click="removeItem(item)" />
@@ -75,7 +75,7 @@
           :scroll="{ x: 900 }"
         >
           <template slot="symbol" slot-scope="value, row">
-            <strong>{{ value }}</strong><small>{{ row.name || (row.watchlist && row.watchlist.group) || '' }}</small>
+            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
           </template>
           <template slot="score" slot-scope="value">
             <a-tag :color="Number(value) >= 70 ? 'green' : Number(value) >= 55 ? 'blue' : ''">{{ Number(value || 0).toFixed(1) }}</a-tag>
@@ -100,6 +100,7 @@
 
 <script>
 import { addCzscWatchlistItem, getCzscSmartWatchlist, removeCzscWatchlistItem, scanCzscWatchlist } from '@/api/czsc'
+import { czscSymbolCode, czscSymbolName, formatCzscSymbolLabel, updateCzscSymbolMeta } from '@/utils/czscSymbols'
 import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.watchlist-scan.v1'
@@ -118,6 +119,7 @@ export default {
       watchlist: [],
       history: [],
       result: null,
+      symbolMeta: updateCzscSymbolMeta(),
       scanCondition: 'default',
       scanLogic: 'and',
       signalFactorConditions: [{ source: 'feature', factor: 'recent_return_pct', operator: 'gte', value: -1, label: 'Recent return' }],
@@ -145,7 +147,10 @@ export default {
         if (state.scanLogic) this.scanLogic = state.scanLogic
         if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
         else this.signalFactorConditions = this.legacyConditions()
-        if (state.result) this.result = state.result
+        if (state.result) {
+          this.result = state.result
+          this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, state.result.results || [])
+        }
       } catch (error) {}
     },
     persistScanState () {
@@ -160,6 +165,7 @@ export default {
         const data = response && response.data ? response.data : {}
         this.watchlist = Array.isArray(data.watchlist) ? data.watchlist : []
         this.history = Array.isArray(data.scan_history) ? data.scan_history : []
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, this.watchlist)
       } catch (error) {
         this.watchlist = []
       } finally {
@@ -171,6 +177,7 @@ export default {
       try {
         const response = await addCzscWatchlistItem({
           symbol: this.symbol,
+          name: this.symbolName(this.symbol),
           group: this.form.group || '默认',
           reason: this.form.reason,
           invalidation_condition: this.form.invalidation_condition,
@@ -215,6 +222,7 @@ export default {
           throw new Error((response && response.msg) || this.$t('czsc.watchlistScanFailed'))
         }
         this.result = response.data
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, response.data.results || [])
         this.persistScanState()
         await this.loadWatchlist()
       } catch (error) {
@@ -242,7 +250,7 @@ export default {
       if (!signal || !row.bar) return
       this.$emit('prepare-review', {
         symbol: row.symbol,
-        name: row.name,
+        name: this.symbolName(row),
         timeframe: this.timeframe,
         template_id: 'smart_watchlist_scan',
         bar: row.bar,
@@ -253,6 +261,15 @@ export default {
         external_source: 'smart_watchlist',
         raw_payload: { row, scan_condition: this.scanCondition, logic: this.scanLogic, conditions: this.conditions() }
       })
+    },
+    symbolCode (value) {
+      return czscSymbolCode(value)
+    },
+    symbolName (item) {
+      return czscSymbolName(item, this.symbolMeta)
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolMeta)
     }
   }
 }

@@ -6,13 +6,16 @@
           <span>{{ $t('czsc.scanSymbols') }}</span>
           <a-textarea v-model="symbolsText" :rows="5" :placeholder="$t('czsc.scanPlaceholder')" @change="persistState" />
         </label>
+        <div class="selected-symbols-preview">
+          <a-tag v-for="item in selectedSymbolItems" :key="item.symbol">{{ formatSymbolLabel(item) }}</a-tag>
+        </div>
 
         <div class="symbol-search-row">
           <a-select
             v-model="selectedSearchSymbol"
             show-search
             allow-clear
-            option-label-prop="value"
+            option-label-prop="label"
             :filter-option="false"
             :placeholder="$t('czsc.symbolPlaceholder')"
             :not-found-content="symbolSearching ? undefined : $t('czsc.noSymbolFound')"
@@ -20,8 +23,8 @@
             @focus="searchSymbols('')"
           >
             <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
-            <a-select-option v-for="item in symbolOptions" :key="item.symbol" :value="item.symbol">
-              <div class="symbol-option"><strong>{{ item.symbol }}</strong><span>{{ item.name || item.exchange }}</span></div>
+            <a-select-option v-for="item in symbolOptions" :key="item.symbol" :value="item.symbol" :label="formatSymbolLabel(item)">
+              <div class="symbol-option"><strong>{{ symbolCode(item.symbol) }}</strong><span>{{ symbolName(item) }}</span></div>
             </a-select-option>
           </a-select>
           <a-button icon="plus" @click="addSearchSymbol">{{ $t('czsc.addSymbol') }}</a-button>
@@ -100,7 +103,7 @@
           :scroll="{ x: 1050 }"
         >
           <template slot="symbol" slot-scope="value, row">
-            <strong>{{ value }}</strong><small>{{ row.name || '' }}</small>
+            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
           </template>
           <template slot="score" slot-scope="value, row">
             <a-tag v-if="row.score !== undefined" :color="Number(row.score) >= 70 ? 'green' : Number(row.score) >= 55 ? 'blue' : ''">
@@ -147,6 +150,17 @@
 
 <script>
 import { addCzscWatchlistItem, scanCzsc, screenCzscSignalFactors, searchCzscSymbols } from '@/api/czsc'
+import {
+  czscSymbolCode,
+  czscSymbolDisplayItem,
+  czscSymbolName,
+  defaultCzscSymbolText,
+  formatCzscSymbolLabel,
+  formatCzscSymbolText,
+  normalizeCzscSymbol,
+  parseCzscSymbolList,
+  updateCzscSymbolMeta
+} from '@/utils/czscSymbols'
 import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.scan.v2'
@@ -162,9 +176,10 @@ export default {
   },
   data () {
     return {
-      symbolsText: '000333.SZ\n600519.SH\n000001.SZ',
+      symbolsText: defaultCzscSymbolText(3),
       selectedSearchSymbol: undefined,
       symbolOptions: [],
+      symbolMeta: updateCzscSymbolMeta(),
       symbolSearching: false,
       symbolSearchTimer: null,
       enabledFactorKeys: [],
@@ -200,6 +215,9 @@ export default {
     resultModeLabel () {
       return this.resultMode === 'screener' ? this.$t('czsc.factorScreener') : this.$t('czsc.templateScan')
     },
+    selectedSymbolItems () {
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
+    },
     legacyConditions () {
       const conditions = []
       if (this.enabledFactorKeys && this.enabledFactorKeys.includes('czsc_direction_up')) conditions.push({ source: 'feature', factor: 'czsc_direction', operator: 'eq', value: 'up' })
@@ -224,7 +242,7 @@ export default {
         const raw = window.localStorage.getItem(STORAGE_KEY)
         const state = raw ? JSON.parse(raw) : null
           if (state && typeof state === 'object') {
-            if (state.symbolsText) this.symbolsText = state.symbolsText
+            if (state.symbolsText) this.symbolsText = formatCzscSymbolText(state.symbolsText)
             if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
             else if (Array.isArray(state.enabledFactorKeys)) {
               this.enabledFactorKeys = state.enabledFactorKeys
@@ -234,7 +252,10 @@ export default {
             }
             if (state.screenLogic) this.screenLogic = state.screenLogic
             if (state.resultLimit !== undefined) this.resultLimit = Number(state.resultLimit)
-            if (state.result) this.result = state.result
+            if (state.result) {
+              this.result = state.result
+              this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, state.result.results || [])
+            }
           if (state.resultMode) this.resultMode = state.resultMode
           if (Array.isArray(state.savedTemplates)) this.savedTemplates = state.savedTemplates
         }
@@ -242,6 +263,8 @@ export default {
     },
     persistState () {
       try {
+        const symbolsText = formatCzscSymbolText(this.symbolsText)
+        if (symbolsText) this.symbolsText = symbolsText
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
           symbolsText: this.symbolsText,
           signalFactorConditions: this.signalFactorConditions,
@@ -254,16 +277,19 @@ export default {
       } catch (error) {}
     },
     parsedSymbols () {
-      return Array.from(new Set(String(this.symbolsText || '').toUpperCase().split(/[\s,;]+/).filter(Boolean).map(this.normalizeCzscSymbol).filter(Boolean)))
+      return parseCzscSymbolList(this.symbolsText)
     },
     normalizeCzscSymbol (value) {
-      const raw = String(value || '').trim().toUpperCase()
-      if (/^[0-9]{6}\.(SH|SZ|BJ)$/.test(raw)) return raw
-      const code = raw.replace(/[^0-9]/g, '')
-      if (!/^[0-9]{6}$/.test(code)) return ''
-      if (/^(600|601|603|605|688|689|900)/.test(code) || code.startsWith('6')) return `${code}.SH`
-      if (/^(000|001|002|003|159|200|300|301)/.test(code) || /^[023]/.test(code)) return `${code}.SZ`
-      return `${code}.BJ`
+      return normalizeCzscSymbol(value)
+    },
+    symbolCode (value) {
+      return czscSymbolCode(value)
+    },
+    symbolName (item) {
+      return czscSymbolName(item, this.symbolMeta)
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolMeta)
     },
     handleSymbolSearch (keyword) {
       if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
@@ -277,7 +303,9 @@ export default {
       try {
         const response = await searchCzscSymbols({ keyword: String(keyword || '').trim(), limit: 20 })
         const data = response && response.data ? response.data : {}
-        this.symbolOptions = Array.isArray(data.items) ? data.items : []
+        const items = Array.isArray(data.items) ? data.items : []
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, items)
+        this.symbolOptions = items.map(item => this.symbolMeta[this.normalizeCzscSymbol(item.symbol)] || item)
       } catch (error) {
         this.symbolOptions = []
       } finally {
@@ -289,7 +317,8 @@ export default {
       if (!symbol) return
       const symbols = new Set(this.parsedSymbols())
       symbols.add(symbol)
-      this.symbolsText = Array.from(symbols).join('\n')
+      this.symbolsText = Array.from(symbols).map(this.symbolCode).join('\n')
+      this.selectedSearchSymbol = undefined
       this.persistState()
     },
     conditionsForRequest () {
@@ -320,6 +349,7 @@ export default {
           throw new Error((response && response.msg) || this.$t('czsc.scanFailed'))
         }
         this.result = response.data
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, response.data.results || [])
         this.persistState()
       } catch (error) {
         this.error = error.backendMessage || error.message || this.$t('czsc.scanFailed')
@@ -346,6 +376,7 @@ export default {
           throw new Error((response && response.msg) || this.$t('czsc.scanFailed'))
         }
         this.result = response.data
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, response.data.results || [])
         this.persistState()
       } catch (error) {
         this.error = error.backendMessage || error.message || this.$t('czsc.scanFailed')
@@ -387,8 +418,8 @@ export default {
       const rows = [['symbol', 'name', 'score', 'action', 'close', 'factor', 'error']]
       ;(this.result.results || []).forEach(row => {
         rows.push([
-          row.symbol,
-          row.name || '',
+          this.symbolCode(row.symbol),
+          this.symbolName(row),
           row.score === undefined ? '' : row.score,
           this.rowAction(row),
           row.bar ? row.bar.close : '',
@@ -410,7 +441,7 @@ export default {
       try {
         await addCzscWatchlistItem({
           symbol: row.symbol,
-          name: row.name || '',
+          name: this.symbolName(row),
           group: this.resultModeLabel,
           tags: [this.timeframe],
           reason: this.factorLabel(row),
@@ -427,7 +458,7 @@ export default {
       const external = this.resultMode === 'screener' || !row.matched
       this.$emit('prepare-review', {
         symbol: row.symbol,
-        name: row.name,
+        name: this.symbolName(row),
         timeframe: this.timeframe,
         template_id: this.templateId,
         template: this.templates.find(item => item.id === this.templateId),
@@ -506,6 +537,7 @@ export default {
 .scan-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 28px; border-right: 1px solid #e5e7eb; background: #fbfbfc; }
 .factor-workspace { min-width: 0; padding: 18px 20px 32px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
+.selected-symbols-preview { display: flex; flex-wrap: wrap; gap: 5px; margin-top: -8px; }
 .symbol-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .symbol-option { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .symbol-option span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }

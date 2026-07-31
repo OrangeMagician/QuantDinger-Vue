@@ -14,6 +14,9 @@
       <label class="field symbols-field">
         <span>{{ $t('czsc.scanSymbols') }}</span>
         <a-textarea v-model="symbolsText" :rows="4" :placeholder="$t('czsc.scanPlaceholder')" @change="persistState" />
+        <div class="selected-symbols-preview">
+          <a-tag v-for="item in selectedSymbolItems" :key="item.symbol">{{ formatSymbolLabel(item) }}</a-tag>
+        </div>
       </label>
       <section class="ai-config-card">
         <div class="section-heading">
@@ -90,6 +93,9 @@
           :data-source="dataQualityRows"
           :pagination="{ pageSize: 10, hideOnSinglePage: true }"
         >
+          <template slot="symbol" slot-scope="value, row">
+            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
+          </template>
           <template slot="status" slot-scope="value">
             <a-tag :color="value === 'PASS' ? 'green' : value === 'WARN' ? 'orange' : 'red'">{{ value }}</a-tag>
           </template>
@@ -103,7 +109,7 @@
         <div>
           <h3>{{ $t('czsc.factorExperiment') }}</h3>
           <div v-for="row in factorRows" :key="row.symbol" class="mini-row">
-            <strong>{{ row.symbol }}</strong>
+            <strong>{{ formatSymbolLabel(row) }}</strong>
             <a-tag :color="Number(row.score) >= 70 ? 'green' : 'blue'">{{ Number(row.score || 0).toFixed(1) }}</a-tag>
             <span>{{ topSignalLabel(row) }}</span>
           </div>
@@ -131,6 +137,17 @@ import {
   saveCzscResearchOpsAiConfig,
   saveCzscResearchOpsWorkflow
 } from '@/api/czsc'
+import {
+  czscSymbolCode,
+  czscSymbolDisplayItem,
+  czscSymbolName,
+  defaultCzscSymbolText,
+  formatCzscSymbolLabel,
+  formatCzscSymbolText,
+  normalizeCzscSymbol,
+  parseCzscSymbolList,
+  updateCzscSymbolMeta
+} from '@/utils/czscSymbols'
 import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.research-ops.v1'
@@ -145,7 +162,7 @@ export default {
   },
   data () {
     return {
-      symbolsText: '000333.SZ\n600519.SH\n000001.SZ\n300750.SZ\n301280.SZ',
+      symbolsText: defaultCzscSymbolText(5),
       workflowFactors: ['recent_return', 'ma_bullish'],
       workflow: { id: 'default_research_ops', name: 'ResearchOps 默认流程', logic: 'and' },
       signalFactorConditions: [
@@ -155,12 +172,13 @@ export default {
       aiConfig: {},
       aiForm: { provider: 'sub2api', base_url: '', model: '', api_key: '' },
       result: null,
+      symbolMeta: updateCzscSymbolMeta(),
       loading: false,
       savingAi: false,
       savingWorkflow: false,
       error: '',
       qualityColumns: [
-        { title: this.$t('czsc.symbol'), dataIndex: 'symbol', key: 'symbol', width: 120 },
+        { title: this.$t('czsc.symbol'), dataIndex: 'symbol', key: 'symbol', scopedSlots: { customRender: 'symbol' }, width: 140 },
         { title: this.$t('czsc.timeframe'), dataIndex: 'timeframe', key: 'timeframe', width: 90 },
         { title: this.$t('czsc.status'), dataIndex: 'status', key: 'status', scopedSlots: { customRender: 'status' }, width: 100 },
         { title: this.$t('czsc.qualityScore'), dataIndex: 'quality_score', key: 'quality_score', width: 110 },
@@ -181,6 +199,9 @@ export default {
     },
     pretrade () {
       return (this.result && this.result.pretrade_validation) || {}
+    },
+    selectedSymbolItems () {
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
     },
     directionCards () {
       const result = this.result || {}
@@ -236,30 +257,46 @@ export default {
     restoreState () {
       try {
         const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-        if (state.symbolsText) this.symbolsText = state.symbolsText
+        if (state.symbolsText) this.symbolsText = formatCzscSymbolText(state.symbolsText)
         if (Array.isArray(state.workflowFactors)) this.workflowFactors = state.workflowFactors
         if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
         else if (Array.isArray(state.workflowFactors)) this.signalFactorConditions = this.legacyWorkflowConditions()
         if (state.workflowLogic) this.workflow.logic = state.workflowLogic
-        if (state.result) this.result = state.result
+        if (state.result) {
+          this.result = state.result
+          this.updateResultSymbolMeta(state.result)
+        }
       } catch (error) {}
     },
     persistState () {
       try {
+        const symbolsText = formatCzscSymbolText(this.symbolsText)
+        if (symbolsText) this.symbolsText = symbolsText
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbolsText: this.symbolsText, workflowFactors: this.workflowFactors, signalFactorConditions: this.signalFactorConditions, workflowLogic: this.workflow.logic, result: this.result }))
       } catch (error) {}
     },
     parsedSymbols () {
-      return Array.from(new Set(String(this.symbolsText || this.symbol).toUpperCase().split(/[\s,;]+/).map(this.normalizeSymbol).filter(Boolean))).slice(0, 50)
+      return parseCzscSymbolList(this.symbolsText || this.symbol).slice(0, 50)
     },
     normalizeSymbol (value) {
-      const raw = String(value || '').trim().toUpperCase()
-      if (/^[0-9]{6}\.(SH|SZ|BJ)$/.test(raw)) return raw
-      const code = raw.replace(/[^0-9]/g, '')
-      if (!/^[0-9]{6}$/.test(code)) return ''
-      if (/^(600|601|603|605|688|689|900)/.test(code) || code.startsWith('6')) return `${code}.SH`
-      if (/^(000|001|002|003|159|200|300|301)/.test(code) || /^[023]/.test(code)) return `${code}.SZ`
-      return `${code}.BJ`
+      return normalizeCzscSymbol(value)
+    },
+    symbolCode (value) {
+      return czscSymbolCode(value)
+    },
+    symbolName (item) {
+      return czscSymbolName(item, this.symbolMeta)
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolMeta)
+    },
+    updateResultSymbolMeta (result) {
+      this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [
+        ...((result && result.data_governance && result.data_governance.rows) || []),
+        ...((result && result.factor_experiment && result.factor_experiment.results) || []),
+        ...((result && result.strategy_workflow && result.strategy_workflow.results) || []),
+        ...((result && result.smart_watchlist_v2 && result.smart_watchlist_v2.results) || [])
+      ])
     },
     async loadAiConfig () {
       try {
@@ -332,6 +369,7 @@ export default {
         })
         if (!response || response.code !== 1 || !response.data) throw new Error((response && response.msg) || this.$t('czsc.researchOpsFailed'))
         this.result = response.data
+        this.updateResultSymbolMeta(response.data)
         this.persistState()
       } catch (error) {
         this.error = error.backendMessage || error.message || this.$t('czsc.researchOpsFailed')
@@ -363,6 +401,7 @@ export default {
 .ops-head p { margin: 0; color: #8c8c8c; font-size: 12px; }
 .ops-config { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; margin-bottom: 16px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
+.selected-symbols-preview { display: flex; flex-wrap: wrap; gap: 5px; }
 .ai-config-card, .workflow-card { padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fbfbfc; }
 .ai-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .workflow-selector { margin-top: 10px; }
@@ -382,7 +421,8 @@ export default {
 .direction-card dd { margin: 2px 0 0; font-size: 13px; }
 .ops-table-region { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e5e7eb; }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr); gap: 24px; }
-.mini-row { display: grid; grid-template-columns: 120px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; }
+.mini-row { display: grid; grid-template-columns: 150px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; }
+.mini-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-row span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
 .pretrade-box { padding: 12px; border: 1px solid #eceef1; border-radius: 8px; background: #fbfbfc; }
 .pretrade-box p { margin: 8px 0 0; color: #595959; font-size: 12px; }

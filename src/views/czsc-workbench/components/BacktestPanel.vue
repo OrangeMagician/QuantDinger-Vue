@@ -91,6 +91,7 @@
 
 <script>
 import { backtestCzsc } from '@/api/czsc'
+import { formatCzscSymbolLabel } from '@/utils/czscSymbols'
 import EquityChart from './EquityChart.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.backtests.v1'
@@ -204,7 +205,7 @@ export default {
     },
     historyLabel (item) {
       const name = this.isChinese ? item.template.name_zh : item.template.name_en
-      return `${item.symbol} · ${name} · ${this.percent(item.metrics.total_return)}`
+      return `${formatCzscSymbolLabel(item)} · ${name} · ${this.percent(item.metrics.total_return)}`
     },
     templateName (item) {
       return this.isChinese ? item.name_zh : item.name_en

@@ -140,6 +140,7 @@ export default {
       const signal = this.result.resonance_signal
       this.$emit('prepare-review', {
         symbol: this.result.symbol,
+        name: this.result.name,
         timeframe: signal.timeframes[0] || '1d',
         template_id: 'multi_period_resonance',
         bar: signal.trigger_bar,

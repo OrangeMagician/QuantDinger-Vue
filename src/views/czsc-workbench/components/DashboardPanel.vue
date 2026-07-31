@@ -8,6 +8,9 @@
       <div class="panel-actions">
         <a-textarea v-model="symbolsText" :rows="2" :placeholder="$t('czsc.scanPlaceholder')" @change="persistState" />
         <a-button type="primary" icon="dashboard" :loading="loading" @click="loadDashboard">{{ $t('czsc.refreshCockpit') }}</a-button>
+        <div class="selected-symbols-preview">
+          <a-tag v-for="item in selectedSymbolItems" :key="item.symbol">{{ formatSymbolLabel(item) }}</a-tag>
+        </div>
       </div>
     </div>
 
@@ -39,7 +42,7 @@
             :data-source="result.top_candidates"
             :pagination="{ pageSize: 10, hideOnSinglePage: true }"
           >
-            <template slot="symbol" slot-scope="value, row"><strong>{{ value }}</strong><small>{{ row.name || '' }}</small></template>
+            <template slot="symbol" slot-scope="value, row"><strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small></template>
             <template slot="score" slot-scope="value"><a-tag :color="Number(value) >= 70 ? 'green' : 'blue'">{{ Number(value || 0).toFixed(1) }}</a-tag></template>
             <template slot="signal" slot-scope="value, row">{{ topSignalLabel(row) }}</template>
             <template slot="operation" slot-scope="value, row">
@@ -58,7 +61,7 @@
             <article v-for="group in reviewGroups" :key="group.key" class="review-group">
               <header><strong>{{ group.label }}</strong><a-tag>{{ group.rows.length }}</a-tag></header>
               <div v-for="item in group.rows" :key="item.signal_id" class="review-row">
-                <strong>{{ item.symbol }}</strong>
+                <strong>{{ formatSymbolLabel(item) }}</strong>
                 <span>{{ item.status }} · {{ item.signal_id }}</span>
               </div>
               <a-empty v-if="!group.rows.length" :description="$t('czsc.none')" />
@@ -70,7 +73,7 @@
       <section class="resonance-strip">
         <h3>{{ $t('czsc.multiPeriodCenter') }}</h3>
         <article v-for="item in result.multi_period" :key="item.symbol" class="resonance-card">
-          <strong>{{ item.symbol }}</strong>
+          <strong>{{ formatSymbolLabel(item) }}</strong>
           <a-tag :color="['bullish', 'bearish'].includes(item.summary.direction) ? $marketColor(item.summary.direction) : ''">
             {{ item.summary.direction }}
           </a-tag>
@@ -84,6 +87,17 @@
 
 <script>
 import { getCzscDashboard } from '@/api/czsc'
+import {
+  czscSymbolCode,
+  czscSymbolDisplayItem,
+  czscSymbolName,
+  defaultCzscSymbolText,
+  formatCzscSymbolLabel,
+  formatCzscSymbolText,
+  normalizeCzscSymbol,
+  parseCzscSymbolList,
+  updateCzscSymbolMeta
+} from '@/utils/czscSymbols'
 
 const STORAGE_KEY = 'quantdinger.czsc.cockpit.v1'
 
@@ -96,10 +110,11 @@ export default {
   },
   data () {
     return {
-      symbolsText: '000333.SZ\n600519.SH\n000001.SZ\n300750.SZ',
+      symbolsText: defaultCzscSymbolText(4),
       loading: false,
       error: '',
       result: null,
+      symbolMeta: updateCzscSymbolMeta(),
       candidateColumns: [
         { title: this.$t('czsc.symbol'), dataIndex: 'symbol', key: 'symbol', scopedSlots: { customRender: 'symbol' }, width: 150 },
         { title: this.$t('czsc.score'), dataIndex: 'score', key: 'score', scopedSlots: { customRender: 'score' }, width: 90 },
@@ -109,6 +124,9 @@ export default {
     }
   },
   computed: {
+    selectedSymbolItems () {
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
+    },
     reviewGroups () {
       const retraq = (this.result && this.result.retraq) || {}
       return [
@@ -125,26 +143,44 @@ export default {
     restoreState () {
       try {
         const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-        if (state.symbolsText) this.symbolsText = state.symbolsText
-        if (state.result) this.result = state.result
+        if (state.symbolsText) this.symbolsText = formatCzscSymbolText(state.symbolsText)
+        if (state.result) {
+          this.result = state.result
+          this.updateResultSymbolMeta(state.result)
+        }
       } catch (error) {}
     },
     persistState () {
       try {
+        const symbolsText = formatCzscSymbolText(this.symbolsText)
+        if (symbolsText) this.symbolsText = symbolsText
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ symbolsText: this.symbolsText, result: this.result }))
       } catch (error) {}
     },
     parsedSymbols () {
-      return Array.from(new Set(String(this.symbolsText || this.symbol).toUpperCase().split(/[\s,;]+/).map(this.normalizeSymbol).filter(Boolean))).slice(0, 50)
+      return parseCzscSymbolList(this.symbolsText || this.symbol).slice(0, 50)
     },
     normalizeSymbol (value) {
-      const raw = String(value || '').trim().toUpperCase()
-      if (/^[0-9]{6}\.(SH|SZ|BJ)$/.test(raw)) return raw
-      const code = raw.replace(/[^0-9]/g, '')
-      if (!/^[0-9]{6}$/.test(code)) return ''
-      if (/^(600|601|603|605|688|689|900)/.test(code) || code.startsWith('6')) return `${code}.SH`
-      if (/^(000|001|002|003|159|200|300|301)/.test(code) || /^[023]/.test(code)) return `${code}.SZ`
-      return `${code}.BJ`
+      return normalizeCzscSymbol(value)
+    },
+    symbolCode (value) {
+      return czscSymbolCode(value)
+    },
+    symbolName (item) {
+      return czscSymbolName(item, this.symbolMeta)
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolMeta)
+    },
+    updateResultSymbolMeta (result) {
+      const retraq = (result && result.retraq) || {}
+      this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [
+        ...((result && result.top_candidates) || []),
+        ...((result && result.multi_period) || []),
+        ...(retraq.pending || []),
+        ...(retraq.blocked || []),
+        ...(retraq.confirmed || [])
+      ])
     },
     async loadDashboard () {
       const symbols = this.parsedSymbols()
@@ -161,6 +197,7 @@ export default {
           throw new Error((response && response.msg) || this.$t('czsc.cockpitFailed'))
         }
         this.result = response.data
+        this.updateResultSymbolMeta(response.data)
         this.persistState()
       } catch (error) {
         this.error = error.backendMessage || error.message || this.$t('czsc.cockpitFailed')
@@ -183,7 +220,7 @@ export default {
       if (!signal || !row.bar) return
       this.$emit('prepare-review', {
         symbol: row.symbol,
-        name: row.name,
+        name: this.symbolName(row),
         timeframe: this.timeframe,
         template_id: 'operation_cockpit',
         bar: row.bar,
@@ -205,6 +242,7 @@ export default {
 .panel-head h2 { margin: 0 0 4px; font-size: 15px; }
 .panel-head p { margin: 0; color: #8c8c8c; font-size: 12px; }
 .panel-actions { display: grid; grid-template-columns: minmax(260px, 430px) auto; align-items: start; gap: 10px; }
+.selected-symbols-preview { display: flex; flex-wrap: wrap; grid-column: 1 / -1; gap: 5px; }
 .manual-boundary { margin-bottom: 12px; }
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(110px, 1fr)); margin: 14px 0; border-top: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
 .metric-grid > div { display: flex; min-height: 62px; flex-direction: column; justify-content: center; padding: 8px 14px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
@@ -219,10 +257,12 @@ export default {
 .review-columns { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .review-group { padding: 10px; border: 1px solid #eceef1; border-radius: 8px; background: #fbfbfc; }
 .review-group header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.review-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-top: 1px solid #eceef1; font-size: 11px; }
+.review-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-top: 1px solid #eceef1; font-size: 11px; }
+.review-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-row span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
 .resonance-strip { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5e7eb; }
-.resonance-card { display: grid; grid-template-columns: 96px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; font-size: 12px; }
+.resonance-card { display: grid; grid-template-columns: 140px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; font-size: 12px; }
+.resonance-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resonance-card span { overflow: hidden; color: #595959; text-overflow: ellipsis; white-space: nowrap; }
 .theme-dark .research-panel { color: #e5e7eb; background: #171a20; }
 .theme-dark .metric-grid, .theme-dark .metric-grid > div, .theme-dark .review-group, .theme-dark .review-row, .theme-dark .resonance-strip, .theme-dark .resonance-card { border-color: #30343b; }

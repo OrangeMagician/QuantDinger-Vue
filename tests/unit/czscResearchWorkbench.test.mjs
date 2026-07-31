@@ -118,6 +118,30 @@ test('CZSC structure chart follows viewport height and summary details remain sc
   assert.match(chart, /min-height: 0/)
 })
 
+test('CZSC symbol display hides exchange suffixes while preserving normalized requests', async () => {
+  const symbols = await import('../../src/utils/czscSymbols.js')
+  const workbench = await source('views/czsc-workbench/index.vue')
+  const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
+  const dashboard = await source('views/czsc-workbench/components/DashboardPanel.vue')
+  const review = await source('views/czsc-workbench/components/ReviewPanel.vue')
+
+  assert.equal(symbols.normalizeCzscSymbol('000333'), '000333.SZ')
+  assert.equal(symbols.normalizeCzscSymbol('600519'), '600519.SH')
+  assert.equal(symbols.formatCzscSymbolLabel({ symbol: '000333.SZ', name: '美的集团' }), '000333 美的集团')
+  assert.equal(symbols.formatCzscSymbolText('000333.SZ\n600519.SH'), '000333\n600519')
+  assert.match(workbench, /activeAnalysisSymbolLabel/)
+  assert.match(workbench, /option-label-prop="label"/)
+  assert.match(scan, /selectedSymbolItems/)
+  assert.match(dashboard, /formatCzscSymbolText/)
+  assert.match(review, /formatSymbolLabel\(candidate\)/)
+  assert.doesNotMatch(workbench, /\|\|\s*item\.exchange/)
+  assert.doesNotMatch(scan, /\|\|\s*item\.exchange/)
+  assert.doesNotMatch(workbench, />\s*\{\{\s*item\.symbol\s*\}\}/)
+  assert.doesNotMatch(scan, />\s*\{\{\s*item\.symbol\s*\}\}/)
+  assert.doesNotMatch(scan, /000333\.SZ\\n600519\.SH/)
+  assert.doesNotMatch(dashboard, /000333\.SZ\\n600519\.SH/)
+})
+
 test('CZSC scan panel supports factor screening persistence and result actions', async () => {
   const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
 

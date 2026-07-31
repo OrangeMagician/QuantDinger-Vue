@@ -19,7 +19,7 @@
 
         <template v-if="candidate">
           <dl class="candidate-details">
-            <div><dt>{{ $t('czsc.symbol') }}</dt><dd>{{ candidate.symbol }}</dd></div>
+            <div><dt>{{ $t('czsc.symbol') }}</dt><dd>{{ formatSymbolLabel(candidate) }}</dd></div>
             <div><dt>{{ $t('czsc.timeframe') }}</dt><dd>{{ candidate.timeframe }}</dd></div>
             <div><dt>{{ $t('czsc.template') }}</dt><dd>{{ candidateTemplateName }}</dd></div>
             <div><dt>{{ $t('czsc.retraqStrategyId') }}</dt><dd>{{ candidateStrategyId }}</dd></div>
@@ -78,7 +78,7 @@
         <div v-if="normalized" class="normalized-result">
           <dl>
             <div><dt>{{ $t('czsc.rawPayload') }}</dt><dd><code>{{ compactJson(normalized.raw_payload) }}</code></dd></div>
-            <div><dt>{{ $t('czsc.symbol') }}</dt><dd>{{ normalized.symbol }}</dd></div>
+            <div><dt>{{ $t('czsc.symbol') }}</dt><dd>{{ formatSymbolLabel(normalized) }}</dd></div>
             <div><dt>{{ $t('czsc.timeframe') }}</dt><dd>{{ normalized.timeframe }}</dd></div>
             <div><dt>{{ $t('czsc.currentEvent') }}</dt><dd>{{ actionLabel(normalized.action) }}</dd></div>
             <div><dt>{{ $t('czsc.reviewQuantity') }}</dt><dd>{{ normalized.quantity }}</dd></div>
@@ -105,6 +105,7 @@
 
 <script>
 import { getRetraqSignalStatus, normalizeTradingViewSignal, submitCzscToRetraq, submitExternalSignalToRetraq } from '@/api/czsc'
+import { formatCzscSymbolLabel } from '@/utils/czscSymbols'
 
 export default {
   name: 'CzscReviewPanel',
@@ -166,7 +167,7 @@ export default {
       if (!this.candidate || this.submitting) return
       this.$confirm({
         title: this.$t('czsc.confirmReviewSubmit'),
-        content: `${this.candidate.symbol} · ${this.actionLabel(this.candidate.action)} · ${this.quantity}`,
+        content: `${this.formatSymbolLabel(this.candidate)} · ${this.actionLabel(this.candidate.action)} · ${this.quantity}`,
         okText: this.$t('czsc.confirmSubmit'),
         cancelText: this.$t('czsc.cancel'),
         onOk: () => this.submit()
@@ -271,6 +272,9 @@ export default {
       } catch (error) {
         return '{}'
       }
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item)
     }
   }
 }

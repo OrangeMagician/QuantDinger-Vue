@@ -18,7 +18,7 @@
             mode="combobox"
             show-search
             allow-clear
-            option-label-prop="value"
+            option-label-prop="label"
             dropdown-class-name="czsc-symbol-dropdown"
             :placeholder="$t('czsc.symbolPlaceholder')"
             :filter-option="false"
@@ -32,13 +32,15 @@
               v-for="item in symbolOptions"
               :key="item.symbol"
               :value="item.symbol"
+              :label="formatSymbolLabel(item)"
             >
               <div class="symbol-option">
-                <strong>{{ item.symbol }}</strong>
-                <span>{{ item.name || item.exchange }}</span>
+                <strong>{{ symbolCode(item.symbol) }}</strong>
+                <span>{{ symbolName(item) }}</span>
               </div>
             </a-select-option>
           </a-select>
+          <small v-if="currentSymbolName" class="symbol-current-name">{{ currentSymbolName }}</small>
         </label>
         <label class="control-field timeframe-field">
           <span>{{ $t('czsc.timeframe') }}</span>
@@ -71,7 +73,7 @@
           <a-checkbox v-model="visibility.strokes">{{ $t('czsc.strokes') }}</a-checkbox>
           <a-checkbox v-model="visibility.unfinished">{{ $t('czsc.unfinished') }}</a-checkbox>
           <a-checkbox v-model="visibility.signals">{{ $t('czsc.enhancedSignals') }}</a-checkbox>
-          <span v-if="analysis" class="active-symbol">{{ analysis.symbol }} · {{ analysis.frequency }}</span>
+          <span v-if="analysis" class="active-symbol">{{ activeAnalysisSymbolLabel }} · {{ analysis.frequency }}</span>
         </div>
 
         <a-alert
@@ -269,6 +271,14 @@ import { Empty } from 'ant-design-vue'
 import { mapState } from 'vuex'
 import { analyzeCzsc, getCzscHealth, getCzscTemplates, searchCzscSymbols } from '@/api/czsc'
 import { getScriptTemplateList } from '@/api/strategy'
+import {
+  czscSymbolCode,
+  czscSymbolName,
+  DEFAULT_CZSC_SYMBOL_ITEMS,
+  formatCzscSymbolLabel,
+  normalizeCzscSymbol,
+  updateCzscSymbolMeta
+} from '@/utils/czscSymbols'
 import BacktestPanel from './components/BacktestPanel.vue'
 import CzscChart from './components/CzscChart.vue'
 import DashboardPanel from './components/DashboardPanel.vue'
@@ -289,7 +299,7 @@ export default {
   data () {
     return {
       activeTab: 'structure',
-      symbolInput: '000333.SZ',
+      symbolInput: '000333',
       timeframe: '30m',
       limit: 1000,
       limits: [500, 1000, 2000, 5000],
@@ -309,6 +319,7 @@ export default {
       selectedTemplateId: 'classic_bs_v1',
       templateError: '',
       symbolOptions: [],
+      symbolMeta: updateCzscSymbolMeta({}, DEFAULT_CZSC_SYMBOL_ITEMS),
       symbolSearching: false,
       symbolSearchTimer: null,
       reviewCandidate: null,
@@ -322,6 +333,12 @@ export default {
     },
     normalizedSymbol () {
       return this.normalizeCzscSymbol(this.symbolInput)
+    },
+    activeAnalysisSymbolLabel () {
+      return this.formatSymbolLabel(this.analysis || this.normalizedSymbol)
+    },
+    currentSymbolName () {
+      return this.symbolName(this.analysis || this.normalizedSymbol)
     },
     summary () {
       return (this.analysis && this.analysis.summary) || {
@@ -381,7 +398,7 @@ export default {
         const state = raw ? JSON.parse(raw) : null
         if (!state || typeof state !== 'object') return
         if (state.activeTab) this.activeTab = state.activeTab
-        if (state.symbolInput) this.symbolInput = state.symbolInput
+        if (state.symbolInput) this.symbolInput = this.symbolCode(state.symbolInput)
         if (state.timeframe) this.timeframe = state.timeframe
         if (state.limit) this.limit = Number(state.limit)
         if (state.selectedTemplateId) this.selectedTemplateId = state.selectedTemplateId
@@ -392,7 +409,7 @@ export default {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
           activeTab: this.activeTab,
-          symbolInput: this.symbolInput,
+          symbolInput: this.symbolCode(this.symbolInput),
           timeframe: this.timeframe,
           limit: this.limit,
           selectedTemplateId: this.selectedTemplateId,
@@ -444,7 +461,7 @@ export default {
     },
     handleSymbolChange (value) {
       const normalized = this.normalizeCzscSymbol(value)
-      this.symbolInput = normalized || String(value || '').trim().toUpperCase()
+      this.symbolInput = normalized ? this.symbolCode(normalized) : String(value || '').trim().toUpperCase()
       this.persistWorkbenchState()
     },
     async searchSymbols (keyword) {
@@ -456,29 +473,32 @@ export default {
         const items = Array.isArray(data.items) ? data.items : []
         const current = this.normalizedSymbol
         const map = new Map()
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, items)
         items.forEach(item => {
-          if (item && item.symbol) map.set(item.symbol, item)
+          if (item && item.symbol) map.set(item.symbol, this.symbolMeta[this.normalizeCzscSymbol(item.symbol)] || item)
         })
         if (current && !map.has(current)) {
-          map.set(current, { symbol: current, name: '', exchange: current.slice(-2) })
+          map.set(current, this.symbolMeta[current] || { symbol: current, name: '', exchange: current.slice(-2) })
         }
         this.symbolOptions = Array.from(map.values())
       } catch (error) {
         const fallback = this.normalizeCzscSymbol(kw)
-        this.symbolOptions = fallback ? [{ symbol: fallback, name: '', exchange: fallback.slice(-2) }] : []
+        this.symbolOptions = fallback ? [this.symbolMeta[fallback] || { symbol: fallback, name: '', exchange: fallback.slice(-2) }] : []
       } finally {
         this.symbolSearching = false
       }
     },
     normalizeCzscSymbol (value) {
-      const raw = String(value || '').trim().toUpperCase()
-      if (!raw) return ''
-      if (/^[0-9]{6}\.(SH|SZ|BJ)$/.test(raw)) return raw
-      const code = raw.replace(/[^0-9]/g, '')
-      if (!/^[0-9]{6}$/.test(code)) return raw
-      if (/^(600|601|603|605|688|689|900)/.test(code) || code.startsWith('6')) return `${code}.SH`
-      if (/^(000|001|002|003|159|200|300|301)/.test(code) || /^[023]/.test(code)) return `${code}.SZ`
-      return `${code}.BJ`
+      return normalizeCzscSymbol(value)
+    },
+    symbolCode (value) {
+      return czscSymbolCode(value)
+    },
+    symbolName (item) {
+      return czscSymbolName(item, this.symbolMeta)
+    },
+    formatSymbolLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolMeta)
     },
     contextChanged () {
       this.persistWorkbenchState()
@@ -486,19 +506,21 @@ export default {
     },
     async runAnalysis () {
       if (this.loading) return
-      this.symbolInput = this.normalizedSymbol
-      if (!/^[0-9]{6}\.(SH|SZ|BJ)$/.test(this.symbolInput)) {
+      const symbol = this.normalizedSymbol
+      if (!/^[0-9]{6}\.(SH|SZ|BJ)$/.test(symbol)) {
         this.error = this.$t('czsc.symbolInvalid')
         return
       }
+      this.symbolInput = this.symbolCode(symbol)
       this.loading = true
       this.error = ''
       try {
-        const response = await analyzeCzsc({ symbol: this.normalizedSymbol, timeframe: this.timeframe, limit: this.limit })
+        const response = await analyzeCzsc({ symbol, timeframe: this.timeframe, limit: this.limit })
         if (!response || response.code !== 1 || !response.data) {
           throw new Error((response && response.msg) || this.$t('czsc.loadFailed'))
         }
         this.analysis = response.data
+        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [response.data])
         this.workerOnline = true
         this.persistWorkbenchState()
       } catch (error) {
@@ -515,18 +537,20 @@ export default {
     },
     viewChart (row) {
       if (!row || !row.symbol) return
-      this.symbolInput = row.symbol
+      this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [row])
+      this.symbolInput = this.symbolCode(row.symbol)
       this.activeTab = 'structure'
       this.$nextTick(() => this.runAnalysis())
     },
     backtestRow (row) {
       if (!row || !row.symbol) return
-      this.symbolInput = row.symbol
+      this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [row])
+      this.symbolInput = this.symbolCode(row.symbol)
       this.activeTab = 'backtest'
       this.persistWorkbenchState()
     },
     importTradingViewContext (context) {
-      this.symbolInput = context.symbol
+      this.symbolInput = this.symbolCode(context.symbol)
       this.timeframe = context.timeframe
       this.selectedTemplateId = context.template_id
       this.activeTab = 'strategy'
@@ -570,6 +594,7 @@ export default {
 .symbol-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .symbol-option strong { color: #262626; font-variant-numeric: tabular-nums; }
 .symbol-option span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
+.symbol-current-name { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
 .timeframe-field { min-width: 210px; }
 .limit-field { width: 92px; }
 .icon-button { width: 32px; padding: 0; }
