@@ -4,6 +4,7 @@
 
 <script>
 import { init, registerOverlay } from 'klinecharts'
+import { marketPalette } from '@/utils/marketColors'
 
 let overlaysRegistered = false
 
@@ -47,7 +48,7 @@ function registerCzscOverlays () {
         const point = coordinates[0]
         const data = overlay.extendData || {}
         const top = data.kind === 'top'
-        const color = data.color || (top ? '#fa541c' : '#08979c')
+        const color = data.color || (top ? '#389e0d' : '#cf1322')
         const confirmed = data.confirmed !== false
         const textY = point.y + (top ? -13 : 13)
         return [
@@ -175,6 +176,7 @@ export default {
     applyTheme () {
       if (!this.chart) return
       const dark = this.dark
+      const market = marketPalette(dark)
       this.chart.setStyles({
         grid: {
           horizontal: { color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(31,41,55,0.08)', style: 'dashed' },
@@ -182,13 +184,13 @@ export default {
         },
         candle: {
           bar: {
-            upColor: '#08979c',
-            downColor: '#fa541c',
+            upColor: market.rise,
+            downColor: market.fall,
             noChangeColor: '#8c8c8c',
-            upBorderColor: '#08979c',
-            downBorderColor: '#fa541c',
-            upWickColor: '#08979c',
-            downWickColor: '#fa541c'
+            upBorderColor: market.rise,
+            downBorderColor: market.fall,
+            upWickColor: market.rise,
+            downWickColor: market.fall
           },
           tooltip: { showRule: 'always', showType: 'standard' }
         },
@@ -231,6 +233,7 @@ export default {
       this.clearOverlays()
       const result = this.analysis
       if (!result) return
+      const market = marketPalette(this.dark)
 
       if (this.visibility.strokes) {
         ;(result.strokes || []).forEach(stroke => {
@@ -241,7 +244,7 @@ export default {
               { timestamp: Number(stroke.end_timestamp), value: Number(stroke.end_price) }
             ],
             extendData: {
-              color: stroke.direction === 'up' ? '#08979c' : '#fa541c',
+              color: stroke.direction === 'up' ? market.rise : market.fall,
               lineWidth: 2
             },
             lock: true

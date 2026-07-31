@@ -53,7 +53,7 @@
 
       <section class="enhanced-strip">
         <h3>{{ $t('czsc.enhancedSignals') }}</h3>
-        <a-tag v-for="signal in result.enhanced_signals" :key="signal.id" :color="signal.direction === 'bullish' ? 'green' : signal.direction === 'bearish' ? 'volcano' : ''">
+        <a-tag v-for="signal in result.enhanced_signals" :key="signal.id" :color="signal.direction === 'bullish' ? '#cf1322' : signal.direction === 'bearish' ? '#389e0d' : ''">
           {{ signal.signal_type_label || signal.signal_type }}
         </a-tag>
       </section>

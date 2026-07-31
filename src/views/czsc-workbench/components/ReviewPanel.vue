@@ -23,7 +23,7 @@
             <div><dt>{{ $t('czsc.timeframe') }}</dt><dd>{{ candidate.timeframe }}</dd></div>
             <div><dt>{{ $t('czsc.template') }}</dt><dd>{{ candidateTemplateName }}</dd></div>
             <div><dt>{{ $t('czsc.retraqStrategyId') }}</dt><dd>{{ candidateStrategyId }}</dd></div>
-            <div><dt>{{ $t('czsc.currentEvent') }}</dt><dd><a-tag :color="candidate.action === 'open_long' ? 'green' : 'volcano'">{{ actionLabel(candidate.action) }}</a-tag></dd></div>
+            <div><dt>{{ $t('czsc.currentEvent') }}</dt><dd><a-tag :color="candidate.action === 'open_long' ? '#cf1322' : '#389e0d'">{{ actionLabel(candidate.action) }}</a-tag></dd></div>
             <div><dt>{{ $t('czsc.matchedFactor') }}</dt><dd>{{ candidateFactor }}</dd></div>
             <div><dt>{{ $t('czsc.barTime') }}</dt><dd>{{ candidate.bar.datetime }}</dd></div>
             <div><dt>{{ $t('czsc.referencePrice') }}</dt><dd>{{ Number(candidate.bar.close).toFixed(2) }}</dd></div>

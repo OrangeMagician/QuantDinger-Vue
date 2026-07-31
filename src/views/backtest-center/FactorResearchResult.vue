@@ -54,6 +54,7 @@
 <script>
 import * as echarts from 'echarts'
 import moment from 'moment'
+import { marketPalette } from '@/utils/marketColors'
 
 export default {
   name: 'FactorResearchResult',
@@ -73,7 +74,7 @@ export default {
         { key: 'positive', label: this.$t('strategyV2.factorResearch.icPositiveRate'), value: this.formatRate(this.result.icPositiveRate), tone: '' },
         { key: 'monotonicity', label: this.$t('strategyV2.factorResearch.monotonicity'), value: this.formatNumber(this.result.monotonicity, 3), tone: this.tone(this.result.monotonicity) },
         { key: 'coverage', label: this.$t('strategyV2.factorResearch.coverage'), value: this.formatRate(this.result.coverage), tone: '' },
-        { key: 'missing', label: this.$t('strategyV2.factorResearch.missingRate'), value: this.formatRate(this.result.missingRate), tone: Number(this.result.missingRate) > 0.2 ? 'negative' : '' },
+        { key: 'missing', label: this.$t('strategyV2.factorResearch.missingRate'), value: this.formatRate(this.result.missingRate), tone: Number(this.result.missingRate) > 0.2 ? 'risk-negative' : '' },
         { key: 'turnover', label: this.$t('strategyV2.factorResearch.turnover'), value: this.formatRate(this.result.averageTurnover), tone: '' },
         { key: 'longShort', label: this.$t('strategyV2.factorResearch.netLongShort'), value: this.formatRate(this.result.netLongShortReturn), tone: this.tone(this.result.netLongShortReturn) }
       ]
@@ -119,6 +120,7 @@ export default {
       }
       const text = this.isDark ? '#8c8c8c' : '#64748b'
       const grid = this.isDark ? '#242424' : '#e8edf3'
+      const market = marketPalette(this.isDark)
       const groupSeries = (this.result.groupCurves || []).map(item => ({ name: `Q${item.group}`, type: 'line', data: (item.points || []).map(point => [moment(point.time).valueOf(), Number(point.net)]), showSymbol: false, xAxisIndex: 0, yAxisIndex: 0 }))
       const longShort = (this.result.longShortCurve || []).map(point => [moment(point.time).valueOf(), Number(point.net)])
       const ic = (this.result.icSeries || []).map(point => [moment(point.time).valueOf(), Number(point.value)])
@@ -139,7 +141,7 @@ export default {
         series: [
           ...groupSeries,
           { name: this.$t('strategyV2.factorResearch.longShortNetValue'), type: 'line', data: longShort, showSymbol: false, xAxisIndex: 0, yAxisIndex: 0, lineStyle: { width: 2.6, type: 'dashed' } },
-          { name: this.$t('strategyV2.factorResearch.rankIc'), type: 'bar', data: ic, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: params => Number(params.value[1]) >= 0 ? '#52c41a' : '#ff4d4f' } },
+          { name: this.$t('strategyV2.factorResearch.rankIc'), type: 'bar', data: ic, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: params => Number(params.value[1]) >= 0 ? market.rise : market.fall } },
           { name: this.$t('strategyV2.factorResearch.rollingIc'), type: 'line', data: rolling, showSymbol: false, xAxisIndex: 1, yAxisIndex: 1, lineStyle: { width: 2 } }
         ]
       }, true)
@@ -151,7 +153,7 @@ export default {
     tone (value) { const number = Number(value || 0); return number > 0 ? 'positive' : number < 0 ? 'negative' : '' },
     signedCell (value, digits = 2) { return this.$createElement('span', { class: this.tone(value) }, `${Number(value) > 0 ? '+' : ''}${this.formatNumber(value, digits)}`) },
     percentCell (value) { return this.$createElement('span', { class: this.tone(value) }, `${Number(value) > 0 ? '+' : ''}${this.formatRate(value)}`) },
-    correlationCellStyle (value) { const alpha = Math.min(0.8, Math.abs(Number(value || 0)) * 0.75 + 0.08); return { background: Number(value) >= 0 ? `rgba(82,196,26,${alpha})` : `rgba(255,77,79,${alpha})` } }
+    correlationCellStyle (value) { const alpha = Math.min(0.8, Math.abs(Number(value || 0)) * 0.75 + 0.08); return { background: Number(value) >= 0 ? `rgba(245,34,45,${alpha})` : `rgba(82,196,26,${alpha})` } }
   }
 }
 </script>
@@ -162,8 +164,9 @@ export default {
 .metric-card { display: flex; flex-direction: column; gap: 3px; }
 .metric-card span, .overview-card span { color: #7c8ca1; font-size: 11px; }
 .metric-card strong { color: #20324a; font-size: 18px; }
-.positive { color: #16a34a !important; }
-.negative { color: #dc2626 !important; }
+.positive { color: var(--market-rise-color) !important; }
+.negative { color: var(--market-fall-color) !important; }
+.risk-negative { color: #dc2626 !important; }
 .chart-card { margin-top: 12px; padding: 13px; border: 1px solid #edf0f4; border-radius: 8px; }
 .chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .chart-heading h3 { margin: 0; color: #26364c; font-size: 14px; }

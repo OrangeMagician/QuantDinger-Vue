@@ -326,7 +326,7 @@
               >
                 <div class="qt-pos-row">
                   <span>{{ $t('quickTrade.side') }}</span>
-                  <a-tag :color="pos.side === 'long' ? '#52c41a' : '#f5222d'" size="small">
+                  <a-tag :color="pos.side === 'long' ? '#cf1322' : '#389e0d'" size="small">
                     {{ pos.side === 'long'
                       ? (isSwapMode ? $t('quickTrade.long') : $t('quickTrade.spotHold'))
                       : $t('quickTrade.short') }}
@@ -354,7 +354,7 @@
                 </div>
                 <div class="qt-pos-row">
                   <span>{{ $t('quickTrade.unrealizedPnl') }}</span>
-                  <span :class="pos.unrealized_pnl >= 0 ? 'qt-green' : 'qt-red'">
+                  <span :class="pos.unrealized_pnl >= 0 ? 'qt-rise' : 'qt-fall'">
                     ${{ formatPrice(pos.unrealized_pnl) }}
                   </span>
                 </div>
@@ -390,7 +390,7 @@
                 <div class="qt-trade-list">
                   <div class="qt-trade-item" v-for="t in recentTrades" :key="t.id">
                     <div class="qt-trade-main">
-                      <a-tag :color="t.side === 'buy' ? '#52c41a' : '#f5222d'" size="small">
+                      <a-tag :color="t.side === 'buy' ? '#cf1322' : '#389e0d'" size="small">
                         {{ t.side === 'buy' ? 'LONG' : 'SHORT' }}
                       </a-tag>
                       <span class="qt-trade-symbol">{{ t.symbol }}</span>
@@ -1885,31 +1885,31 @@ export default {
     user-select: none;
   }
   .qt-dir-long {
-    color: #52c41a;
-    background: rgba(82, 196, 26, 0.06);
-    border-color: rgba(82, 196, 26, 0.2);
+    color: var(--market-rise-color);
+    background: var(--market-rise-soft);
+    border-color: var(--market-rise-border);
     &.active {
-      background: #52c41a;
+      background: var(--market-rise-strong);
       color: #fff;
-      border-color: #52c41a;
-      box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+      border-color: var(--market-rise-strong);
+      box-shadow: 0 4px 12px var(--market-rise-border);
     }
     &:hover:not(.active) {
-      border-color: #52c41a;
+      border-color: var(--market-rise-strong);
     }
   }
   .qt-dir-short {
-    color: #f5222d;
-    background: rgba(245, 34, 45, 0.06);
-    border-color: rgba(245, 34, 45, 0.2);
+    color: var(--market-fall-color);
+    background: var(--market-fall-soft);
+    border-color: var(--market-fall-border);
     &.active {
-      background: #f5222d;
+      background: var(--market-fall-strong);
       color: #fff;
-      border-color: #f5222d;
-      box-shadow: 0 4px 12px rgba(245, 34, 45, 0.3);
+      border-color: var(--market-fall-strong);
+      box-shadow: 0 4px 12px var(--market-fall-border);
     }
     &:hover:not(.active) {
-      border-color: #f5222d;
+      border-color: var(--market-fall-strong);
     }
   }
 }
@@ -2140,7 +2140,7 @@ export default {
 }
 
 .qt-tp-label {
-  color: #389e0d !important;
+  color: var(--market-rise-color) !important;
 }
 
 .qt-sl-label {
@@ -2187,16 +2187,16 @@ export default {
     letter-spacing: 0.5px;
   }
   .qt-btn-long {
-    background: #52c41a !important;
-    border-color: #52c41a !important;
-    &:hover { background: #73d13d !important; }
-    &:active { background: #389e0d !important; }
+    background: var(--market-rise-strong) !important;
+    border-color: var(--market-rise-strong) !important;
+    &:hover { background: #ff7875 !important; }
+    &:active { background: var(--market-rise-color) !important; }
   }
   .qt-btn-short {
-    background: #f5222d !important;
-    border-color: #f5222d !important;
-    &:hover { background: #ff4d4f !important; }
-    &:active { background: #cf1322 !important; }
+    background: var(--market-fall-strong) !important;
+    border-color: var(--market-fall-strong) !important;
+    &:hover { background: #73d13d !important; }
+    &:active { background: var(--market-fall-color) !important; }
   }
 }
 
@@ -2273,8 +2273,8 @@ export default {
   & + .qt-position-card {
     margin-top: 10px;
   }
-  &.long { border-left-color: #52c41a; }
-  &.short { border-left-color: #f5222d; }
+  &.long { border-left-color: var(--market-rise-color); }
+  &.short { border-left-color: var(--market-fall-color); }
   .qt-pos-row {
     display: flex;
     justify-content: space-between;
@@ -2295,8 +2295,8 @@ export default {
   align-items: center;
 }
 
-.qt-green { color: #52c41a !important; }
-.qt-red   { color: #f5222d !important; }
+.qt-rise { color: var(--market-rise-color) !important; }
+.qt-fall { color: var(--market-fall-color) !important; }
 
 .qt-trade-list {
   .qt-trade-item {
@@ -2513,7 +2513,7 @@ export default {
     color: #73d13d;
   }
   .qt-tp-label {
-    color: #95de64 !important;
+    color: #ff7875 !important;
   }
   .qt-sl-label {
     color: #ff7875 !important;

@@ -405,23 +405,23 @@ export default {
     getTradeTypeColor (type) {
       const ty = String(type || '').toLowerCase()
       const colorMap = {
-        buy: 'green',
-        sell: 'red',
+        buy: '#cf1322',
+        sell: '#389e0d',
         liquidation: 'volcano',
-        open_long: 'green',
-        add_long: 'cyan',
-        close_long: 'orange',
+        open_long: '#cf1322',
+        add_long: '#cf1322',
+        close_long: '#389e0d',
         close_long_stop: 'red',
-        close_long_profit: 'lime',
-        close_long_trailing: 'purple',
-        reduce_long: 'geekblue',
-        open_short: 'magenta',
-        add_short: 'volcano',
-        close_short: 'blue',
+        close_long_profit: '#389e0d',
+        close_long_trailing: '#389e0d',
+        reduce_long: '#389e0d',
+        open_short: '#389e0d',
+        add_short: '#389e0d',
+        close_short: '#cf1322',
         close_short_stop: 'red',
-        close_short_profit: 'cyan',
-        close_short_trailing: 'purple',
-        reduce_short: 'geekblue'
+        close_short_profit: '#cf1322',
+        close_short_trailing: '#cf1322',
+        reduce_short: '#cf1322'
       }
       return colorMap[ty] || 'default'
     },
@@ -565,8 +565,8 @@ export default {
     span { display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; }
     strong { font-size: 16px; font-variant-numeric: tabular-nums; }
   }
-  .cost-positive { color: @success-color; }
-  .cost-negative { color: @danger-color; }
+  .cost-positive { color: var(--market-rise-color); }
+  .cost-negative { color: var(--market-fall-color); }
   .cost-neutral { color: #64748b; }
   &.theme-dark .cost-summary-card {
     background: #171717;
@@ -602,10 +602,10 @@ export default {
     font-variant-numeric: tabular-nums;
   }
   .ta-pnl-pos {
-    color: #0ecb81 !important;
+    color: var(--market-rise-color) !important;
   }
   .ta-pnl-neg {
-    color: #f6465d !important;
+    color: var(--market-fall-color) !important;
   }
   .ta-pnl-zero {
     color: #64748b !important;
@@ -1560,10 +1560,10 @@ body.realdark .trading-records * {
   }
 
   ::v-deep .ant-table-tbody > tr > td .ta-pnl-pos {
-    color: #49c292 !important;
+    color: #ff6b7a !important;
   }
   ::v-deep .ant-table-tbody > tr > td .ta-pnl-neg {
-    color: #ff6b7a !important;
+    color: #49c292 !important;
   }
 
   ::v-deep .ant-tag {

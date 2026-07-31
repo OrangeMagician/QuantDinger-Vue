@@ -487,8 +487,8 @@ export default {
       return this.$t('czsc.hold')
     },
     actionColor (action) {
-      if (action === 'open_long') return 'green'
-      if (action === 'close_long') return 'volcano'
+      if (action === 'open_long') return 'red'
+      if (action === 'close_long') return 'green'
       if (action === 'error') return 'red'
       return ''
     },

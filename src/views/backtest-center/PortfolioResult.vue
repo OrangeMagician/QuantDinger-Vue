@@ -501,7 +501,7 @@ export default {
             price: entryPrice,
             text: this.$t('strategyV2.backtest.entryMarker'),
             side: isShort ? 'sell' : 'buy',
-            color: isShort ? '#f6465d' : '#0ecb81'
+            color: isShort ? '#389e0d' : '#cf1322'
           }))
         }
         if (Number.isFinite(exitPrice)) {
@@ -510,7 +510,7 @@ export default {
             price: exitPrice,
             text: this.$t('strategyV2.backtest.exitMarker'),
             side: isShort ? 'buy' : 'sell',
-            color: isShort ? '#0ecb81' : '#f6465d'
+            color: isShort ? '#cf1322' : '#389e0d'
           }))
         }
         this.focusReviewRange(chart, entryTime, exitTime)
@@ -592,8 +592,8 @@ export default {
 .metric-label { display: inline-flex; align-items: center; gap: 5px; }
 .metric-label .anticon { cursor: help; }
 .metric-card strong { color: #20324a; font-size: 18px; font-variant-numeric: tabular-nums; }
-.positive { color: #16a34a !important; }
-.negative { color: #dc2626 !important; }
+.positive { color: var(--market-rise-color) !important; }
+.negative { color: var(--market-fall-color) !important; }
 .neutral { color: #94a3b8 !important; }
 .chart-card { margin-top: 12px; padding: 13px; border: 1px solid #edf0f4; border-radius: 8px; }
 .chart-heading { display: flex; justify-content: space-between; gap: 16px; }

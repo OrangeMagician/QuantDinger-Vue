@@ -106,8 +106,8 @@ export default {
   gap: 12px;
 }
 .bp-table-count { font-size: 12px; color: #8c8c8c; }
-.pnl-positive { color: #389e0d; font-weight: 600; font-variant-numeric: tabular-nums; }
-.pnl-negative { color: #cf1322; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pnl-positive { color: var(--market-rise-color); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pnl-negative { color: var(--market-fall-color); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .bp-table-wrapper.theme-dark {
   .bp-table-count { color: rgba(255, 255, 255, 0.48); }

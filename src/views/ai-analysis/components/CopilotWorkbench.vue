@@ -5379,13 +5379,13 @@ export default {
 }
 
 .watch-change.up {
-  color: var(--qd-green);
-  background: rgba(10, 163, 117, 0.12);
+  color: var(--market-rise-color);
+  background: var(--market-rise-soft);
 }
 
 .watch-change.down {
-  color: var(--qd-red);
-  background: rgba(229, 75, 75, 0.12);
+  color: var(--market-fall-color);
+  background: var(--market-fall-soft);
 }
 
 .watch-actions {
@@ -5446,11 +5446,11 @@ export default {
 }
 
 .up {
-  color: var(--qd-green);
+  color: var(--market-rise-color);
 }
 
 .down {
-  color: var(--qd-red);
+  color: var(--market-fall-color);
 }
 
 .event-title-row {

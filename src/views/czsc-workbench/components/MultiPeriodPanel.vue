@@ -26,7 +26,7 @@
 
       <section class="signal-callout">
         <div>
-          <a-tag :color="result.resonance_signal.direction === 'bullish' ? 'green' : result.resonance_signal.direction === 'bearish' ? 'volcano' : 'blue'">
+          <a-tag :color="result.resonance_signal.direction === 'bullish' ? '#cf1322' : result.resonance_signal.direction === 'bearish' ? '#389e0d' : 'blue'">
             {{ directionLabel(result.resonance_signal.direction) }}
           </a-tag>
           <strong>{{ $t('czsc.multiPeriodSignal') }}</strong>
@@ -42,7 +42,7 @@
         <article v-for="row in result.signal_tree" :key="row.timeframe" class="period-card">
           <header>
             <strong>{{ row.timeframe }}</strong>
-            <a-tag :color="row.direction === 'up' || row.direction === 'bullish' ? 'green' : row.direction === 'down' || row.direction === 'bearish' ? 'volcano' : ''">
+            <a-tag :color="row.direction === 'up' || row.direction === 'bullish' ? '#cf1322' : row.direction === 'down' || row.direction === 'bearish' ? '#389e0d' : ''">
               {{ directionLabel(row.direction) }}
             </a-tag>
           </header>
@@ -181,8 +181,8 @@ export default {
 .metric-grid > div { display: flex; min-height: 62px; flex-direction: column; justify-content: center; padding: 8px 14px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
 .metric-grid span, .period-card dt, .signal-callout small { color: #8c8c8c; font-size: 10px; }
 .metric-grid strong { font-size: 17px; }
-.positive { color: #08979c; }
-.negative { color: #fa541c; }
+.positive { color: var(--market-rise-color); }
+.negative { color: var(--market-fall-color); }
 .signal-callout { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 14px; border: 1px solid #d9f7be; border-radius: 8px; background: #fcfff7; }
 .signal-callout strong { margin-left: 6px; }
 .signal-callout p { margin: 8px 0 4px; color: #434343; font-size: 12px; }

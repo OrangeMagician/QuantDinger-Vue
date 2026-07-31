@@ -206,10 +206,10 @@ export default {
     },
     getSignalColor (signal) {
       const map = {
-        overbought: 'volcano',
-        oversold: 'green',
-        bullish_momentum: 'cyan',
-        bearish_momentum: 'red'
+        overbought: '#389e0d',
+        oversold: '#cf1322',
+        bullish_momentum: '#cf1322',
+        bearish_momentum: '#389e0d'
       }
       return map[signal] || 'default'
     },
@@ -490,14 +490,12 @@ export default {
           font-weight: 700;
           color: #222;
 
-          &.rc-up   { color: #16a34a; }
-          &.rc-down { color: #dc2626; }
+          &.rc-up   { color: var(--market-rise-color); }
+          &.rc-down { color: var(--market-fall-color); }
 
           &.rc-signal-val { font-size: 11px; font-weight: 600; }
-          &.rc-signal-bullish_momentum { color: #0891b2; }
-          &.rc-signal-overbought       { color: #d97706; }
-          &.rc-signal-oversold         { color: #16a34a; }
-          &.rc-signal-bearish_momentum { color: #dc2626; }
+          &.rc-signal-bullish_momentum, &.rc-signal-oversold { color: var(--market-rise-color); }
+          &.rc-signal-bearish_momentum, &.rc-signal-overbought { color: var(--market-fall-color); }
         }
       }
 
@@ -635,12 +633,10 @@ export default {
           .rc-metric-label { color: #666; }
           .rc-metric-value {
             color: #ddd;
-            &.rc-up   { color: #4ade80; }
-            &.rc-down { color: #f87171; }
-            &.rc-signal-bullish_momentum { color: #22d3ee; }
-            &.rc-signal-overbought       { color: #fbbf24; }
-            &.rc-signal-oversold         { color: #4ade80; }
-            &.rc-signal-bearish_momentum { color: #f87171; }
+            &.rc-up   { color: var(--market-rise-color); }
+            &.rc-down { color: var(--market-fall-color); }
+            &.rc-signal-bullish_momentum, &.rc-signal-oversold { color: var(--market-rise-color); }
+            &.rc-signal-bearish_momentum, &.rc-signal-overbought { color: var(--market-fall-color); }
           }
         }
 

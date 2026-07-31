@@ -239,8 +239,8 @@ export default {
 .metric-grid > div { display: flex; min-height: 68px; flex-direction: column; justify-content: center; padding: 8px 12px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
 .metric-grid span { color: #8c8c8c; font-size: 10px; }
 .metric-grid strong { margin-top: 3px; font-size: 17px; font-variant-numeric: tabular-nums; }
-.positive { color: #08979c; }
-.negative { color: #cf1322; }
+.positive { color: var(--market-rise-color); }
+.negative { color: var(--market-fall-color); }
 .assumption-strip { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 2px; color: #595959; font-size: 11px; }
 .assumption-strip span::before { display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: #08979c; content: ''; vertical-align: 1px; }
 .equity-region, .trade-region { margin-top: 20px; }

@@ -77,7 +77,7 @@
           <div v-if="evaluation.enhanced_signals && evaluation.enhanced_signals.length" class="enhanced-grid">
             <article v-for="signal in evaluation.enhanced_signals.slice(0, 8)" :key="signal.id" class="enhanced-card">
               <div>
-                <a-tag :color="signal.direction === 'bullish' ? 'green' : signal.direction === 'bearish' ? 'volcano' : ''">
+                <a-tag :color="signal.direction === 'bullish' ? '#cf1322' : signal.direction === 'bearish' ? '#389e0d' : ''">
                   {{ signal.direction_label }}
                 </a-tag>
                 <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>
@@ -107,7 +107,7 @@
           <h3>{{ $t('czsc.factorEvents') }}</h3>
           <div v-for="(event, action) in evaluation.events" :key="action" class="event-group">
             <div class="event-heading">
-              <a-tag :color="event.matched ? (action === 'open_long' ? 'green' : 'volcano') : ''">
+              <a-tag :color="event.matched ? (action === 'open_long' ? '#cf1322' : '#389e0d') : ''">
                 {{ actionLabel(action) }}
               </a-tag>
               <span>{{ event.operate }}</span>
@@ -235,8 +235,8 @@ export default {
 .system-template-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .evaluation-result { margin-top: 18px; }
 .result-status { display: flex; align-items: center; gap: 12px; min-height: 70px; padding: 10px 14px; border-left: 3px solid #bfbfbf; background: #fafafa; }
-.result-status.open_long { border-color: #08979c; }
-.result-status.close_long { border-color: #fa541c; }
+.result-status.open_long { border-color: var(--market-rise-color); }
+.result-status.close_long { border-color: var(--market-fall-color); }
 .status-icon { display: grid; width: 34px; height: 34px; place-items: center; color: #595959; font-size: 18px; }
 .result-status > div { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 .result-status span, .result-status small { color: #8c8c8c; font-size: 10px; }

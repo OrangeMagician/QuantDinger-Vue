@@ -132,7 +132,7 @@
               <div v-if="enhancedSignals.length" class="enhanced-signal-cards">
                 <article v-for="signal in enhancedSignals" :key="signal.id" class="enhanced-signal-card">
                   <div>
-                    <a-tag :color="signal.direction === 'bullish' ? 'green' : signal.direction === 'bearish' ? 'volcano' : ''">
+                    <a-tag :color="signal.direction === 'bullish' ? '#cf1322' : signal.direction === 'bearish' ? '#389e0d' : ''">
                       {{ signal.direction_label }}
                     </a-tag>
                     <strong>{{ signal.signal_type_label || signal.signal_type }}</strong>
@@ -595,8 +595,8 @@ export default {
 .summary-grid > div { min-width: 0; padding: 10px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
 .summary-grid dt, .metadata-list dt { color: #8c8c8c; font-size: 11px; }
 .summary-grid dd { margin: 4px 0 0; color: #262626; font-size: 20px; line-height: 24px; font-variant-numeric: tabular-nums; }
-.summary-grid dd.up, .direction-mark.up { color: #08979c; }
-.summary-grid dd.down, .direction-mark.down { color: #fa541c; }
+.summary-grid dd.up, .direction-mark.up { color: var(--market-rise-color); }
+.summary-grid dd.down, .direction-mark.down { color: var(--market-fall-color); }
 .metadata-list { margin: 0 0 22px; }
 .metadata-list > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid #ebedf0; }
 .metadata-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #434343; text-align: right; font-size: 12px; }

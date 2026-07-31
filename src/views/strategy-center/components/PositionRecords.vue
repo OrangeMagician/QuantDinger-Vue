@@ -29,7 +29,7 @@
           <strong>{{ record.symbol || text }}</strong>
         </template>
         <template slot="side" slot-scope="text, record">
-          <a-tag :color="(record.side || text) === 'long' ? 'green' : 'red'">
+          <a-tag :color="(record.side || text) === 'long' ? '#cf1322' : '#389e0d'">
             {{ (record.side || text) === 'long' ? $t('trading-assistant.table.long') : $t('trading-assistant.table.short') }}
           </a-tag>
         </template>
@@ -410,6 +410,8 @@ export default {
 @primary-color: #1890ff;
 @success-color: #0ecb81;
 @danger-color: #f6465d;
+@market-rise-color: #f6465d;
+@market-fall-color: #0ecb81;
 
 .position-records {
   width: 100%;
@@ -513,12 +515,12 @@ export default {
   }
 
   .profit {
-    color: @success-color;
+    color: @market-rise-color;
     font-weight: 700;
   }
 
   .loss {
-    color: @danger-color;
+    color: @market-fall-color;
     font-weight: 700;
   }
 

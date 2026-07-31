@@ -1803,11 +1803,11 @@ export default {
     }
 
     .positive {
-      color: #52c41a !important;
+      color: var(--market-rise-color) !important;
     }
 
     .negative {
-      color: #f5222d !important;
+      color: var(--market-fall-color) !important;
     }
 
     &__best,

@@ -621,8 +621,8 @@ export default {
     },
     directionModeColor (mode) {
       return {
-        long_only: 'green',
-        short_only: 'red',
+        long_only: 'red',
+        short_only: 'green',
         both: 'blue',
         neutral: 'purple'
       }[normalizeDirectionMode(mode)] || 'default'

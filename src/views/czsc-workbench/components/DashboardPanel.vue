@@ -71,7 +71,7 @@
         <h3>{{ $t('czsc.multiPeriodCenter') }}</h3>
         <article v-for="item in result.multi_period" :key="item.symbol" class="resonance-card">
           <strong>{{ item.symbol }}</strong>
-          <a-tag :color="item.summary.direction === 'bullish' ? 'green' : item.summary.direction === 'bearish' ? 'volcano' : ''">
+          <a-tag :color="item.summary.direction === 'bullish' ? '#cf1322' : item.summary.direction === 'bearish' ? '#389e0d' : ''">
             {{ item.summary.direction }}
           </a-tag>
           <span>{{ item.resonance_signal && item.resonance_signal.explanation }}</span>

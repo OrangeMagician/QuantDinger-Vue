@@ -170,6 +170,7 @@ import { init, registerIndicator, registerOverlay } from 'klinecharts'
 import request from '@/utils/request'
 import ExchangeKlineWs from '@/utils/exchangeWs'
 import { splitIndicatorPlotsByPane } from '@/utils/indicatorPlotGrouping'
+import { marketPalette } from '@/utils/marketColors'
 import { usePyodide } from '@/services/pyodide/usePyodide'
 import {
   calculateSMA,
@@ -1382,7 +1383,7 @@ const defaultSignalText = (signal, side) => {
 
 const defaultSignalColor = (signal, side) => {
   if (signal?.color) return signal.color
-  return side === 'buy' ? '#22C55E' : '#EF4444'
+  return side === 'buy' ? marketPalette(false).riseStrong : marketPalette(false).fallStrong
 }
 
 const parseSignalValue = (value) => {
@@ -3210,6 +3211,7 @@ registerOverlay({
 
       const theme = themeConfig.value
       const isDark = chartTheme.value === 'dark'
+      const market = marketPalette(isDark)
 
       chartRef.value.setStyles({
         grid: {
@@ -3264,8 +3266,8 @@ registerOverlay({
             }
           },
           bar: {
-            upColor: isDark ? '#0ecb81' : '#13c2c2',
-            downColor: isDark ? '#f6465d' : '#fa541c',
+            upColor: market.rise,
+            downColor: market.fall,
             noChangeColor: theme.borderColor
           },
           area: {

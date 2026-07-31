@@ -1025,8 +1025,8 @@ export default {
 .metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .metric-card { padding: 13px; border: 1px solid #edf0f4; border-radius: 9px; background: #f7f9fc; }
 .metric-card strong { font-size: 20px; color: #20324a; }
-.positive { color: #16a34a !important; }
-.negative { color: #dc2626 !important; }
+.positive { color: var(--market-rise-color) !important; }
+.negative { color: var(--market-fall-color) !important; }
 .trade-profit { font-weight: 700; font-variant-numeric: tabular-nums; }
 .neutral { color: #94a3b8 !important; }
 .run-id { color: #8a97aa; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

@@ -564,7 +564,7 @@ export default {
 .row-status > i.running { background: #28a85f; }.row-status > i.warning { background: #e16b47; }.row-status > i.stopped { background: #858c96; }
 .row-status em { width: max-content; padding: 1px 5px; border: 1px solid #dfe3e8; border-radius: 3px; color: #697382; font-size: 11px; font-style: normal; font-weight: 500; }.row-status em.live { border-color: rgba(222, 164, 24, .35); color: #a66f00; }
 .row-pnl { text-align: right; color: #596273; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.profit { color: #24a25a !important; }.loss { color: #d95656 !important; }
+.profit { color: var(--market-rise-color) !important; }.loss { color: var(--market-fall-color) !important; }
 .list-empty, .section-empty { display: flex; align-items: center; justify-content: center; min-height: 180px; color: #949ca7; }.section-empty.compact { min-height: 110px; }
 .strategy-master footer { padding: 12px 16px; border-top: 1px solid #e7eaf0; color: #7d8794; font-size: 12px; }
 .strategy-detail { min-width: 0; padding: 18px; background: #fff; }
