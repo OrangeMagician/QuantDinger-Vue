@@ -1,11 +1,25 @@
 <template>
   <span v-if="currentUser && currentUser.name" class="ant-pro-account-avatar qd-account-trigger">
     <a-dropdown placement="bottomRight" overlayClassName="qd-account-dropdown">
-      <span class="account-identity" @click.stop="handleProfile">
+      <span class="account-avatar-button" :title="currentUser.name" :aria-label="currentUser.name">
         <a-avatar :size="28" :src="currentUser.avatar" class="antd-pro-global-header-index-avatar" />
-        <span class="account-name">{{ currentUser.name }}</span>
       </span>
       <a-menu slot="overlay" mode="vertical" class="qd-account-menu" :selected-keys="[]">
+        <a-menu-item key="identity" disabled class="account-menu-identity">
+          <a-avatar :size="28" :src="currentUser.avatar" />
+          <span class="account-menu-name">{{ currentUser.name }}</span>
+        </a-menu-item>
+        <a-menu-divider />
+        <a-menu-item key="credits" @click="handleCredits">
+          <a-icon type="wallet" />
+          <span>{{ $t('profile.credits.wallet') }}</span>
+          <strong class="account-menu-credits">{{ formattedCredits }}</strong>
+        </a-menu-item>
+        <a-menu-item key="billing" @click="handleBilling">
+          <a-icon type="credit-card" />
+          {{ $t('profile.credits.rechargeShort') || 'Top Up' }}
+        </a-menu-item>
+        <a-menu-divider />
         <a-menu-item key="profile" @click="handleProfile">
           <a-icon type="user" />
           {{ $t('menu.myProfile') || $t('menu.profile') || 'Profile' }}
@@ -16,13 +30,6 @@
         </a-menu-item>
       </a-menu>
     </a-dropdown>
-    <span class="account-credits" @click.stop="handleCredits">
-      <a-icon type="wallet" />
-      <strong>{{ formattedCredits }}</strong>
-    </span>
-    <a-button size="small" type="primary" class="account-recharge" @click.stop="handleBilling">
-      <span>{{ $t('profile.credits.rechargeShort') || '充值' }}</span>
-    </a-button>
   </span>
   <span v-else>
     <a-spin size="small" :style="{ marginLeft: 8, marginRight: 8 }" />
@@ -110,23 +117,19 @@ export default {
 .qd-account-trigger {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 10px;
   min-width: 0;
   height: 64px !important;
-  margin-right: 8px;
-  padding: 0 4px !important;
+  margin: 0;
+  padding: 0 !important;
   line-height: normal !important;
   vertical-align: top;
 
-  .account-identity {
+  .account-avatar-button {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    min-width: 0;
-    height: 32px;
-    padding: 0 7px 0 3px;
-    border-radius: 9px;
-    line-height: 32px;
+    justify-content: center;
+    width: 44px;
+    height: 64px;
     cursor: pointer;
     transition: background 0.16s ease, color 0.16s ease;
 
@@ -142,78 +145,18 @@ export default {
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
   }
 
-  .account-name {
-    max-width: 104px;
-    overflow: hidden;
-    color: rgba(15, 23, 42, 0.86);
-    font-size: 13px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .account-credits {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 9px;
-    border: 1px solid color-mix(in srgb, var(--primary-color, #1890ff) 18%, transparent);
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--primary-color, #1890ff) 5%, #fff);
-    color: var(--primary-color, #1890ff);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 30px;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background 0.16s ease, border-color 0.16s ease;
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--primary-color, #1890ff) 34%, transparent);
-      background: color-mix(in srgb, var(--primary-color, #1890ff) 9%, #fff);
-    }
-
-    .anticon {
-      font-size: 13px;
-    }
-
-    strong {
-      color: var(--primary-color, #1890ff);
-      font-size: 13px;
-      font-weight: 700;
-    }
-  }
-
-  .account-recharge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 9px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 30px;
-    box-shadow: 0 3px 8px color-mix(in srgb, var(--primary-color, #1890ff) 22%, transparent);
-
-    span {
-      line-height: 1;
-    }
-  }
 }
 
 .qd-account-dropdown {
-  width: 172px;
-  min-width: 172px;
+  width: 208px;
+  min-width: 208px;
 
   .qd-account-menu.ant-menu,
   .qd-account-menu.ant-dropdown-menu {
     display: flex !important;
     flex-direction: column !important;
-    width: 172px !important;
-    min-width: 172px !important;
+    width: 208px !important;
+    min-width: 208px !important;
     padding: 6px !important;
     border: 0;
     border-radius: 8px;
@@ -227,9 +170,9 @@ export default {
     flex: 0 0 auto;
     float: none !important;
     clear: both;
-    width: 160px !important;
+    width: 196px !important;
     height: 36px !important;
-    min-width: 160px !important;
+    min-width: 196px !important;
     margin: 0 !important;
     padding: 0 10px !important;
     border-radius: 6px;
@@ -247,6 +190,28 @@ export default {
       line-height: 1;
     }
   }
+
+  .account-menu-identity.ant-menu-item-disabled {
+    height: 48px !important;
+    color: rgba(15, 23, 42, 0.88) !important;
+    cursor: default;
+    opacity: 1;
+
+    .ant-avatar { margin-right: 10px; }
+  }
+
+  .account-menu-name {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+  }
+
+  .account-menu-credits {
+    margin-left: auto;
+    color: var(--primary-color, #1890ff);
+    font-size: 12px;
+  }
 }
 
 body.dark .qd-account-trigger,
@@ -255,23 +220,8 @@ body.realdark .qd-account-trigger,
 .ant-layout.realdark .qd-account-trigger,
 .ant-pro-layout.dark .qd-account-trigger,
 .ant-pro-layout.realdark .qd-account-trigger {
-  .account-credits {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--primary-color, #1890ff) !important;
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--primary-color, #1890ff) 36%, transparent);
-      background: color-mix(in srgb, var(--primary-color, #1890ff) 12%, transparent);
-    }
-  }
-
-  .account-identity:hover {
+  .account-avatar-button:hover {
     background: rgba(255, 255, 255, 0.08);
-  }
-
-  .account-name {
-    color: rgba(248, 250, 252, 0.92) !important;
   }
 }
 
@@ -290,33 +240,6 @@ body.realdark .qd-account-trigger,
   }
   .ant-dropdown-menu-item {
     min-width: 160px;
-  }
-}
-
-@media (max-width: 1280px) {
-  .qd-account-trigger {
-    gap: 10px;
-    padding-right: 6px !important;
-
-    .account-credits {
-      height: 30px;
-      padding: 0 9px;
-    }
-
-    .account-recharge {
-      height: 30px;
-      padding: 0 12px;
-    }
-  }
-}
-
-@media (max-width: 920px) {
-  .qd-account-trigger {
-    .account-name,
-    .account-credits,
-    .account-recharge {
-      display: none;
-    }
   }
 }
 
@@ -350,6 +273,10 @@ body.realdark .qd-account-menu.ant-menu,
     .anticon {
       color: rgba(255, 255, 255, 0.85);
     }
+  }
+
+  .account-menu-identity.ant-menu-item-disabled {
+    color: rgba(255, 255, 255, 0.9) !important;
   }
 
   .ant-dropdown-menu-item-divider {

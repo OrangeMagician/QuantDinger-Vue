@@ -7035,9 +7035,9 @@ export default {
   "indicatorIde.signalAlert.deleteConfirmContent": "{symbol} {timeframe} 的通知任务将停止。",
   "indicatorIde.signalAlert.deleted": "已删除",
   "indicatorIde.signalAlert.deleteFailed": "删除失败",
-  "menu.dashboard.trendChart": "走势图",
+  "menu.dashboard.trendChart": "走势",
   "menu.dashboard.market": "市场",
-  "menu.dashboard.strategyMarket": "策略市场",
+  "menu.dashboard.strategyMarket": "策略",
   "menu.dashboard.taskCenter": "任务中心",
   "trendChart.adjustQfq": "前复权",
   "trendChart.adjustNone": "不复权",
@@ -7122,7 +7122,7 @@ export default {
   "taskCenter.types.evaluate": "信号评估",
   "taskCenter.types.research_ops": "研究任务",
   "taskCenter.allTypes": "全部任务类型",
-  "menu.dashboard.marketScreener": "条件选股",
+  "menu.dashboard.marketScreener": "选股",
   "marketScreener.title": "条件选股",
   "marketScreener.subtitle": "从统一关注列表或股票池运行因子与信号条件扫描",
   "marketScreener.refresh": "刷新目录",
@@ -7240,5 +7240,9 @@ export default {
   "signalReviews.approveConfirm": "通过这条候选信号？",
   "signalReviews.rejectConfirm": "拒绝这条候选信号？",
   "signalReviews.saved": "审核结果已保存",
-  "signalReviews.loadFailed": "信号审核队列加载失败"
+  "signalReviews.loadFailed": "信号审核队列加载失败",
+  "settings.group.page_preferences": "页面设置",
+  "settings.page.language": "界面语言",
+  "settings.page.languageDescription": "切换系统菜单和页面文字使用的语言",
+  "profile.credits.wallet": "钱包"
 }

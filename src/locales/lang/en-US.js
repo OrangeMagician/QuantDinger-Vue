@@ -7247,9 +7247,9 @@ export default {
   "trading-assistant.form.marginNotionalCapacity": "Maximum notional capacity: {margin} × {leverage} = {notional} USDT",
   "quickTrade.marginAmount": "Margin Amount",
   "quickTrade.marginNotionalFormula": "Estimated position value: {margin} × {leverage} = {notional} {currency}",
-  "menu.dashboard.trendChart": "Trend Chart",
+  "menu.dashboard.trendChart": "Trend",
   "menu.dashboard.market": "Market",
-  "menu.dashboard.strategyMarket": "Strategy Marketplace",
+  "menu.dashboard.strategyMarket": "Strategy",
   "menu.dashboard.taskCenter": "Task Center",
   "trendChart.adjustQfq": "Forward adjusted",
   "trendChart.adjustNone": "Unadjusted",
@@ -7334,7 +7334,7 @@ export default {
   "taskCenter.types.evaluate": "Signal evaluation",
   "taskCenter.types.research_ops": "Research task",
   "taskCenter.allTypes": "All task types",
-  "menu.dashboard.marketScreener": "Stock Screener",
+  "menu.dashboard.marketScreener": "Screener",
   "marketScreener.title": "Stock Screener",
   "marketScreener.subtitle": "Run factor and signal conditions over the shared watchlist or stock pool",
   "marketScreener.refresh": "Refresh catalog",
@@ -7452,5 +7452,9 @@ export default {
   "signalReviews.approveConfirm": "Approve this candidate signal?",
   "signalReviews.rejectConfirm": "Reject this candidate signal?",
   "signalReviews.saved": "Review saved",
-  "signalReviews.loadFailed": "Failed to load the signal review queue"
+  "signalReviews.loadFailed": "Failed to load the signal review queue",
+  "settings.group.page_preferences": "Page Settings",
+  "settings.page.language": "Interface language",
+  "settings.page.languageDescription": "Choose the language used for system menus and page text",
+  "profile.credits.wallet": "Wallet"
 }

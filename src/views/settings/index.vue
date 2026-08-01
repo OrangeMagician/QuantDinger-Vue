@@ -216,6 +216,24 @@
             </a-form>
           </div>
 
+          <div v-else-if="activeGroupKey === 'page_preferences'" class="settings-detail-inner page-preferences-panel">
+            <div class="detail-header">
+              <a-icon type="skin" class="detail-icon" />
+              <h3 class="detail-title">{{ $t('settings.group.page_preferences') }}</h3>
+            </div>
+            <section class="page-language-setting">
+              <div>
+                <h3>{{ $t('settings.page.language') }}</h3>
+                <p>{{ $t('settings.page.languageDescription') }}</p>
+              </div>
+              <a-radio-group :value="currentLanguage" button-style="solid" @change="handleLanguageChange">
+                <a-radio-button value="zh-CN">简体中文</a-radio-button>
+                <a-radio-button value="en-US">English</a-radio-button>
+              </a-radio-group>
+            </section>
+            <setting-drawer embedded :settings="pageSettings" @change="handlePageSettingChange" />
+          </div>
+
           <div v-else-if="currentGroup" class="settings-detail-inner">
             <div class="detail-header">
               <a-icon :type="currentGroup.icon || getGroupIcon(activeGroupKey)" class="detail-icon" />
@@ -703,7 +721,7 @@
       </div>
     </a-spin>
 
-    <div v-if="activeGroupKey !== 'market_catalog'" class="settings-footer">
+    <div v-if="!['market_catalog', 'page_preferences'].includes(activeGroupKey)" class="settings-footer">
       <a-button @click="handleReset" :disabled="saving">
         <a-icon type="undo" />
         {{ $t('settings.reset') }}
@@ -721,9 +739,11 @@ import { getSettingsSchema, getSettingsValues, saveSettings, getOpenRouterBalanc
 import { getMarketModules } from '@/api/marketModules'
 import { getSystemUniverseOverview, syncSystemUniverses } from '@/api/universe'
 import { baseMixin } from '@/store/app-mixin'
+import SettingDrawer from '@/components/SettingDrawer/SettingDrawer'
 
 export default {
   name: 'Settings',
+  components: { SettingDrawer },
   mixins: [baseMixin],
   data () {
     return {
@@ -733,7 +753,7 @@ export default {
       values: {},
       // The vertically-listed group currently selected in the left nav.
       // Defaults to the first group in ``sortedSchema`` once data arrives.
-      activeGroupKey: '',
+      activeGroupKey: 'page_preferences',
       // Free-text search across every group / item. Non-empty value switches
       // the right-side detail pane into "search results" mode.
       searchKeyword: '',
@@ -766,6 +786,12 @@ export default {
           icon: 'database',
           order: 4,
           items: []
+        },
+        page_preferences: {
+          title: this.$t('settings.group.page_preferences'),
+          icon: 'skin',
+          order: -1,
+          items: []
         }
       })
       entries.sort((a, b) => {
@@ -782,6 +808,23 @@ export default {
     // Currently selected group object (right-side detail content).
     currentGroup () {
       return this.sortedSchema[this.activeGroupKey] || null
+    },
+    currentLanguage () {
+      return this.$store.state.app.lang
+    },
+    pageSettings () {
+      return {
+        layout: this.layout,
+        contentWidth: this.contentWidth,
+        theme: this.navTheme,
+        primaryColor: this.primaryColor,
+        marketColorConvention: this.marketColorConvention,
+        fixedHeader: this.fixedHeader,
+        fixSiderbar: this.fixedSidebar,
+        autoHideHeader: this.autoHideHeader,
+        colorWeak: this.colorWeak,
+        multiTab: this.multiTab
+      }
     },
     currentDisplayEntries () {
       const items = this.currentGroup && Array.isArray(this.currentGroup.items)
@@ -1095,6 +1138,12 @@ export default {
       this.activeGroupKey = key
       this.searchKeyword = ''
     },
+    handleLanguageChange (event) {
+      this.$store.dispatch('setLang', event.target.value)
+    },
+    handlePageSettingChange (payload) {
+      this.$root.$emit('page-setting-change', payload)
+    },
     tOr (key, fallback) {
       const text = this.$t(key)
       return text && text !== key ? text : fallback
@@ -1335,7 +1384,8 @@ export default {
         agent: 'experiment',
         security: 'safety',
         billing: 'dollar',
-        market_catalog: 'database'
+        market_catalog: 'database',
+        page_preferences: 'skin'
       }
       return icons[groupKey] || 'setting'
     },
@@ -1775,6 +1825,30 @@ export default {
     }
   }
 
+  .page-language-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    max-width: 680px;
+    margin-bottom: 24px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+
+    h3 {
+      margin: 0 0 4px;
+      color: #1e293b;
+      font-size: 15px;
+    }
+
+    p {
+      margin: 0;
+      color: #64748b;
+      font-size: 13px;
+    }
+  }
+
   .commercial-license-notice {
     margin-top: 24px;
 
@@ -2133,6 +2207,14 @@ export default {
       }
     }
 
+    .page-language-setting {
+      border-color: rgba(255, 255, 255, 0.1);
+      background: #171717;
+
+      h3 { color: #e0e6ed; }
+      p { color: #8b949e; }
+    }
+
     .settings-nav {
       background: #181818;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
@@ -2337,6 +2419,21 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .settings-page .page-language-setting {
+    align-items: flex-start;
+    flex-direction: column;
+
+    ::v-deep .ant-radio-group {
+      display: flex;
+      width: 100%;
+    }
+
+    ::v-deep .ant-radio-button-wrapper {
+      flex: 1;
+      text-align: center;
+    }
+  }
+
   .settings-page {
     padding: 12px !important;
     padding-bottom: 104px !important;

@@ -7004,5 +7004,12 @@ export default {
   "trading-assistant.form.initialMargin": "投入保證金",
   "trading-assistant.form.marginNotionalCapacity": "最大可用名義價值: {margin} × {leverage} = {notional} USDT",
   "quickTrade.marginAmount": "投入保證金",
-  "quickTrade.marginNotionalFormula": "預計持倉價值: {margin} × {leverage} = {notional} {currency}"
+  "quickTrade.marginNotionalFormula": "預計持倉價值: {margin} × {leverage} = {notional} {currency}",
+  "menu.dashboard.trendChart": "走勢",
+  "menu.dashboard.strategyMarket": "策略",
+  "menu.dashboard.marketScreener": "選股",
+  "settings.group.page_preferences": "頁面設定",
+  "settings.page.language": "介面語言",
+  "settings.page.languageDescription": "切換系統選單和頁面文字使用的語言",
+  "profile.credits.wallet": "錢包"
 }

@@ -1,14 +1,11 @@
 <template>
-  <div class="setting-drawer" :class="{ 'setting-drawer--dark': isDarkDrawer }">
-    <a-drawer
-      v-if="visible"
-      width="300"
-      placement="right"
+  <div class="setting-drawer" :class="{ 'setting-drawer--dark': isDarkDrawer, 'setting-drawer--embedded': embedded }">
+    <component
+      :is="embedded ? 'div' : 'a-drawer'"
+      v-if="embedded || visible"
+      v-bind="drawerProps"
+      class="setting-drawer-surface"
       @close="onClose"
-      :closable="true"
-      :visible="visible"
-      :get-container="false"
-      :destroy-on-close="true"
     >
       <div class="setting-drawer-index-content">
 
@@ -175,7 +172,7 @@
         <a-divider />
         <slot />
       </div>
-    </a-drawer>
+    </component>
   </div>
 </template>
 
@@ -191,6 +188,10 @@ export default {
     SettingItem
   },
   props: {
+    embedded: {
+      type: Boolean,
+      default: false
+    },
     settings: {
       type: Object,
       default: () => ({})
@@ -204,6 +205,17 @@ export default {
     }
   },
   computed: {
+    drawerProps () {
+      if (this.embedded) return {}
+      return {
+        width: 300,
+        placement: 'right',
+        closable: true,
+        visible: this.visible,
+        getContainer: false,
+        destroyOnClose: true
+      }
+    },
     colorList () {
       return getColorList()
     },
@@ -360,6 +372,19 @@ export default {
 </script>
 
 <style lang="less" scoped>
+  .setting-drawer--embedded {
+    width: 100%;
+
+    .setting-drawer-surface,
+    .setting-drawer-index-content {
+      width: 100%;
+    }
+
+    .setting-drawer-index-content {
+      max-width: 680px;
+    }
+  }
+
   :deep(.ant-drawer-handle),
   :deep(.setting-drawer-index-handle) {
     display: none !important;

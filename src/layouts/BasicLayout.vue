@@ -43,63 +43,9 @@
         </div>
       </a-modal>
 
-      <setting-drawer ref="settingDrawer" :settings="settings" @change="handleSettingChange">
-        <div class="setting-drawer-support">
-          <div class="support-block">
-            <div class="support-title">{{ $t('menu.footer.contactUs') }}</div>
-            <div class="support-links">
-              <a :href="menuFooterConfig.contact.support_url" target="_blank" rel="noopener noreferrer">{{ $t('menu.footer.support') }}</a>
-              <span class="separator">|</span>
-              <a :href="menuFooterConfig.contact.feature_request_url" target="_blank" rel="noopener noreferrer">{{ $t('menu.footer.featureRequest') }}</a>
-            </div>
-          </div>
-          <div class="support-block">
-            <div class="support-title">{{ $t('menu.footer.getSupport') }}</div>
-            <div class="support-links">
-              <a :href="'mailto:' + menuFooterConfig.contact.email">{{ $t('menu.footer.email') }}</a>
-              <span class="separator">|</span>
-              <a :href="menuFooterConfig.contact.live_chat_url" target="_blank" rel="noopener noreferrer">{{ $t('menu.footer.liveChat') }}</a>
-            </div>
-          </div>
-          <div class="support-block" v-if="menuFooterConfig.social_accounts && menuFooterConfig.social_accounts.length > 0">
-            <div class="support-title">{{ $t('menu.footer.socialAccounts') }}</div>
-            <div class="support-socials">
-              <a
-                v-for="(account, index) in menuFooterConfig.social_accounts"
-                :key="index"
-                :href="account.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                :title="account.name"
-                class="support-social"
-              >
-                <Icon :icon="`simple-icons:${account.icon}`" />
-              </a>
-            </div>
-          </div>
-          <div class="support-legal">
-            <a
-              v-if="menuFooterConfig.legal.user_agreement_url"
-              :href="menuFooterConfig.legal.user_agreement_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >{{ $t('menu.footer.userAgreement') }}</a>
-            <a v-else @click="showLegalModal = true">{{ $t('menu.footer.userAgreement') }}</a>
-            <span class="separator">&</span>
-            <a
-              v-if="menuFooterConfig.legal.privacy_policy_url"
-              :href="menuFooterConfig.legal.privacy_policy_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >{{ $t('menu.footer.privacyPolicy') }}</a>
-            <a v-else @click="showPrivacyModal = true">{{ $t('menu.footer.privacyPolicy') }}</a>
-          </div>
-          <div class="support-copy">{{ menuFooterConfig.copyright }}</div>
-          <div class="support-version">V{{ appVersion }}</div>
-        </div>
-      </setting-drawer>
       <template #rightContentRender>
         <div class="layout-top-actions">
+          <right-content :top-menu="settings.layout === 'topmenu'" :is-mobile="isMobile" :theme="settings.theme" />
           <a-dropdown
             v-if="showTopAdminShortcut"
             placement="bottomRight"
@@ -109,10 +55,10 @@
               class="top-admin-shortcut"
               :class="{ 'top-admin-shortcut--active': topAdminShortcutActive }"
               type="button"
+              :title="topAdminTitle"
+              :aria-label="topAdminTitle"
             >
               <a-icon type="setting" />
-              <span>{{ topAdminTitle }}</span>
-              <a-icon type="down" class="top-admin-shortcut__arrow" />
             </button>
             <a-menu slot="overlay" :selected-keys="[$route.path]" @click="handleTopAdminMenuClick">
               <a-menu-item v-for="route in topAdminRoutes" :key="route.path">
@@ -121,7 +67,6 @@
               </a-menu-item>
             </a-menu>
           </a-dropdown>
-          <right-content :top-menu="settings.layout === 'topmenu'" :is-mobile="isMobile" :theme="settings.theme" />
         </div>
       </template>
       <!-- custom footer removed -->
@@ -235,7 +180,6 @@ import {
 
 import defaultSettings from '@/config/defaultSettings'
 import RightContent from '@/components/GlobalHeader/RightContent'
-import SettingDrawer from '@/components/SettingDrawer/SettingDrawer'
 import MultiTab from '@/components/MultiTab'
 import RouteView from './RouteView'
 import { Icon } from '@iconify/vue2'
@@ -247,7 +191,6 @@ import { migrateLegacyCzscResults } from '@/utils/czscLegacyMigration'
 export default {
   name: 'BasicLayout',
   components: {
-    SettingDrawer,
     RightContent,
     MultiTab,
     RouteView,
@@ -453,11 +396,7 @@ export default {
     // first update color
     // TIPS: THEME COLOR HANDLER!! PLEASE CHECK THAT!!
 
-    this.$root.$on('show-setting-drawer', () => {
-      if (this.$refs.settingDrawer) {
-        this.$refs.settingDrawer.showDrawer()
-      }
-    })
+    this.$root.$on('page-setting-change', this.handleSettingChange)
 
     // Footer config is static for local OSS build
 
@@ -534,7 +473,7 @@ export default {
     }, 200)
   },
   beforeDestroy () {
-    this.$root.$off('show-setting-drawer')
+    this.$root.$off('page-setting-change', this.handleSettingChange)
     window.removeEventListener('resize', this.updateMenuFooterPosition)
 
     if (this._menuFooterObserver) {

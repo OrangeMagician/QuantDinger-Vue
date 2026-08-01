@@ -101,6 +101,7 @@ export const asyncRouterMap = [
         path: '/tasks',
         name: 'TaskCenter',
         component: () => import('@/views/task-center'),
+        hidden: true,
         meta: { title: 'menu.dashboard.taskCenter', keepAlive: true, icon: 'profile', permission: ['dashboard'] }
       },
       {
