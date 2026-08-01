@@ -2,50 +2,78 @@
   <section class="scan-panel">
     <div class="scan-layout">
       <aside class="scan-sidebar">
-        <label class="field symbols-field">
-          <span>{{ $t('czsc.scanSymbols') }}</span>
-          <a-textarea v-model="symbolsText" :rows="5" :placeholder="$t('czsc.scanPlaceholder')" @change="persistState" />
-        </label>
-        <div class="selected-symbols-preview">
-          <a-tag v-for="item in selectedSymbolItems" :key="item.symbol">{{ formatSymbolLabel(item) }}</a-tag>
+        <div class="pool-head">
+          <div>
+            <strong>{{ $t('czsc.stockPool') }}</strong>
+            <small>{{ $t('czsc.stockPoolDesc') }}</small>
+          </div>
+          <a-tag>{{ poolTotalLabel }}</a-tag>
         </div>
 
-        <div class="symbol-search-row">
-          <a-select
-            v-model="selectedSearchSymbol"
-            show-search
-            allow-clear
-            option-label-prop="label"
-            :filter-option="false"
-            :placeholder="$t('czsc.symbolPlaceholder')"
-            :not-found-content="symbolSearching ? undefined : $t('czsc.noSymbolFound')"
-            @search="handleSymbolSearch"
-            @focus="searchSymbols('')"
-          >
-            <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
-            <a-select-option v-for="item in symbolOptions" :key="item.symbol" :value="symbolCode(item.symbol)" :label="formatSymbolLabel(item)">
-              <div class="symbol-option"><strong>{{ symbolCode(item.symbol) }}</strong><span>{{ symbolName(item) }}</span></div>
-            </a-select-option>
-          </a-select>
-          <a-button icon="plus" @click="addSearchSymbol">{{ $t('czsc.addSymbol') }}</a-button>
+        <div class="pool-switches">
+          <a-checkbox v-model="stockPool.exclude_st" @change="persistState">{{ $t('czsc.excludeSt') }}</a-checkbox>
+          <div class="recent-filter-row">
+            <a-checkbox :checked="stockPool.exclude_recent_days > 0" @change="toggleExcludeRecent">{{ $t('czsc.excludeRecentList') }}</a-checkbox>
+            <a-input-number
+              v-model="stockPool.exclude_recent_days"
+              :min="0"
+              :max="3650"
+              :step="30"
+              :disabled="stockPool.exclude_recent_days <= 0"
+              @change="persistState"
+            />
+          </div>
         </div>
 
         <label class="field">
-          <span>{{ $t('czsc.template') }}</span>
-          <a-select :value="templateId" @change="$emit('update:templateId', $event)">
-            <a-select-option v-for="item in templates" :key="item.id" :value="item.id">
-              {{ templateName(item) }}
+          <span>{{ $t('czsc.industryFilter') }}</span>
+          <a-select
+            v-model="stockPool.industries"
+            mode="tags"
+            allow-clear
+            show-search
+            :loading="poolOptionsLoading"
+            :placeholder="$t('czsc.industryPlaceholder')"
+            @focus="loadPoolOptions"
+            @change="persistState"
+          >
+            <a-select-option v-for="industry in poolOptions.industries" :key="industry" :value="industry">
+              {{ industry }}
             </a-select-option>
           </a-select>
         </label>
 
+        <div class="range-grid">
+          <label class="field">
+            <span>{{ $t('czsc.priceMin') }}</span>
+            <a-input-number v-model="stockPool.price_min" :min="0" :max="100000" :step="1" @change="persistState" />
+          </label>
+          <label class="field">
+            <span>{{ $t('czsc.priceMax') }}</span>
+            <a-input-number v-model="stockPool.price_max" :min="0" :max="100000" :step="1" @change="persistState" />
+          </label>
+        </div>
+
+        <div class="range-grid">
+          <label class="field">
+            <span>{{ $t('czsc.poolLimit') }}</span>
+            <a-input-number v-model="stockPool.pool_limit" :min="1" :max="100" :step="10" @change="persistState" />
+          </label>
+          <label class="field">
+            <span>{{ $t('czsc.poolSort') }}</span>
+            <a-select v-model="stockPool.sort_by" @change="persistState">
+              <a-select-option value="sort_order">{{ $t('czsc.poolSortDefault') }}</a-select-option>
+              <a-select-option value="symbol">{{ $t('czsc.poolSortSymbol') }}</a-select-option>
+              <a-select-option value="name">{{ $t('czsc.poolSortName') }}</a-select-option>
+            </a-select>
+          </label>
+        </div>
+
         <div class="scan-actions">
-          <a-button type="primary" icon="scan" :loading="loading && resultMode === 'template'" @click="runScan">
-            {{ $t('czsc.runScan') }}
-          </a-button>
-          <a-button icon="filter" :loading="loading && resultMode === 'screener'" @click="runScreener">
+          <a-button type="primary" icon="filter" :loading="loading" @click="runScreener">
             {{ $t('czsc.runFactorScreen') }}
           </a-button>
+          <a-button icon="reload" @click="resetStockPool">{{ $t('czsc.resetPoolFilters') }}</a-button>
         </div>
       </aside>
 
@@ -89,7 +117,7 @@
           <div><span>{{ $t('czsc.evaluated') }}</span><strong>{{ result.summary.evaluated }}</strong></div>
           <div><span>{{ $t('czsc.matched') }}</span><strong>{{ result.summary.matched }}</strong></div>
           <div><span>{{ $t('czsc.failed') }}</span><strong>{{ result.summary.failed }}</strong></div>
-          <div><span>{{ $t('czsc.resultMode') }}</span><strong>{{ resultModeLabel }}</strong></div>
+          <div><span>{{ $t('czsc.poolSelected') }}</span><strong>{{ resultPoolSelected }}</strong></div>
         </div>
 
         <a-table
@@ -149,21 +177,25 @@
 </template>
 
 <script>
-import { addCzscWatchlistItem, scanCzsc, screenCzscSignalFactors, searchCzscSymbols } from '@/api/czsc'
+import { addCzscWatchlistItem, getCzscStockPoolOptions, screenCzscSignalFactors } from '@/api/czsc'
 import {
   czscSymbolCode,
-  czscSymbolDisplayItem,
   czscSymbolName,
-  defaultCzscSymbolText,
   formatCzscSymbolLabel,
-  formatCzscSymbolText,
-  normalizeCzscSymbol,
-  parseCzscSymbolList,
   updateCzscSymbolMeta
 } from '@/utils/czscSymbols'
 import SignalFactorSelector from './SignalFactorSelector.vue'
 
 const STORAGE_KEY = 'quantdinger.czsc.scan.v2'
+const defaultStockPool = () => ({
+  exclude_st: true,
+  exclude_recent_days: 60,
+  industries: [],
+  price_min: null,
+  price_max: null,
+  pool_limit: 100,
+  sort_by: 'sort_order'
+})
 
 export default {
   name: 'CzscScanPanel',
@@ -177,12 +209,10 @@ export default {
   },
   data () {
     return {
-      symbolsText: defaultCzscSymbolText(3),
-      selectedSearchSymbol: undefined,
-      symbolOptions: [],
+      stockPool: defaultStockPool(),
+      poolOptions: { industries: [], total: 0, st_count: 0 },
+      poolOptionsLoading: false,
       symbolMeta: updateCzscSymbolMeta(),
-      symbolSearching: false,
-      symbolSearchTimer: null,
       enabledFactorKeys: [],
       maxDrawdownPct: 18,
       recentReturnMinPct: -5,
@@ -214,11 +244,15 @@ export default {
       return String(this.$i18n.locale || '').toLowerCase().startsWith('zh')
     },
     resultModeLabel () {
-      return this.resultMode === 'screener' ? this.$t('czsc.factorScreener') : this.$t('czsc.templateScan')
+      return this.$t('czsc.factorScreener')
     },
-    selectedSymbolItems () {
-      const symbolMeta = { ...this.workbenchSymbolMeta, ...this.symbolMeta }
-      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(symbolMeta[symbol] || symbol, symbolMeta))
+    poolTotalLabel () {
+      const total = Number(this.poolOptions.total || 0)
+      return total > 0 ? this.$t('czsc.poolTotalCount', { count: total }) : this.$t('czsc.allAsharePool')
+    },
+    resultPoolSelected () {
+      const summary = this.result && this.result.universe && this.result.universe.summary
+      return summary ? summary.selected : '-'
     },
     legacyConditions () {
       const conditions = []
@@ -234,30 +268,34 @@ export default {
   },
   created () {
     this.restoreState()
-  },
-  beforeDestroy () {
-    if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
+    this.loadPoolOptions()
   },
   methods: {
     restoreState () {
       try {
         const raw = window.localStorage.getItem(STORAGE_KEY)
         const state = raw ? JSON.parse(raw) : null
-          if (state && typeof state === 'object') {
-            if (state.symbolsText) this.symbolsText = formatCzscSymbolText(state.symbolsText)
-            if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
-            else if (Array.isArray(state.enabledFactorKeys)) {
-              this.enabledFactorKeys = state.enabledFactorKeys
-              this.maxDrawdownPct = state.maxDrawdownPct
-              this.recentReturnMinPct = state.recentReturnMinPct
-              this.signalFactorConditions = this.legacyConditions()
+        if (state && typeof state === 'object') {
+          if (state.stockPool && typeof state.stockPool === 'object') {
+            this.stockPool = {
+              ...defaultStockPool(),
+              ...state.stockPool,
+              industries: Array.isArray(state.stockPool.industries) ? state.stockPool.industries : []
             }
-            if (state.screenLogic) this.screenLogic = state.screenLogic
-            if (state.resultLimit !== undefined) this.resultLimit = Number(state.resultLimit)
-            if (state.result) {
-              this.result = state.result
-              this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, state.result.results || [])
-            }
+          }
+          if (Array.isArray(state.signalFactorConditions)) this.signalFactorConditions = state.signalFactorConditions
+          else if (Array.isArray(state.enabledFactorKeys)) {
+            this.enabledFactorKeys = state.enabledFactorKeys
+            this.maxDrawdownPct = state.maxDrawdownPct
+            this.recentReturnMinPct = state.recentReturnMinPct
+            this.signalFactorConditions = this.legacyConditions()
+          }
+          if (state.screenLogic) this.screenLogic = state.screenLogic
+          if (state.resultLimit !== undefined) this.resultLimit = Number(state.resultLimit)
+          if (state.result) {
+            this.result = state.result
+            this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, state.result.results || [])
+          }
           if (state.resultMode) this.resultMode = state.resultMode
           if (Array.isArray(state.savedTemplates)) this.savedTemplates = state.savedTemplates
         }
@@ -265,10 +303,8 @@ export default {
     },
     persistState () {
       try {
-        const symbolsText = formatCzscSymbolText(this.symbolsText)
-        if (symbolsText) this.symbolsText = symbolsText
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          symbolsText: this.symbolsText,
+          stockPool: this.stockPoolForStorage(),
           signalFactorConditions: this.signalFactorConditions,
           screenLogic: this.screenLogic,
           resultLimit: this.resultLimit,
@@ -277,12 +313,6 @@ export default {
           savedTemplates: this.savedTemplates
         }))
       } catch (error) {}
-    },
-    parsedSymbols () {
-      return parseCzscSymbolList(this.symbolsText)
-    },
-    normalizeCzscSymbol (value) {
-      return normalizeCzscSymbol(value)
     },
     symbolCode (value) {
       return czscSymbolCode(value)
@@ -293,81 +323,65 @@ export default {
     formatSymbolLabel (item) {
       return formatCzscSymbolLabel(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
-    handleSymbolSearch (keyword) {
-      if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
-      this.symbolSearchTimer = setTimeout(() => {
-        this.symbolSearchTimer = null
-        this.searchSymbols(keyword)
-      }, 240)
-    },
-    async searchSymbols (keyword) {
-      this.symbolSearching = true
-      try {
-        const response = await searchCzscSymbols({ keyword: String(keyword || '').trim(), limit: 20 })
-        const data = response && response.data ? response.data : {}
-        const items = Array.isArray(data.items) ? data.items : []
-        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, items)
-        this.symbolOptions = items.map(item => this.symbolMeta[this.normalizeCzscSymbol(item.symbol)] || item)
-      } catch (error) {
-        this.symbolOptions = []
-      } finally {
-        this.symbolSearching = false
+    stockPoolForStorage () {
+      return {
+        ...this.stockPool,
+        industries: Array.isArray(this.stockPool.industries) ? this.stockPool.industries : []
       }
     },
-    addSearchSymbol () {
-      const symbol = this.normalizeCzscSymbol(this.selectedSearchSymbol)
-      if (!symbol) return
-      const symbols = new Set(this.parsedSymbols())
-      symbols.add(symbol)
-      this.symbolsText = Array.from(symbols).map(this.symbolCode).join('\n')
-      this.selectedSearchSymbol = undefined
+    stockPoolForRequest () {
+      const pool = this.stockPoolForStorage()
+      return {
+        enabled: true,
+        exclude_st: Boolean(pool.exclude_st),
+        exclude_recent_days: Number(pool.exclude_recent_days || 0),
+        industries: pool.industries,
+        price_min: this.optionalNumber(pool.price_min),
+        price_max: this.optionalNumber(pool.price_max),
+        pool_limit: Number(pool.pool_limit || 100),
+        sort_by: pool.sort_by || 'sort_order'
+      }
+    },
+    optionalNumber (value) {
+      if (value === '' || value === null || value === undefined) return null
+      const number = Number(value)
+      return Number.isFinite(number) ? number : null
+    },
+    async loadPoolOptions () {
+      if (this.poolOptionsLoading) return
+      this.poolOptionsLoading = true
+      try {
+        const response = await getCzscStockPoolOptions()
+        const data = response && response.data ? response.data : {}
+        this.poolOptions = {
+          industries: Array.isArray(data.industries) ? data.industries : [],
+          total: Number(data.total || 0),
+          st_count: Number(data.st_count || 0)
+        }
+      } catch (error) {
+        this.poolOptions = { industries: [], total: 0, st_count: 0 }
+      } finally {
+        this.poolOptionsLoading = false
+      }
+    },
+    resetStockPool () {
+      this.stockPool = defaultStockPool()
+      this.persistState()
+    },
+    toggleExcludeRecent (event) {
+      this.stockPool.exclude_recent_days = event && event.target && event.target.checked ? 60 : 0
       this.persistState()
     },
     conditionsForRequest () {
       return Array.isArray(this.signalFactorConditions) ? this.signalFactorConditions : []
     },
-    validateSymbols (max) {
-      const symbols = this.parsedSymbols()
-      if (!symbols.length || symbols.length > max) {
-        this.error = this.$t(max === 50 ? 'czsc.scanSymbolLimit' : 'czsc.screenerSymbolLimit')
-        return null
-      }
-      return symbols
-    },
-    async runScan () {
-      const symbols = this.validateSymbols(50)
-      if (!symbols) return
-      this.loading = true
-      this.resultMode = 'template'
-      this.error = ''
-      try {
-        const response = await scanCzsc({
-          symbols,
-          timeframe: this.timeframe,
-          limit: this.limit,
-          template_id: this.templateId
-        })
-        if (!response || response.code !== 1 || !response.data) {
-          throw new Error((response && response.msg) || this.$t('czsc.scanFailed'))
-        }
-        this.result = response.data
-        this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, response.data.results || [])
-        this.persistState()
-      } catch (error) {
-        this.error = error.backendMessage || error.message || this.$t('czsc.scanFailed')
-      } finally {
-        this.loading = false
-      }
-    },
     async runScreener () {
-      const symbols = this.validateSymbols(100)
-      if (!symbols) return
       this.loading = true
       this.resultMode = 'screener'
       this.error = ''
       try {
         const response = await screenCzscSignalFactors({
-          symbols,
+          universe: this.stockPoolForRequest(),
           timeframe: this.timeframe,
           limit: this.limit,
           result_limit: Number(this.resultLimit || 50),
@@ -394,7 +408,8 @@ export default {
         name,
         signalFactorConditions: JSON.parse(JSON.stringify(this.signalFactorConditions || [])),
         screenLogic: this.screenLogic,
-        resultLimit: Number(this.resultLimit || 50)
+        resultLimit: Number(this.resultLimit || 50),
+        stockPool: this.stockPoolForStorage()
       }
       this.savedTemplates = [item, ...this.savedTemplates.filter(template => template.name !== name)].slice(0, 20)
       this.templateNameInput = ''
@@ -413,6 +428,13 @@ export default {
       }
       this.screenLogic = item.screenLogic || 'and'
       this.resultLimit = Number(item.resultLimit)
+      if (item.stockPool && typeof item.stockPool === 'object') {
+        this.stockPool = {
+          ...defaultStockPool(),
+          ...item.stockPool,
+          industries: Array.isArray(item.stockPool.industries) ? item.stockPool.industries : []
+        }
+      }
       this.persistState()
     },
     exportResult () {
@@ -539,10 +561,13 @@ export default {
 .scan-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 28px; border-right: 1px solid #e5e7eb; background: #fbfbfc; }
 .factor-workspace { min-width: 0; padding: 18px 20px 32px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
-.selected-symbols-preview { display: flex; flex-wrap: wrap; gap: 5px; margin-top: -8px; }
-.symbol-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-.symbol-option { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.symbol-option span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
+.pool-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pool-head strong { display: block; color: #262626; font-size: 14px; line-height: 1.4; }
+.pool-head small { display: block; margin-top: 3px; color: #8c8c8c; font-size: 11px; line-height: 1.4; }
+.pool-switches { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #eceef1; border-radius: 8px; background: #fff; }
+.recent-filter-row { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px; align-items: center; }
+.range-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.range-grid .ant-input-number, .range-grid .ant-select { width: 100%; }
 .scan-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .factor-head, .template-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .factor-head h2 { margin: 0 0 4px; font-size: 15px; }
@@ -569,6 +594,9 @@ export default {
 .row-actions { display: flex; gap: 4px; }
 .theme-dark .scan-panel { color: #e5e7eb; background: #171a20; }
 .theme-dark .scan-sidebar, .theme-dark .factor-grid { border-color: #30343b; background: #1c2027; }
+.theme-dark .pool-head strong { color: #f3f4f6; }
+.theme-dark .pool-head small { color: #c5cad3; }
+.theme-dark .pool-switches { border-color: #30343b; background: #171a20; }
 .theme-dark .field, .theme-dark .factor-head p { color: #c5cad3; }
 .theme-dark .factor-checkboxes >>> .ant-checkbox-wrapper { border-color: #30343b; background: #171a20; }
 .theme-dark .factor-checkboxes strong, .theme-dark .factor-head h2 { color: #f3f4f6; }

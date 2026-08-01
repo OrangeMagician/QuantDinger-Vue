@@ -34,6 +34,14 @@ export function searchCzscSymbols (params = {}) {
   })
 }
 
+export function getCzscStockPoolOptions () {
+  return request({
+    url: '/api/czsc/stock-pool/options',
+    method: 'get',
+    timeout: 15000
+  })
+}
+
 export function evaluateCzsc (data) {
   return request({
     url: '/api/czsc/evaluate',

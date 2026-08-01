@@ -233,7 +233,7 @@
       </a-tab-pane>
 
       <a-tab-pane key="scan">
-        <span slot="tab"><a-icon type="scan" />{{ $t('czsc.tabScan') }}</span>
+        <span slot="tab"><a-icon type="filter" />{{ $t('czsc.tabScan') }}</span>
         <scan-panel
           :timeframe="timeframe"
           :limit="limit"
