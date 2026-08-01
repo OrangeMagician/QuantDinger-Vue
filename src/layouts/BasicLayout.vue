@@ -242,6 +242,7 @@ import { Icon } from '@iconify/vue2'
 import logoLight from '@/assets/logo.png'
 import logoDark from '@/assets/logo_w.png'
 import slogoImg from '@/assets/slogo.png'
+import { migrateLegacyCzscResults } from '@/utils/czscLegacyMigration'
 
 export default {
   name: 'BasicLayout',
@@ -436,6 +437,9 @@ export default {
     }
   },
   mounted () {
+    migrateLegacyCzscResults().then(({ count }) => {
+      if (count) this.$message.success(this.$t('trendChart.legacyImported', { count }))
+    }).catch(() => {})
     const userAgent = navigator.userAgent
     if (userAgent.indexOf('Edge') > -1) {
       this.$nextTick(() => {
@@ -568,7 +572,7 @@ export default {
         {
           name: 'MenuGroupAI',
           path: '/menu-group/ai-workspace',
-          title: this.$t('menu.group.aiWorkspace') || 'AI Workspace',
+          title: this.$t('menu.dashboard.market') || 'Market',
           icon: 'thunderbolt',
           paths: ['/ai-asset-analysis'],
           singleAsItem: true
@@ -576,7 +580,7 @@ export default {
         {
           name: 'MenuGroupCommunity',
           path: '/menu-group/indicator-community',
-          title: this.$t('menu.dashboard.community') || 'Marketplace',
+          title: this.$t('menu.dashboard.strategyMarket') || 'Strategy Marketplace',
           icon: 'shop',
           paths: ['/indicator-community'],
           singleAsItem: true
@@ -590,11 +594,11 @@ export default {
           singleAsItem: true
         },
         {
-          name: 'MenuGroupCzsc',
-          path: '/menu-group/czsc-workbench',
-          title: this.$t('menu.dashboard.czscWorkbench') || 'CZSC',
-          icon: 'line-chart',
-          paths: ['/czsc-workbench'],
+          name: 'MenuGroupTrendChart',
+          path: '/menu-group/trend-chart',
+          title: this.$t('menu.dashboard.trendChart') || 'Trend Chart',
+          icon: 'stock',
+          paths: ['/trend-chart'],
           singleAsItem: true
         },
         {

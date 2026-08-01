@@ -1,5 +1,5 @@
 const locale = {
-  'strategyV2.backtest.mode.portfolio': 'Portfolio Backtest',
+  'strategyV2.backtest.mode.portfolio': 'Strategy Backtest',
   'strategyV2.backtest.mode.factor': 'Factor Research',
   'strategyV2.backtest.portfolioDashboard': 'Portfolio performance and risk',
   'strategyV2.backtest.chartInteractionHint': 'Hover for linked values · drag or wheel to zoom',
@@ -346,7 +346,7 @@ const zhCN = {
   'strategyV2.backtest.rangeLimitEstimate': '当前每个标的预计约 {bars} 根 K 线。日期选择器和服务端会在加载行情前共同执行限制。',
   'strategyV2.backtest.rangeLimitExceeded': '所选区间超过 {timeframe} 上限，请缩短到 {maxDays} 天以内，或改用更高 K 线周期。',
   'strategyV2.backtest.rangeLimitAdjusted': '日期区间已自动调整为 {timeframe} 的 {maxDays} 天上限。',
-  'strategyV2.backtest.mode.portfolio': '组合回测',
+  'strategyV2.backtest.mode.portfolio': '策略回测',
   'strategyV2.backtest.mode.factor': '因子研究',
   'strategyV2.backtest.portfolioDashboard': '组合表现与风险',
   'strategyV2.backtest.chartInteractionHint': '悬停联动查看数据 · 拖动或滚轮缩放',

@@ -12,24 +12,60 @@
       </div>
       <div class="sc-refresh">
         <span v-if="refreshedAt">{{ $t('systemOverview.colUpdatedAt') }} · {{ formatTime(refreshedAt) }}</span>
-        <a-button type="primary" icon="plus" @click="openCreateLive">{{ $t('strategyCenter.stats.createLive') }}</a-button>
+        <a-button v-if="activeTab === 'assets'" type="primary" icon="plus" @click="openCreateAsset">{{ $t('strategyCenter.assets.create') }}</a-button>
+        <a-button v-else type="primary" icon="plus" @click="openCreateLive">{{ $t('strategyCenter.stats.createLive') }}</a-button>
         <a-button icon="reload" :loading="loading" @click="loadStrategies">{{ $t('common.refresh') }}</a-button>
       </div>
     </header>
 
-    <live-operations-table
-      :strategies="strategies"
-      :loading="loading"
-      :load-error="loadError"
-      :dark="isDarkTheme"
-      :initial-strategy-id="initialStrategyId"
-      :control-loading-id="controlLoadingId"
-      @start="handleStart"
-      @stop="handleStop"
-      @edit="openEditLive"
-      @delete="handleDelete"
-      @open-workspace="openStrategyWorkspace"
-    />
+    <a-tabs v-model="activeTab" class="strategy-tabs">
+      <a-tab-pane key="assets" :tab="$t('strategyCenter.assets.tab')">
+        <section class="asset-library">
+          <div class="asset-library__summary">
+            <div><strong>{{ assets.length }}</strong><span>{{ $t('strategyCenter.assets.total') }}</span></div>
+            <p>{{ $t('strategyCenter.assets.hint') }}</p>
+          </div>
+          <a-table
+            row-key="strategy_version_id"
+            size="middle"
+            :loading="assetsLoading"
+            :columns="assetColumns"
+            :data-source="assets"
+            :pagination="{ pageSize: 12 }"
+            :scroll="{ x: 900 }">
+            <template slot="assetName" slot-scope="value, row">
+              <div class="asset-name"><strong>{{ row.name }}</strong><span>{{ row.description || row.template_key || '-' }}</span></div>
+            </template>
+            <template slot="kind" slot-scope="value"><a-tag>{{ value === 'portfolio' ? $t('strategyV2.portfolio') : $t('strategyV2.cta') }}</a-tag></template>
+            <template slot="engine" slot-scope="value"><a-tag :color="value === 'czsc' ? 'green' : 'blue'">{{ value === 'czsc' ? 'CZSC' : 'Native' }}</a-tag></template>
+            <template slot="version" slot-scope="value, row"><span class="version-cell">v{{ row.version_no }}<small>{{ row.checksum ? row.checksum.slice(0, 8) : '-' }}</small></span></template>
+            <template slot="status" slot-scope="value, row"><a-badge :status="row.published_at ? 'success' : 'default'" :text="row.published_at ? $t('strategyCenter.assets.published') : $t('strategyCenter.assets.draft')" /></template>
+            <template slot="assetActions" slot-scope="value, row">
+              <div class="asset-actions">
+                <a-tooltip :title="$t('strategyCenter.assets.backtest')"><a-button shape="circle" icon="bar-chart" @click="openAssetBacktest(row)" /></a-tooltip>
+                <a-tooltip :title="$t('strategyCenter.assets.review')"><a-button shape="circle" icon="audit" @click="openAssetReviews(row)" /></a-tooltip>
+                <a-tooltip v-if="row.engine === 'native'" :title="$t('strategyCenter.assets.edit')"><a-button shape="circle" icon="code" @click="openAssetEditor(row)" /></a-tooltip>
+              </div>
+            </template>
+          </a-table>
+        </section>
+      </a-tab-pane>
+      <a-tab-pane key="instances" :tab="$t('strategyCenter.assets.instances')">
+        <live-operations-table
+          :strategies="strategies"
+          :loading="loading"
+          :load-error="loadError"
+          :dark="isDarkTheme"
+          :initial-strategy-id="initialStrategyId"
+          :control-loading-id="controlLoadingId"
+          @start="handleStart"
+          @stop="handleStop"
+          @edit="openEditLive"
+          @delete="handleDelete"
+          @open-workspace="openStrategyWorkspace"
+        />
+      </a-tab-pane>
+    </a-tabs>
 
     <live-strategy-editor
       v-if="editorOpen"
@@ -46,6 +82,7 @@
 <script>
 import { mapState } from 'vuex'
 import { deleteStrategy, getStrategyList, startStrategy, stopStrategy } from '@/api/strategy'
+import { listUnifiedStrategies, registerCzscStrategies } from '@/api/domain'
 import LiveOperationsTable from './components/LiveOperationsTable.vue'
 import LiveStrategyEditor from './components/LiveStrategyEditor.vue'
 
@@ -55,6 +92,9 @@ export default {
   data () {
     return {
       strategies: [],
+      assets: [],
+      assetsLoading: false,
+      activeTab: String(this.$route.query.view || 'assets') === 'instances' ? 'instances' : 'assets',
       loading: false,
       loadError: false,
       refreshedAt: '',
@@ -73,6 +113,17 @@ export default {
     initialStrategyId () {
       const value = Number(this.$route.query.strategyId || 0)
       return Number.isFinite(value) ? value : 0
+    },
+    assetColumns () {
+      return [
+        { title: this.$t('strategyCenter.assets.name'), key: 'name', scopedSlots: { customRender: 'assetName' } },
+        { title: this.$t('strategyCenter.assets.kind'), dataIndex: 'kind', width: 110, scopedSlots: { customRender: 'kind' } },
+        { title: this.$t('strategyCenter.assets.engine'), dataIndex: 'engine', width: 110, scopedSlots: { customRender: 'engine' } },
+        { title: this.$t('strategyCenter.assets.version'), key: 'version', width: 120, scopedSlots: { customRender: 'version' } },
+        { title: this.$t('strategyCenter.assets.status'), key: 'status', width: 120, scopedSlots: { customRender: 'status' } },
+        { title: this.$t('strategyCenter.assets.updated'), dataIndex: 'updated_at', width: 175, customRender: this.formatTime },
+        { title: '', key: 'actions', width: 150, scopedSlots: { customRender: 'assetActions' } }
+      ]
     }
   },
   mounted () {
@@ -98,17 +149,42 @@ export default {
     async loadStrategies () {
       if (this.loading) return
       this.loading = true
+      this.assetsLoading = true
       this.loadError = false
       try {
-        const res = await getStrategyList()
+        await registerCzscStrategies().catch(() => null)
+        const [res, assetResponse] = await Promise.all([getStrategyList(), listUnifiedStrategies()])
         if (!res || res.code !== 1) throw new Error('STRATEGY_LIST_LOAD_FAILED')
         this.strategies = this.parseList(res)
+        this.assets = Array.isArray(assetResponse.data) ? assetResponse.data : []
         this.refreshedAt = new Date()
       } catch (error) {
         this.loadError = true
       } finally {
         this.loading = false
+        this.assetsLoading = false
       }
+    },
+    openCreateAsset () {
+      this.$router.push({ path: '/strategy-ide', query: { mode: 'create' } })
+    },
+    openAssetBacktest (asset) {
+      const sourceId = asset.engine === 'czsc' ? `czsc:${asset.strategy_version_id}` : asset.id
+      this.$router.push({ path: '/backtest-center', query: { sourceId } })
+    },
+    openAssetReviews (asset) {
+      this.$router.push({
+        path: '/signal-reviews',
+        query: {
+          strategyId: asset.id,
+          strategyVersionId: asset.strategy_version_id,
+          strategyName: asset.name,
+          engine: asset.engine
+        }
+      })
+    },
+    openAssetEditor (asset) {
+      this.$router.push({ path: '/strategy-ide', query: { sourceId: asset.id } })
     },
     async handleStart (strategy) {
       if (!strategy || !strategy.id || this.controlLoadingId) return
@@ -250,6 +326,15 @@ export default {
   text-rendering: optimizeLegibility;
 }
 .strategy-center > .operations-workspace { flex: 1 1 auto; min-height: 0; }
+.strategy-tabs { flex: 1 1 auto; min-height: 0; }
+.strategy-tabs /deep/ .ant-tabs-content, .strategy-tabs /deep/ .ant-tabs-tabpane { height: 100%; }
+.asset-library { min-height: 560px; padding: 14px; border: 1px solid #e4e8ee; border-radius: 7px; background: #fff; }
+.asset-library__summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.asset-library__summary div { display: flex; align-items: baseline; gap: 7px; }
+.asset-library__summary strong { color: #111827; font-size: 24px; }.asset-library__summary span, .asset-library__summary p { color: #667085; font-size: 12px; }.asset-library__summary p { margin: 0; }
+.asset-name { display: flex; min-width: 180px; flex-direction: column; }.asset-name strong { color: #202938; }.asset-name span { overflow: hidden; max-width: 460px; color: #7b8492; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.version-cell { display: flex; flex-direction: column; font-weight: 600; }.version-cell small { color: #9299a5; font-family: monospace; font-weight: 400; }
+.asset-actions { display: flex; gap: 7px; }
 .sc-header {
   display: flex;
   align-items: flex-start;
@@ -277,6 +362,8 @@ export default {
   .sc-header h1 { color: #f3f4f6; }
   .sc-header p, .sc-refresh { color: #7f8793; }
   .system-health { color: #61c885; }
+  .asset-library { border-color: #2c2c2c; background: #101010; }
+  .asset-library__summary strong, .asset-name strong { color: #e7e9ed; }
 }
 @media (max-width: 720px) {
   .strategy-center { height: auto; min-height: calc(100vh - 64px); overflow: visible; padding: 12px !important; }

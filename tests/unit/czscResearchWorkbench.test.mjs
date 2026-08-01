@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const root = new URL('../../src/', import.meta.url)
@@ -8,185 +8,135 @@ async function source (path) {
   return readFile(new URL(path, root), 'utf8')
 }
 
-test('CZSC workbench exposes integrated cockpit, research and review views', async () => {
-  const workbench = await source('views/czsc-workbench/index.vue')
+async function fileDoesNotExist (path) {
+  await assert.rejects(access(new URL(path, root)), error => error && error.code === 'ENOENT')
+}
 
-  for (const tab of ['structure', 'cockpit', 'multi-period', 'factor-lab', 'quality', 'watchlist', 'research-ops', 'strategy', 'scan', 'backtest', 'review']) {
-    assert.match(workbench, new RegExp(`key="${tab}"`))
+test('navigation is organized by product tasks and has no visible CZSC entry', async () => {
+  const [routes, layout] = await Promise.all([
+    source('config/router.config.js'),
+    source('layouts/BasicLayout.vue')
+  ])
+
+  for (const route of ['/trend-chart', '/market-screener', '/strategy-center', '/backtest-center', '/tasks']) {
+    assert.match(routes, new RegExp(`path: '${route.replaceAll('/', '\\/')}'`))
   }
-  assert.match(workbench, /<dashboard-panel/)
-  assert.match(workbench, /<multi-period-panel/)
-  assert.match(workbench, /<factor-lab-panel/)
-  assert.match(workbench, /<quality-panel/)
-  assert.match(workbench, /<smart-watchlist-panel/)
-  assert.match(workbench, /<research-ops-panel/)
-  assert.match(workbench, /<strategy-panel/)
-  assert.match(workbench, /<scan-panel/)
-  assert.match(workbench, /<backtest-panel/)
-  assert.match(workbench, /<review-panel/)
-  assert.match(workbench, /searchCzscSymbols/)
-  assert.match(workbench, /getScriptTemplateList/)
+  assert.match(layout, /paths: \['\/trend-chart'\]/)
+  assert.match(layout, /paths: \['\/backtest-center'\]/)
+  assert.doesNotMatch(layout, /title:\s*['"]CZSC['"]/)
+  assert.doesNotMatch(layout, /paths:\s*\['\/czsc-workbench'\]/)
 })
 
-test('CZSC API includes bounded research, TradingView, and Retraq endpoints', async () => {
-  const api = await source('api/czsc.js')
+test('legacy workbench URLs redirect to the corresponding unified pages', async () => {
+  const routes = await source('config/router.config.js')
+
+  assert.match(routes, /path: '\/czsc-workbench'[\s\S]*hidden: true/)
+  assert.match(routes, /tab === 'structure'[\s\S]*path: '\/trend-chart'/)
+  assert.match(routes, /tab === 'multi-period'[\s\S]*mode: 'multi-period'/)
+  assert.match(routes, /\['scan', 'watchlist'\][\s\S]*path: '\/market-screener'/)
+  assert.match(routes, /\['factor-lab', 'quality', 'backtest'\][\s\S]*path: '\/backtest-center'/)
+  assert.match(routes, /tab === 'strategy'[\s\S]*path: '\/strategy-center'/)
+  assert.match(routes, /tab === 'research-ops'[\s\S]*path: '\/tasks'/)
+  assert.match(routes, /tab === 'review'[\s\S]*path: '\/signal-reviews'/)
+})
+
+test('unified domain client uses v2 product APIs instead of frontend CZSC routes', async () => {
+  const api = await source('api/domain.js')
 
   for (const endpoint of [
-    '/api/czsc/templates',
-    '/api/czsc/symbols/search',
-    '/api/czsc/evaluate',
-    '/api/czsc/scan',
-    '/api/czsc/screener',
-    '/api/czsc/signal-factors/catalog',
-    '/api/czsc/signal-factors/screener',
-    '/api/czsc/factors/catalog',
-    '/api/czsc/multi-period',
-    '/api/czsc/factors/evaluate',
-    '/api/czsc/signal-quality',
-    '/api/czsc/watchlist',
-    '/api/czsc/watchlist/add',
-    '/api/czsc/watchlist/remove',
-    '/api/czsc/watchlist/scan',
-    '/api/czsc/dashboard',
-    '/api/czsc/backtest',
-    '/api/czsc/tradingview/normalize',
-    '/api/czsc/retraq/submit',
-    '/api/czsc/retraq/submit-external',
-    '/api/czsc/retraq/status',
-    '/api/czsc/research-ops/suite',
-    '/api/czsc/research-ops/ai-config',
-    '/api/czsc/research-ops/workflows',
-    '/api/czsc/research-ops/signals/journal'
+    '/api/v2/engines',
+    '/api/v2/market/bars',
+    '/api/v2/chart-layer-runs',
+    '/api/v2/multi-period-runs',
+    '/api/v2/backtests',
+    '/api/v2/factor-research',
+    '/api/v2/factors/catalog',
+    '/api/v2/stock-pools/options',
+    '/api/v2/screens',
+    '/api/v2/tasks',
+    '/api/v2/results',
+    '/api/v2/strategies',
+    '/api/v2/signals'
   ]) {
     assert.match(api, new RegExp(endpoint.replaceAll('/', '\\/')))
   }
+  assert.doesNotMatch(api, /\/api\/czsc\//)
+  await fileDoesNotExist('api/czsc.js')
 })
 
-test('ResearchOps panel wires ten-direction suite, AI config, workflows and safe secret handling', async () => {
-  const panel = await source('views/czsc-workbench/components/ResearchOpsPanel.vue')
+test('trend chart owns base bars, CZSC structure layers and multi-period analysis', async () => {
+  const page = await source('views/trend-chart/index.vue')
 
-  assert.match(panel, /runCzscResearchOpsSuite/)
-  assert.match(panel, /getCzscResearchOpsAiConfig/)
-  assert.match(panel, /saveCzscResearchOpsAiConfig/)
-  assert.match(panel, /saveCzscResearchOpsWorkflow/)
-  assert.match(panel, /quantdinger\.czsc\.research-ops\.v1/)
-  for (const key of [
-    'data_governance',
-    'signal_knowledge',
-    'factor_experiment',
-    'strategy_workflow',
-    'review_cockpit',
-    'smart_watchlist_v2',
-    'external_signal_center',
-    'pretrade_validation',
-    'ai_research_assistant',
-    'ops_dashboard'
-  ]) {
-    assert.match(panel, new RegExp(key))
-  }
-  assert.match(panel, /api_key_configured/)
-  assert.doesNotMatch(panel, /RETRAQ_SIGNAL_BRIDGE_SECRET/)
+  assert.match(page, /<czsc-chart/)
+  assert.match(page, /getMarketBars/)
+  assert.match(page, /createChartLayerRun/)
+  assert.match(page, /createMultiPeriodRun/)
+  assert.match(page, /query\.mode === 'multi-period'/)
+  assert.match(page, /engineSource/)
+  assert.match(page, /workerAvailable/)
+  assert.match(page, /normalizeEpochMilliseconds/)
 })
 
-test('Retraq review requires confirmation and never exposes integration secrets', async () => {
-  const review = await source('views/czsc-workbench/components/ReviewPanel.vue')
-
-  assert.match(review, /this\.\$confirm/)
-  assert.match(review, /submitCzscToRetraq/)
-  assert.match(review, /submitExternalSignalToRetraq/)
-  assert.match(review, /getRetraqSignalStatus/)
-  assert.doesNotMatch(review, /RETRAQ_SIGNAL_BRIDGE_SECRET/)
-  assert.doesNotMatch(review, /secret:/)
-})
-
-test('CZSC chart renders volume and MACD panes', async () => {
-  const chart = await source('views/czsc-workbench/components/CzscChart.vue')
+test('structure chart renders volume, MACD and aligned CZSC overlays', async () => {
+  const chart = await source('components/charts/StructureChart.vue')
 
   assert.match(chart, /createIndicator\('VOL'/)
   assert.match(chart, /createIndicator\('MACD'/)
-  assert.match(chart, /czscSignalMarker/)
+  assert.match(chart, /name: 'czscStroke'/)
+  assert.match(chart, /name: 'czscFractal'/)
+  assert.match(chart, /name: 'czscSignalMarker'/)
+  assert.match(chart, /timestamp: normalizeEpochMilliseconds\(bar\.timestamp\)/)
+  assert.match(chart, /normalizeEpochMilliseconds\(stroke\.start_timestamp\)/)
+  assert.match(chart, /normalizeEpochMilliseconds\(fractal\.timestamp\)/)
 })
 
-test('CZSC structure chart follows viewport height and summary details remain scrollable', async () => {
-  const workbench = await source('views/czsc-workbench/index.vue')
-  const chart = await source('views/czsc-workbench/components/CzscChart.vue')
+test('research workflows use one task center and product task IDs', async () => {
+  const [tasks, screener, backtests] = await Promise.all([
+    source('views/task-center/index.vue'),
+    source('views/market-screener/index.vue'),
+    source('views/backtest-center/index.vue')
+  ])
 
-  assert.match(workbench, /height: clamp\(440px, calc\(100dvh - 224px\), 720px\)/)
-  assert.match(workbench, /\.summary-region \{[^}]*overflow-y: auto/)
-  assert.match(workbench, /\.workbench-grid \{ grid-template-columns: 1fr; height: auto; overflow: visible; \}/)
-  assert.doesNotMatch(workbench, /\$t\('czsc\.(?:source|engine)'\)/)
-  assert.match(chart, /min-height: 0/)
+  assert.match(tasks, /listTasks/)
+  assert.match(tasks, /getTask\(row\.task_id\)/)
+  assert.match(tasks, /cancelTask\(row\.task_id\)/)
+  assert.match(tasks, /retryTask\(row\.task_id\)/)
+  assert.doesNotMatch(tasks, /worker_task_id/)
+  assert.match(screener, /createScreen/)
+  assert.match(screener, /getStockPoolOptions/)
+  assert.match(screener, /getWatchlist/)
+  assert.match(backtests, /response\.data\.task_id/)
+  assert.match(backtests, /listResearchResults/)
 })
 
-test('CZSC symbol display hides exchange suffixes while preserving normalized requests', async () => {
-  const symbols = await import('../../src/utils/czscSymbols.js')
-  const workbench = await source('views/czsc-workbench/index.vue')
-  const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
-  const dashboard = await source('views/czsc-workbench/components/DashboardPanel.vue')
-  const review = await source('views/czsc-workbench/components/ReviewPanel.vue')
+test('signal review defaults to PENDING and requires an explicit decision', async () => {
+  const review = await source('views/signal-reviews/index.vue')
 
-  assert.equal(symbols.normalizeCzscSymbol('000333'), '000333.SZ')
-  assert.equal(symbols.normalizeCzscSymbol('600519'), '600519.SH')
-  assert.equal(symbols.formatCzscSymbolLabel({ symbol: '000333.SZ', name: '美的集团' }), '000333 美的集团')
-  assert.equal(symbols.formatCzscSymbolText('000333.SZ\n600519.SH'), '000333\n600519')
-  assert.match(workbench, /activeAnalysisSymbolLabel/)
-  assert.match(workbench, /option-label-prop="label"/)
-  assert.match(scan, /selectedSymbolItems/)
-  assert.match(dashboard, /formatCzscSymbolText/)
-  assert.match(review, /formatSymbolLabel\(candidate\)/)
-  assert.doesNotMatch(workbench, /\|\|\s*item\.exchange/)
-  assert.doesNotMatch(scan, /\|\|\s*item\.exchange/)
-  assert.doesNotMatch(workbench, />\s*\{\{\s*item\.symbol\s*\}\}/)
-  assert.doesNotMatch(scan, />\s*\{\{\s*item\.symbol\s*\}\}/)
-  assert.doesNotMatch(scan, /000333\.SZ\\n600519\.SH/)
-  assert.doesNotMatch(dashboard, /000333\.SZ\\n600519\.SH/)
+  assert.match(review, /status: 'PENDING'/)
+  assert.match(review, /row\.status === 'PENDING'/)
+  assert.match(review, /this\.\$confirm/)
+  assert.match(review, /reviewSignal\(row\.signal_id, \{ decision \}\)/)
+  assert.match(review, /evaluateStrategySignal/)
+  assert.doesNotMatch(review, /RETRAQ_SIGNAL_BRIDGE_SECRET/)
+  assert.doesNotMatch(review, /api[_-]?key/i)
+  assert.doesNotMatch(review, /broker.*credential/i)
 })
 
-test('CZSC scan panel supports factor screening persistence and result actions', async () => {
-  const scan = await source('views/czsc-workbench/components/ScanPanel.vue')
+test('legacy browser results migrate once to PostgreSQL-backed result APIs', async () => {
+  const migration = await source('utils/czscLegacyMigration.js')
 
-  assert.match(scan, /screenCzscSignalFactors/)
-  assert.match(scan, /SignalFactorSelector/)
-  assert.match(scan, /signalFactorConditions/)
-  assert.match(scan, /addCzscWatchlistItem/)
-  assert.match(scan, /quantdinger\.czsc\.scan\.v2/)
-  assert.match(scan, /saveFactorTemplate/)
-  assert.match(scan, /exportResult/)
-  assert.match(scan, /addWatchlist/)
-  assert.match(scan, /factor_screener/)
+  assert.match(migration, /importLegacyResults/)
+  assert.match(migration, /engine: 'czsc'/)
+  assert.match(migration, /dataset_snapshot/)
+  assert.match(migration, /localStorage\.removeItem/)
+  assert.match(migration, /domain-migration\.v1/)
 })
 
-test('Signal factor selector exposes all clickable condition sources', async () => {
-  const selector = await source('views/czsc-workbench/components/SignalFactorSelector.vue')
-  const researchOps = await source('views/czsc-workbench/components/ResearchOpsPanel.vue')
-  const watchlist = await source('views/czsc-workbench/components/SmartWatchlistPanel.vue')
-
-  assert.match(selector, /getCzscSignalFactorCatalog/)
-  for (const sourceKey of ['feature_conditions', 'enhanced_signals', 'factor_library', 'template_signals']) {
-    assert.match(selector, new RegExp(sourceKey))
-  }
-  assert.match(selector, /selectedConditions/)
-  assert.match(researchOps, /<signal-factor-selector/)
-  assert.match(watchlist, /<signal-factor-selector/)
-})
-
-test('New CZSC research panels wire to backend workflows and manual review only sources', async () => {
-  const panels = {
-    dashboard: await source('views/czsc-workbench/components/DashboardPanel.vue'),
-    multi: await source('views/czsc-workbench/components/MultiPeriodPanel.vue'),
-    factor: await source('views/czsc-workbench/components/FactorLabPanel.vue'),
-    quality: await source('views/czsc-workbench/components/QualityPanel.vue'),
-    watchlist: await source('views/czsc-workbench/components/SmartWatchlistPanel.vue')
-  }
-
-  assert.match(panels.dashboard, /getCzscDashboard/)
-  assert.match(panels.dashboard, /operation_cockpit/)
-  assert.match(panels.multi, /analyzeCzscMultiPeriod/)
-  assert.match(panels.multi, /czsc_multi_period/)
-  assert.match(panels.factor, /getCzscFactorCatalog/)
-  assert.match(panels.factor, /evaluateCzscFactors/)
-  assert.match(panels.quality, /getCzscSignalQuality/)
-  assert.match(panels.watchlist, /getCzscSmartWatchlist/)
-  assert.match(panels.watchlist, /scanCzscWatchlist/)
-  assert.match(panels.watchlist, /smart_watchlist/)
+test('deleted CZSC workbench product surfaces stay removed', async () => {
+  await Promise.all([
+    fileDoesNotExist('views/czsc-workbench/index.vue'),
+    fileDoesNotExist('views/czsc-workbench/components/ResearchOpsPanel.vue'),
+    fileDoesNotExist('views/czsc-workbench/components/BacktestPanel.vue'),
+    fileDoesNotExist('locales/lang/czsc-workbench.js')
+  ])
 })

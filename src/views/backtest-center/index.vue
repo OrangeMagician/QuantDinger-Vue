@@ -46,6 +46,23 @@
             </a-select-option>
           </a-select>
 
+          <div v-if="isCzscSource" class="form-grid engine-fields">
+            <a-form-item :label="$t('unifiedBacktest.symbol')">
+              <a-input v-model="form.symbol" placeholder="000333.SZ" />
+            </a-form-item>
+            <a-form-item :label="$t('unifiedBacktest.timeframe')">
+              <a-select v-model="form.timeframe">
+                <a-select-option value="1m">1m</a-select-option>
+                <a-select-option value="5m">5m</a-select-option>
+                <a-select-option value="30m">30m</a-select-option>
+                <a-select-option value="1d">1D</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item :label="$t('unifiedBacktest.limit')">
+              <a-input-number v-model="form.limit" :min="100" :max="5000" :step="100" class="full-width" />
+            </a-form-item>
+          </div>
+
           <div v-if="manifest" class="manifest-card">
             <div class="manifest-title">
               <a-icon type="safety-certificate" />
@@ -83,13 +100,13 @@
               <a-form-item :label="$t('backtest-center.slippage')">
                 <a-input-number v-model="form.slippage" :min="0" :max="1" :step="0.0001" class="full-width" />
               </a-form-item>
-              <a-form-item v-if="mode === 'portfolio'" :label="$t('strategyV2.leverageEnabled')">
+              <a-form-item v-if="mode === 'portfolio' && !isCzscSource" :label="$t('strategyV2.leverageEnabled')">
                 <div class="switch-row">
                   <a-switch v-model="form.leverageEnabled" :disabled="!leverageAllowed" />
                   <span>{{ leverageAllowed ? $t('strategyV2.backtest.optional') : $t('strategyV2.codeOwned') }}</span>
                 </div>
               </a-form-item>
-              <a-form-item v-if="mode === 'portfolio' && form.leverageEnabled" :label="$t('strategyV2.leverageMultiplier')">
+              <a-form-item v-if="mode === 'portfolio' && !isCzscSource && form.leverageEnabled" :label="$t('strategyV2.leverageMultiplier')">
                 <a-input-number v-model="form.leverage" :min="1" :max="maxLeverage" :step="0.5" class="full-width" />
               </a-form-item>
             </div>
@@ -103,7 +120,7 @@
               :description="backtestRangeAlertDescription"
             />
 
-            <div v-if="mode === 'portfolio' && paramDefinitions.length" class="params-section">
+            <div v-if="mode === 'portfolio' && !isCzscSource && paramDefinitions.length" class="params-section">
               <div class="subheading">
                 <h3>{{ $t('backtest-center.codeParams') }}</h3>
                 <span>{{ $t('strategyV2.backtest.paramCount', { count: paramDefinitions.length }) }}</span>
@@ -140,8 +157,11 @@
                 :message="$t('strategyV2.factorResearch.universeContractTitle')"
                 :description="$t('strategyV2.factorResearch.universeContractDesc')" />
               <div class="form-grid">
-                <a-form-item :label="$t('strategyV2.factorResearch.factor')">
-                  <a-select v-model="factorForm.factorId" class="full-width">
+                <a-form-item v-if="!isCzscSource || factorForm.researchType === 'factor'" :label="$t('strategyV2.factorResearch.factor')">
+                  <a-select v-if="isCzscSource" v-model="factorForm.factorId" class="full-width" show-search option-filter-prop="children">
+                    <a-select-option v-for="item in czscFactors" :key="item.factor_id || item.id" :value="item.factor_id || item.id">{{ item.name_zh || item.name_en || item.factor_id }}</a-select-option>
+                  </a-select>
+                  <a-select v-else v-model="factorForm.factorId" class="full-width">
                     <a-select-option value="momentum_20">{{ $t('strategyV2.factorResearch.factors.momentum20') }}</a-select-option>
                     <a-select-option value="volatility_20">{{ $t('strategyV2.factorResearch.factors.volatility20') }}</a-select-option>
                     <a-select-option value="reversal_5">{{ $t('strategyV2.factorResearch.factors.reversal5') }}</a-select-option>
@@ -150,14 +170,28 @@
                     <a-select-option value="size">{{ $t('strategyV2.factorResearch.factors.size') }}</a-select-option>
                   </a-select>
                 </a-form-item>
-                <a-form-item :label="$t('strategyV2.factorResearch.groups')">
+                <a-form-item v-if="isCzscSource" :label="$t('unifiedFactor.researchType')">
+                  <a-radio-group v-model="factorForm.researchType" button-style="solid" size="small">
+                    <a-radio-button value="factor">{{ $t('unifiedFactor.experiment') }}</a-radio-button>
+                    <a-radio-button value="quality">{{ $t('unifiedFactor.quality') }}</a-radio-button>
+                  </a-radio-group>
+                </a-form-item>
+                <a-form-item v-if="!isCzscSource" :label="$t('strategyV2.factorResearch.groups')">
                   <a-input-number v-model="factorForm.groups" :min="2" :max="10" class="full-width" />
                 </a-form-item>
-                <a-form-item :label="$t('strategyV2.factorResearch.holdingPeriod')">
+                <a-form-item v-if="!isCzscSource" :label="$t('strategyV2.factorResearch.holdingPeriod')">
                   <a-input-number v-model="factorForm.holdingPeriod" :min="1" :max="60" class="full-width" />
                 </a-form-item>
-                <a-form-item :label="$t('strategyV2.factorResearch.industryNeutralization')">
+                <a-form-item v-if="!isCzscSource" :label="$t('strategyV2.factorResearch.industryNeutralization')">
                   <div class="switch-row"><a-switch v-model="factorForm.neutralizeIndustry" /><span>{{ $t('strategyV2.factorResearch.neutralizationHint') }}</span></div>
+                </a-form-item>
+                <a-form-item v-if="isCzscSource && factorForm.researchType === 'quality'" :label="$t('unifiedFactor.forwardBars')">
+                  <a-select v-model="factorForm.forwardBars" mode="multiple" class="full-width">
+                    <a-select-option v-for="item in [5, 10, 20, 30]" :key="item" :value="item">{{ item }}</a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item v-if="isCzscSource && factorForm.researchType === 'quality'" :label="$t('unifiedFactor.sampleStep')">
+                  <a-input-number v-model="factorForm.sampleStep" :min="1" :max="50" class="full-width" />
                 </a-form-item>
               </div>
             </div>
@@ -232,6 +266,7 @@
         </div>
 
         <portfolio-result v-else-if="mode === 'portfolio'" :result="result" :is-dark="isDarkTheme" />
+        <engine-factor-result v-else-if="isCzscSource" :result="factorResult" :is-dark="isDarkTheme" />
         <factor-research-result v-else :result="factorResult" :is-dark="isDarkTheme" />
       </section>
     </div>
@@ -265,22 +300,25 @@
           type="button"
           class="run-card"
           :class="{
-            active: selectedRun && Number(selectedRun.id || selectedRun.runId) === Number(item.id),
-            loading: historyDetailLoading && Number(historyDetailRunId) === Number(item.id)
+            active: selectedRun && String(selectedRun.id || selectedRun.runId) === String(item.id),
+            loading: historyDetailLoading && String(historyDetailRunId) === String(item.id)
           }"
           :disabled="historyDetailLoading"
           @click="openRun(item)"
         >
           <span class="run-card__top">
-            <strong><a-icon v-if="historyDetailLoading && Number(historyDetailRunId) === Number(item.id)" type="loading" />{{ mode === 'factor' ? (item.source_name || item.factor_id) : historySymbolLabel(item) }}</strong>
+            <strong><a-icon v-if="historyDetailLoading && String(historyDetailRunId) === String(item.id)" type="loading" />{{ mode === 'factor' ? (item.source_name || item.factor_id) : historySymbolLabel(item) }}</strong>
             <em>{{ mode === 'factor' ? 'FR-' : '#' }}{{ item.id }}</em>
           </span>
           <span class="run-card__meta">{{ item.market }} · {{ item.timeframe }} · {{ formatDate(item.created_at) }}</span>
           <template v-if="mode === 'factor'">
-            <span class="run-card__status status-complete">{{ factorLabel(item.factor_id) }} · {{ item.groups_count }}Q · {{ item.holding_period }}{{ $t('strategyV2.factorResearch.bars') }}</span>
+            <span v-if="item.unified_result" class="run-card__status status-complete">{{ item.research_type === 'quality' ? $t('unifiedFactor.quality') : $t('unifiedFactor.experiment') }} · {{ factorLabel(item.factor_id) }}</span>
+            <span v-else class="run-card__status status-complete">{{ factorLabel(item.factor_id) }} · {{ item.groups_count }}Q · {{ item.holding_period }}{{ $t('strategyV2.factorResearch.bars') }}</span>
             <span class="run-card__metrics factor-history-metrics">
-              <b :class="factorTone(item.rank_ic)">IC {{ formatSignedNumber(item.rank_ic, 4) }}</b>
-              <small>{{ $t('strategyV2.factorResearch.icir') }} {{ formatNumber(item.icir, 3) }} · {{ $t('strategyV2.factorResearch.netLongShort') }} {{ formatRate(item.net_long_short_return) }}</small>
+              <b v-if="item.unified_result">{{ item.research_type === 'quality' ? $t('unifiedFactor.bestScore') : $t('unifiedFactor.latestValue') }} {{ formatNumber(item.rank_ic, item.research_type === 'quality' ? 2 : 4) }}</b>
+              <b v-else :class="factorTone(item.rank_ic)">IC {{ formatSignedNumber(item.rank_ic, 4) }}</b>
+              <small v-if="item.unified_result">{{ item.groups_count }} {{ item.research_type === 'quality' ? $t('unifiedFactor.signalTypes') : $t('unifiedFactor.factorCount') }} · {{ item.holding_period }} {{ item.research_type === 'quality' ? $t('unifiedFactor.samples') : $t('unifiedFactor.points') }}</small>
+              <small v-else>{{ $t('strategyV2.factorResearch.icir') }} {{ formatNumber(item.icir, 3) }} · {{ $t('strategyV2.factorResearch.netLongShort') }} {{ formatRate(item.net_long_short_return) }}</small>
             </span>
           </template>
           <template v-else>
@@ -314,16 +352,27 @@ import {
   runStrategyFactorResearch,
   runStrategyBacktest
 } from '@/api/strategy'
+import {
+  createCzscBacktest,
+  createFactorResearch,
+  getFactorCatalog,
+  getTask,
+  listResearchResults,
+  listUnifiedStrategies,
+  registerCzscStrategies
+} from '@/api/domain'
 import PortfolioResult from './PortfolioResult.vue'
 import FactorResearchResult from './FactorResearchResult.vue'
+import EngineFactorResult from './EngineFactorResult.vue'
 
 export default {
   name: 'BacktestCenter',
-  components: { PortfolioResult, FactorResearchResult },
+  components: { PortfolioResult, FactorResearchResult, EngineFactorResult },
   data () {
     return {
-      mode: 'portfolio',
+      mode: ['factor', 'factor-research'].includes(String(this.$route.query.view || '')) ? 'factor' : 'portfolio',
       sources: [],
+      czscFactors: [],
       portfolioHistory: [],
       factorHistory: [],
       source: null,
@@ -350,13 +399,19 @@ export default {
         commission: 0.0005,
         slippage: 0.0005,
         leverageEnabled: false,
-        leverage: 1
+        leverage: 1,
+        symbol: '000333.SZ',
+        timeframe: '1d',
+        limit: 2000
       },
       factorForm: {
         factorId: 'momentum_20',
+        researchType: this.$route.query.researchType === 'quality' ? 'quality' : 'factor',
         groups: 5,
         holdingPeriod: 5,
-        neutralizeIndustry: false
+        neutralizeIndustry: false,
+        forwardBars: [5, 10, 20],
+        sampleStep: 5
       }
     }
   },
@@ -369,13 +424,17 @@ export default {
       return this.mode === 'portfolio' ? this.result : this.factorResult
     },
     availableSources () {
-      if (this.mode !== 'factor') return this.sources
-      return this.sources.filter(item => item.asset_type === 'portfolio_strategy')
+      if (this.mode !== 'factor') return this.sources.filter(item => !item.research_asset)
+      return this.sources.filter(item => item.research_asset || (item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy'))
+    },
+    isCzscSource () {
+      return Boolean(this.source && this.source.engine === 'czsc')
     },
     history () {
       return this.mode === 'factor' ? this.factorHistory : this.portfolioHistory
     },
     factorCompatible () {
+      if (this.source && this.source.research_asset) return true
       if (!this.manifest || this.manifest.strategyType !== 'portfolio') return false
       const universe = this.manifest.universe || {}
       return Boolean(universe.reference) || (universe.instruments || []).length >= 3
@@ -447,7 +506,7 @@ export default {
       })
     },
     runDisabled () {
-      return !this.manifest || this.backtestRangeExceeded || (this.mode === 'factor' && !this.factorCompatible)
+      return !this.manifest || this.backtestRangeExceeded || (this.isCzscSource && !this.form.symbol) || (this.mode === 'factor' && !this.factorCompatible)
     },
     strategyTypeLabel () {
       const type = String((this.manifest && this.manifest.strategyType) || 'cta')
@@ -566,8 +625,9 @@ export default {
   },
   async mounted () {
     await this.refreshPage()
-    const routeSourceId = Number(this.$route.query.sourceId)
-    const sourceId = routeSourceId || (this.sources[0] && Number(this.sources[0].id))
+    const routeSourceId = this.$route.query.sourceId
+    const routeSourceAvailable = this.availableSources.some(item => String(item.id) === String(routeSourceId || ''))
+    const sourceId = routeSourceAvailable ? routeSourceId : (this.availableSources[0] && this.availableSources[0].id)
     if (sourceId) {
       this.form.sourceId = sourceId
       await this.selectSource(sourceId)
@@ -677,18 +737,70 @@ export default {
       await Promise.all([this.loadSources(), this.loadHistory()])
     },
     async loadSources () {
-      const response = await getScriptSourceList()
-      this.sources = (response.data && response.data.items) || []
+      const nativeRequest = getScriptSourceList()
+      const czscRequest = registerCzscStrategies()
+        .then(() => listUnifiedStrategies({ engine: 'czsc' }))
+        .catch(() => ({ data: [] }))
+      const factorRequest = getFactorCatalog().catch(() => ({ data: {} }))
+      const [nativeResponse, czscResponse, factorResponse] = await Promise.all([nativeRequest, czscRequest, factorRequest])
+      const nativeSources = ((nativeResponse.data && nativeResponse.data.items) || []).map(item => ({
+        ...item,
+        engine: 'native'
+      }))
+      const czscSources = (Array.isArray(czscResponse.data) ? czscResponse.data : []).map(item => ({
+        ...item,
+        id: `czsc:${item.strategy_version_id}`,
+        source_id: item.id,
+        engine: 'czsc',
+        asset_type: item.kind === 'portfolio' ? 'portfolio_strategy' : 'script',
+        param_schema: item.parameters || {},
+        manifest: {
+          strategyType: item.kind || 'cta',
+          engine: 'czsc',
+          primaryFrequency: '1d',
+          subscriptions: [{ frequency: '1d' }],
+          universe: { instruments: [{ market: 'CNStock', symbol: this.form.symbol, market_type: 'stock' }] }
+        }
+      }))
+      this.czscFactors = (factorResponse.data && factorResponse.data.factor_library) || []
+      const researchSource = {
+        id: 'research:cnstock-factors',
+        name: this.$t('unifiedFactor.assetName'),
+        engine: 'czsc',
+        research_asset: true,
+        asset_type: 'portfolio_strategy',
+        param_schema: {},
+        manifest: {
+          strategyType: 'portfolio',
+          engine: 'czsc',
+          primaryFrequency: '1d',
+          subscriptions: [{ frequency: '1d' }],
+          universe: { reference: 'CNStock' }
+        }
+      }
+      this.sources = [...nativeSources, ...czscSources, researchSource]
+      if (!this.czscFactors.some(item => (item.factor_id || item.id) === this.factorForm.factorId) && this.czscFactors.length) {
+        this.factorForm.factorId = this.czscFactors[0].factor_id || this.czscFactors[0].id
+      }
     },
     async loadHistory () {
       this.historyLoading = true
       try {
-        const [portfolioResponse, factorResponse] = await Promise.all([
+        const [portfolioResponse, factorResponse, engineFactorResponse, qualityResponse] = await Promise.all([
           getStrategyBacktestHistory({ limit: 24 }),
-          getStrategyFactorResearchHistory({ limit: 24 })
+          getStrategyFactorResearchHistory({ limit: 24 }),
+          listResearchResults({ result_type: 'factor', limit: 24 }).catch(() => ({ data: [] })),
+          listResearchResults({ result_type: 'factor_quality', limit: 24 }).catch(() => ({ data: [] }))
         ])
         this.portfolioHistory = Array.isArray(portfolioResponse.data) ? portfolioResponse.data : []
-        this.factorHistory = Array.isArray(factorResponse.data) ? factorResponse.data : []
+        const nativeHistory = Array.isArray(factorResponse.data) ? factorResponse.data : []
+        const engineHistory = [
+          ...(Array.isArray(engineFactorResponse.data) ? engineFactorResponse.data : []),
+          ...(Array.isArray(qualityResponse.data) ? qualityResponse.data : [])
+        ].map(item => this.normalizeEngineFactorHistory(item))
+        this.factorHistory = [...nativeHistory, ...engineHistory]
+          .sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
+          .slice(0, 48)
       } finally {
         this.historyLoading = false
       }
@@ -696,11 +808,11 @@ export default {
     async handleModeChange () {
       this.selectedRun = null
       this.historyVisible = false
-      const currentId = Number(this.form.sourceId)
-      const currentAvailable = this.availableSources.some(item => Number(item.id) === currentId)
+      const currentId = String(this.form.sourceId || '')
+      const currentAvailable = this.availableSources.some(item => String(item.id) === currentId)
       if (!currentAvailable) {
         const nextSource = this.availableSources[0]
-        this.form.sourceId = nextSource ? Number(nextSource.id) : null
+        this.form.sourceId = nextSource ? nextSource.id : null
         if (nextSource) await this.selectSource(nextSource.id)
         else {
           this.source = null
@@ -717,8 +829,19 @@ export default {
       this.selectedRun = null
       this.form.leverageEnabled = false
       this.form.leverage = 1
+      const selected = this.sources.find(item => String(item.id) === String(sourceId))
+      if (selected && selected.engine === 'czsc') {
+        this.source = selected
+        this.manifest = selected.manifest
+        this.backtestRangePolicy = null
+        this.params = {}
+        if (selected.research_asset && this.czscFactors.length) {
+          this.factorForm.factorId = this.czscFactors[0].factor_id || this.czscFactors[0].id
+        }
+        return
+      }
       const response = await getScriptSourceDetail(sourceId)
-      this.source = response.data
+      this.source = { ...response.data, engine: 'native' }
       const compiled = await compileScriptSource({ sourceId })
       this.manifest = compiled.data && compiled.data.manifest
       this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
@@ -729,8 +852,10 @@ export default {
       }, {})
     },
     sourceTypeLabel (item) {
+      if (item.research_asset) return this.$t('strategyV2.factorResearch.independentMode')
       if (String(item.template_key || '').startsWith('robot_v2_')) return this.$t('strategyV2.robot')
-      return this.$t(item.asset_type === 'portfolio_strategy' ? 'strategyV2.portfolio' : 'strategyV2.cta')
+      const kind = this.$t(item.asset_type === 'portfolio_strategy' ? 'strategyV2.portfolio' : 'strategyV2.cta')
+      return item.engine === 'czsc' ? `${kind} · CZSC` : kind
     },
     formatInstrument (item) {
       const marketType = String(item.market_type || item.marketType || '').toLowerCase()
@@ -805,19 +930,21 @@ export default {
       this.selectedRun = null
       this.startRunTimer()
       try {
-        const response = await runStrategyBacktest({
-          sourceId: this.form.sourceId,
-          startDate: this.form.startDate.format('YYYY-MM-DD'),
-          endDate: this.form.endDate.format('YYYY-MM-DD'),
-          initialCapital: this.form.initialCapital,
-          commission: this.form.commission,
-          slippage: this.form.slippage,
-          leverageEnabled: this.form.leverageEnabled,
-          leverage: this.form.leverageEnabled ? this.form.leverage : 1,
-          params: this.params
-        })
+        const response = this.isCzscSource
+          ? await this.runCzscBacktest()
+          : await runStrategyBacktest({
+            sourceId: this.form.sourceId,
+            startDate: this.form.startDate.format('YYYY-MM-DD'),
+            endDate: this.form.endDate.format('YYYY-MM-DD'),
+            initialCapital: this.form.initialCapital,
+            commission: this.form.commission,
+            slippage: this.form.slippage,
+            leverageEnabled: this.form.leverageEnabled,
+            leverage: this.form.leverageEnabled ? this.form.leverage : 1,
+            params: this.params
+          })
         this.result = response.data
-        this.selectedRun = { id: response.data && response.data.runId }
+        this.selectedRun = { id: response.data && (response.data.runId || response.data.run_id) }
         const billing = response.data && response.data.billing
         if (billing && typeof billing.remaining !== 'undefined') {
           this.$root.$emit('credits-updated', billing.remaining)
@@ -830,6 +957,124 @@ export default {
         this.running = false
       }
     },
+    async runCzscBacktest () {
+      const specification = this.source.engine_specification || {}
+      const response = await createCzscBacktest({
+        strategy_id: this.source.source_id,
+        strategy_version_id: this.source.strategy_version_id,
+        strategy_name: this.source.name,
+        template_id: specification.id || this.source.template_key,
+        symbol: this.form.symbol.trim().toUpperCase(),
+        timeframe: this.form.timeframe,
+        start: this.form.startDate.format('YYYY-MM-DD'),
+        end: this.form.endDate.format('YYYY-MM-DD'),
+        limit: this.form.limit,
+        initial_cash: this.form.initialCapital,
+        commission_rate: this.form.commission,
+        min_commission: 5,
+        stamp_tax_rate: 0.0005,
+        transfer_fee_rate: 0.00001,
+        execution_assumptions: {
+          adjustment: 'qfq',
+          calendar: 'CNStock',
+          t_plus_one: true,
+          execution_price: 'next_bar_open',
+          commission_rate: this.form.commission,
+          min_commission: 5,
+          stamp_tax_rate: 0.0005,
+          transfer_fee_rate: 0.00001
+        }
+      }, `backtest-${this.source.strategy_version_id}-${this.form.symbol}-${Date.now()}`)
+      if (!response || response.code !== 1) throw new Error(response && response.msg)
+      const task = await this.waitResearchTask(response.data.task_id)
+      const envelope = task.result || {}
+      return {
+        data: {
+          ...this.normalizeCzscResult(envelope.payload || {}, envelope),
+          run_id: envelope.backtest_run_id,
+          task_id: task.task_id,
+          billing: response.data.billing || (task.request && task.request._billing) || {}
+        }
+      }
+    },
+    async waitResearchTask (taskId) {
+      const deadline = Date.now() + 300000
+      while (Date.now() < deadline) {
+        const response = await getTask(taskId)
+        if (!response || response.code !== 1) throw new Error(response && response.msg)
+        const task = response.data
+        if (task.status === 'SUCCEEDED') return task
+        if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(task.status)) {
+          throw new Error(task.error_message || task.status)
+        }
+        await new Promise(resolve => setTimeout(resolve, 1200))
+      }
+      throw new Error(this.$t('trendChart.taskTimeout'))
+    },
+    normalizeCzscResult (payload, envelope = {}) {
+      const metrics = payload.metrics || {}
+      const assumptions = envelope.execution_assumptions || payload.parameters || {}
+      const percent = value => Number(value || 0) * 100
+      const trades = (payload.trades || []).map((trade, index) => ({
+        ...trade,
+        id: trade.trade_id || index + 1,
+        symbol: payload.symbol,
+        side: 'long',
+        entry_time: trade.entry_datetime,
+        exit_time: trade.exit_datetime,
+        profit: trade.pnl,
+        close_reason: 'signal'
+      }))
+      const executions = (payload.orders || []).map((order, index) => ({
+        ...order,
+        id: index + 1,
+        symbol: payload.symbol,
+        side: order.action === 'open_long' ? 'buy' : 'sell',
+        signal_time: order.datetime,
+        time: order.datetime,
+        commission: order.fee
+      }))
+      return {
+        engine: envelope.engine || { name: 'czsc', version: '0.9.68' },
+        totalReturn: percent(metrics.total_return),
+        benchmarkTotalReturn: percent(metrics.benchmark_return),
+        benchmarkStatus: 'available',
+        excessReturn: percent(Number(metrics.total_return || 0) - Number(metrics.benchmark_return || 0)),
+        maxDrawdown: percent(metrics.max_drawdown),
+        totalExecutions: executions.length,
+        totalTrades: trades.length,
+        winRate: percent(metrics.win_rate),
+        sharpeRatio: Number(metrics.sharpe_ratio || 0),
+        resultStatus: trades.length ? 'completed_trades' : 'no_signals',
+        audit: { passed: true },
+        dataProvenance: { kind: 'market', source: 'local_parquet', snapshot: envelope.dataset_snapshot || {} },
+        executionAssumptions: {
+          ...assumptions,
+          initialCapital: metrics.initial_cash || assumptions.initial_cash,
+          startDate: payload.range && payload.range.start,
+          endDate: payload.range && payload.range.end,
+          commission: assumptions.commission_rate,
+          slippage: 0,
+          leverage: 1
+        },
+        equityCurve: (payload.equity_curve || []).map(point => ({
+          time: point.datetime || point.timestamp,
+          value: point.equity,
+          cash: point.cash,
+          grossExposure: point.equity ? Math.abs(Number(point.equity) - Number(point.cash || 0)) / Number(point.equity) : 0,
+          netExposure: point.equity ? (Number(point.equity) - Number(point.cash || 0)) / Number(point.equity) : 0
+        })),
+        executions,
+        rawTrades: executions,
+        closedTrades: trades,
+        trades,
+        orderLedger: executions.map(item => ({ ...item, status: 'filled', filledQuantity: item.quantity })),
+        attribution: {
+          feeDrag: metrics.initial_cash ? (payload.orders || []).reduce((sum, item) => sum + Number(item.fee || 0), 0) / Number(metrics.initial_cash) : 0,
+          orderStatus: { filled: executions.length, partial: 0, deferred: 0, rejected: 0 }
+        }
+      }
+    },
     async runFactorResearch () {
       if (!this.form.sourceId) {
         this.$message.warning(this.$t('strategyV2.sourceContractRequired'))
@@ -840,20 +1085,44 @@ export default {
       this.factorResult = null
       this.startRunTimer()
       try {
-        const response = await runStrategyFactorResearch({
-          sourceId: this.form.sourceId,
-          startDate: this.form.startDate.format('YYYY-MM-DD'),
-          endDate: this.form.endDate.format('YYYY-MM-DD'),
-          commission: this.form.commission,
-          slippage: this.form.slippage,
-          factorId: this.factorForm.factorId,
-          groups: this.factorForm.groups,
-          holdingPeriod: this.factorForm.holdingPeriod,
-          neutralizeIndustry: this.factorForm.neutralizeIndustry,
-          timeout: 180000
-        })
-        this.factorResult = response.data
-        this.selectedRun = { id: response.data && response.data.runId }
+        if (this.isCzscSource) {
+          const quality = this.factorForm.researchType === 'quality'
+          const payload = {
+            research_type: quality ? 'quality' : 'factor',
+            symbol: this.form.symbol.trim().toUpperCase(),
+            timeframe: this.form.timeframe,
+            limit: Math.max(quality ? 140 : 100, Number(this.form.limit || 1000))
+          }
+          if (quality) {
+            payload.forward_bars = this.factorForm.forwardBars
+            payload.sample_step = this.factorForm.sampleStep
+          } else {
+            payload.start = this.form.startDate.format('YYYY-MM-DD')
+            payload.end = this.form.endDate.format('YYYY-MM-DD')
+            payload.factor_ids = [this.factorForm.factorId]
+          }
+          const response = await createFactorResearch(payload, `factor-${this.factorForm.researchType}-${this.form.symbol}-${Date.now()}`)
+          if (!response || response.code !== 1) throw new Error(response && response.msg)
+          const task = await this.waitResearchTask(response.data.task_id)
+          const record = task.result || {}
+          this.factorResult = this.normalizeEngineFactorResult(record, this.factorForm.researchType)
+          this.selectedRun = { id: `unified:${record.id || task.task_id}`, taskId: task.task_id }
+        } else {
+          const response = await runStrategyFactorResearch({
+            sourceId: this.form.sourceId,
+            startDate: this.form.startDate.format('YYYY-MM-DD'),
+            endDate: this.form.endDate.format('YYYY-MM-DD'),
+            commission: this.form.commission,
+            slippage: this.form.slippage,
+            factorId: this.factorForm.factorId,
+            groups: this.factorForm.groups,
+            holdingPeriod: this.factorForm.holdingPeriod,
+            neutralizeIndustry: this.factorForm.neutralizeIndustry,
+            timeout: 180000
+          })
+          this.factorResult = response.data
+          this.selectedRun = { id: response.data && response.data.runId }
+        }
         await this.loadHistory()
       } catch (error) {
         this.$message.error((error && error.backendMessage) || this.$t('strategyV2.factorResearch.runFailed'))
@@ -874,8 +1143,11 @@ export default {
         const response = await getStrategyBacktestRun(item.id)
         const run = response.data || {}
         this.selectedRun = run
-        this.result = run.result || null
-        const assumptions = (run.result && run.result.executionAssumptions) || {}
+        const isCzsc = run.engine_name === 'czsc' || (run.engine && run.engine.name === 'czsc')
+        this.result = isCzsc ? this.normalizeCzscResult(run.result || {}, run) : (run.result || null)
+        const assumptions = isCzsc
+          ? (run.execution_assumptions || {})
+          : ((run.result && run.result.executionAssumptions) || {})
         const initialCapital = run.initial_capital !== undefined && run.initial_capital !== null
           ? run.initial_capital
           : assumptions.initialCapital
@@ -894,7 +1166,17 @@ export default {
         if (run.start_date || assumptions.startDate) this.form.startDate = moment(run.start_date || assumptions.startDate)
         if (run.end_date || assumptions.endDate) this.form.endDate = moment(run.end_date || assumptions.endDate)
         this.params = run.params || {}
-        if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
+        if (isCzsc) {
+          const source = this.sources.find(row => row.engine === 'czsc' && Number(row.strategy_version_id) === Number(run.strategy_version_id))
+          if (source) {
+            this.form.sourceId = source.id
+            this.source = source
+            this.manifest = source.manifest
+            this.backtestRangePolicy = null
+          }
+          if (run.symbol) this.form.symbol = run.symbol
+          if (run.timeframe) this.form.timeframe = run.timeframe
+        } else if (run.source_id && Number(this.form.sourceId) !== Number(run.source_id)) {
           this.form.sourceId = Number(run.source_id)
           const detail = await getScriptSourceDetail(run.source_id)
           this.source = detail.data
@@ -915,6 +1197,23 @@ export default {
       this.historyDetailLoading = true
       this.historyDetailRunId = item.id
       try {
+        if (item.unified_result) {
+          this.selectedRun = item
+          this.factorResult = this.normalizeEngineFactorResult(item.result_record, item.research_type)
+          this.factorForm.researchType = item.research_type
+          if (item.factor_id && item.factor_id !== 'signal_quality') this.factorForm.factorId = item.factor_id
+          if (item.symbol) this.form.symbol = item.symbol
+          if (item.timeframe) this.form.timeframe = item.timeframe
+          const source = this.sources.find(row => row.research_asset)
+          if (source) {
+            this.form.sourceId = source.id
+            this.source = source
+            this.manifest = source.manifest
+            this.backtestRangePolicy = null
+          }
+          this.historyVisible = false
+          return
+        }
         const response = await getStrategyFactorResearchRun(item.id)
         const run = response.data || {}
         this.selectedRun = run
@@ -923,7 +1222,10 @@ export default {
           factorId: run.factor_id || 'momentum_20',
           groups: Number(run.groups_count || 5),
           holdingPeriod: Number(run.holding_period || 5),
-          neutralizeIndustry: Boolean(run.neutralize_industry)
+          neutralizeIndustry: Boolean(run.neutralize_industry),
+          researchType: 'factor',
+          forwardBars: [5, 10, 20],
+          sampleStep: 5
         }
         this.form.commission = Number(run.commission || 0)
         this.form.slippage = Number(run.slippage || 0)
@@ -945,7 +1247,43 @@ export default {
         this.historyDetailRunId = null
       }
     },
+    normalizeEngineFactorResult (record, researchType) {
+      return {
+        ...((record && record.payload) || {}),
+        researchType: researchType || (record && record.result_type === 'factor_quality' ? 'quality' : 'factor'),
+        engine: (record && record.engine) || { name: 'czsc', version: '0.9.68' },
+        datasetSnapshot: (record && record.dataset_snapshot) || {},
+        executionAssumptions: (record && record.execution_assumptions) || {},
+        resultId: record && record.id,
+        taskId: record && record.task_id
+      }
+    },
+    normalizeEngineFactorHistory (record) {
+      const payload = (record && record.payload) || {}
+      const quality = record.result_type === 'factor_quality'
+      const factor = (payload.factors || [])[0] || {}
+      return {
+        id: `unified:${record.id}`,
+        unified_result: true,
+        result_record: record,
+        research_type: quality ? 'quality' : 'factor',
+        source_name: payload.name || payload.symbol || this.$t('unifiedFactor.assetName'),
+        factor_id: quality ? 'signal_quality' : (factor.id || '-'),
+        symbol: payload.symbol,
+        market: 'CNStock',
+        timeframe: payload.timeframe || '1d',
+        groups_count: quality ? ((payload.summary && payload.summary.signal_types) || 0) : 1,
+        holding_period: quality ? ((payload.summary && payload.summary.sample_count) || 0) : ((factor.series || []).length),
+        rank_ic: quality ? ((payload.summary && payload.summary.best_quality_score) || 0) : factor.latest,
+        icir: 0,
+        net_long_short_return: 0,
+        created_at: record.created_at
+      }
+    },
     factorLabel (factorId) {
+      if (factorId === 'signal_quality') return this.$t('unifiedFactor.quality')
+      const engineFactor = this.czscFactors.find(item => (item.factor_id || item.id) === factorId)
+      if (engineFactor) return engineFactor.name_zh || engineFactor.name_en || factorId
       return this.$t(`strategyV2.factorResearch.factors.${{
         momentum_20: 'momentum20',
         volatility_20: 'volatility20',
@@ -1003,6 +1341,7 @@ export default {
 .hero-card h1 { margin: 2px 0 4px; font-size: 24px; color: #17233d; }
 .hero-card p, .section-hint, .history-title-row p { margin: 0; color: #718096; line-height: 1.55; }
 .eyebrow { color: #52c41a; font-weight: 800; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+.engine-fields { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e7ebf0; }
 .hero-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .hero-stat { display: inline-flex; align-items: baseline; gap: 5px; padding: 7px 10px; border-radius: 8px; color: #718096; background: #f7f9fb; font-size: 12px; }
 .hero-stat strong { color: #25364f; font-size: 16px; }

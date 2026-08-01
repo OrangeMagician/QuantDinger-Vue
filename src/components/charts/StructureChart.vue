@@ -5,6 +5,7 @@
 <script>
 import { init, registerOverlay } from 'klinecharts'
 import { marketPalette } from '@/utils/marketColors'
+import { normalizeEpochMilliseconds } from '@/utils/timestamps'
 
 let overlaysRegistered = false
 
@@ -108,7 +109,7 @@ function registerCzscOverlays () {
 }
 
 export default {
-  name: 'CzscChart',
+  name: 'StructureChart',
   props: {
     analysis: {
       type: Object,
@@ -228,7 +229,7 @@ export default {
       if (!this.chart) return
       const bars = this.analysis && Array.isArray(this.analysis.bars) ? this.analysis.bars : []
       this.chart.applyNewData(bars.map(bar => ({
-        timestamp: Number(bar.timestamp),
+        timestamp: normalizeEpochMilliseconds(bar.timestamp),
         open: Number(bar.open),
         high: Number(bar.high),
         low: Number(bar.low),
@@ -250,8 +251,8 @@ export default {
           this.addOverlay({
             name: 'czscStroke',
             points: [
-              { timestamp: Number(stroke.start_timestamp), value: Number(stroke.start_price) },
-              { timestamp: Number(stroke.end_timestamp), value: Number(stroke.end_price) }
+              { timestamp: normalizeEpochMilliseconds(stroke.start_timestamp), value: Number(stroke.start_price) },
+              { timestamp: normalizeEpochMilliseconds(stroke.end_timestamp), value: Number(stroke.end_price) }
             ],
             extendData: {
               color: stroke.direction === 'up' ? market.rise : market.fall,
@@ -266,7 +267,7 @@ export default {
         ;(result.fractals || []).forEach(fractal => {
           this.addOverlay({
             name: 'czscFractal',
-            points: [{ timestamp: Number(fractal.timestamp), value: Number(fractal.price) }],
+            points: [{ timestamp: normalizeEpochMilliseconds(fractal.timestamp), value: Number(fractal.price) }],
             extendData: {
               kind: fractal.kind,
               text: fractal.kind === 'top' ? this.$t('czsc.top') : this.$t('czsc.bottom'),
@@ -283,7 +284,7 @@ export default {
         unfinished.forEach(fractal => {
           this.addOverlay({
             name: 'czscFractal',
-            points: [{ timestamp: Number(fractal.timestamp), value: Number(fractal.price) }],
+            points: [{ timestamp: normalizeEpochMilliseconds(fractal.timestamp), value: Number(fractal.price) }],
             extendData: {
               kind: fractal.kind,
               text: this.$t('czsc.unfinishedShort'),
@@ -299,8 +300,8 @@ export default {
           this.addOverlay({
             name: 'czscStroke',
             points: [
-              { timestamp: Number(lastStroke.end_timestamp), value: Number(lastStroke.end_price) },
-              { timestamp: Number(candidate.timestamp), value: Number(candidate.price) }
+              { timestamp: normalizeEpochMilliseconds(lastStroke.end_timestamp), value: Number(lastStroke.end_price) },
+              { timestamp: normalizeEpochMilliseconds(candidate.timestamp), value: Number(candidate.price) }
             ],
             extendData: { color: '#d4a017', lineWidth: 1.5, dashed: true },
             lock: true
@@ -314,7 +315,7 @@ export default {
           if (!mark.timestamp || !mark.price) return
           this.addOverlay({
             name: 'czscSignalMarker',
-            points: [{ timestamp: Number(mark.timestamp), value: Number(mark.price) }],
+            points: [{ timestamp: normalizeEpochMilliseconds(mark.timestamp), value: Number(mark.price) }],
             extendData: {
               text: mark.text || signal.signal_type_label || signal.signal_type,
               color: mark.color,

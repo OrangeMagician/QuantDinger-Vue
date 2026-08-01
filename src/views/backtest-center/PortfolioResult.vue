@@ -63,8 +63,8 @@
     </section>
 
     <div v-if="result.executionAssumptions" class="assumption-strip">
-      <div><span>{{ $t('strategyV2.backtest.engine') }}</span><strong>{{ $t('strategyV2.backtest.engineV2') }}</strong></div>
-      <div><span>{{ $t('strategyV2.backtest.fillRule') }}</span><strong>{{ $t('strategyV2.backtest.fillRuleNextOpen') }}</strong></div>
+      <div><span>{{ $t('strategyV2.backtest.engine') }}</span><strong>{{ engineLabel }}</strong></div>
+      <div><span>{{ $t('strategyV2.backtest.fillRule') }}</span><strong>{{ fillRuleLabel }}</strong></div>
       <div><span>{{ $t('strategyV2.backtest.dateRange') }}</span><strong>{{ formatDateRange(result.executionAssumptions) }}</strong></div>
       <div><span>{{ $t('backtest-center.initialCapital') }}</span><strong>{{ formatNumber(result.executionAssumptions.initialCapital) }}</strong></div>
       <div><span>{{ $t('backtest-center.leverage') }}</span><strong>{{ formatLeverage(result.executionAssumptions) }}</strong></div>
@@ -248,6 +248,15 @@ export default {
   },
   computed: {
     marketColorConvention () { return this.$store.state.app.marketColorConvention },
+    engineLabel () {
+      const engine = this.result.engine || {}
+      const name = String(engine.name || 'native').toLowerCase() === 'czsc' ? 'CZSC' : 'Native'
+      return [name, engine.version].filter(Boolean).join(' ')
+    },
+    fillRuleLabel () {
+      const assumptions = this.result.executionAssumptions || {}
+      return assumptions.execution_price || assumptions.fillRule || this.$t('strategyV2.backtest.fillRuleNextOpen')
+    },
     auditPassed () { return Boolean(this.result.audit && this.result.audit.passed) },
     legacyBackfilled () { return Boolean(this.result.compatibility && this.result.compatibility.legacyBackfill) },
     initialCapital () {

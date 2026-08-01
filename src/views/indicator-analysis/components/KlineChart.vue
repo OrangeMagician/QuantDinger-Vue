@@ -70,7 +70,7 @@
           </div>
         </div>
         <div
-          id="kline-chart-container"
+          ref="chartContainerRef"
           class="kline-chart-container"
         ></div>
         <canvas
@@ -261,6 +261,7 @@ export default {
     const chartInitialized = ref(false)
 
     const chartRef = shallowRef(null)
+    const chartContainerRef = ref(null)
     const chartTheme = ref(props.theme || 'light')
     let chartResizeObserver = null
     let chartResizeRafId = null
@@ -329,7 +330,7 @@ export default {
     const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value))
 
     const estimateVisibleBarCount = () => {
-      const container = document.getElementById('kline-chart-container')
+      const container = chartContainerRef.value
       const width = container && container.clientWidth ? container.clientWidth : (window.innerWidth || 1280)
       return clampNumber(Math.ceil(width / 8), 120, 260)
     }
@@ -2946,14 +2947,14 @@ registerOverlay({
     }
 
     const initChart = () => {
-      const container = document.getElementById('kline-chart-container')
+      const container = chartContainerRef.value
       if (!container) return
 
       if (container.clientWidth === 0 || container.clientHeight === 0) {
         let retryCount = 0
         const maxRetries = 10
         const checkAndInit = () => {
-          const checkContainer = document.getElementById('kline-chart-container')
+          const checkContainer = chartContainerRef.value
           if (checkContainer && checkContainer.clientWidth > 0 && checkContainer.clientHeight > 0) {
             initChart()
           } else if (retryCount < maxRetries) {
@@ -2977,7 +2978,7 @@ registerOverlay({
       volPaneEnsured = false
 
       try {
-        const container = document.getElementById('kline-chart-container')
+        const container = chartContainerRef.value
         if (!container) {
           throw new Error('K-line chart container is missing')
         }
@@ -3201,7 +3202,7 @@ registerOverlay({
           }
         }, 100)
       } else {
-        const container = document.getElementById('kline-chart-container')
+        const container = chartContainerRef.value
         if (container && container.clientWidth > 0 && container.clientHeight > 0) {
           initChart()
         }
@@ -5045,7 +5046,7 @@ registerOverlay({
       })
 
       nextTick(() => {
-        const el = document.getElementById('kline-chart-container')
+        const el = chartContainerRef.value
         if (!el || typeof ResizeObserver === 'undefined') return
         chartResizeObserver = new ResizeObserver(() => {
           if (chartResizeRafId != null) cancelAnimationFrame(chartResizeRafId)
@@ -5055,7 +5056,7 @@ registerOverlay({
               chartRef.value.resize()
               scheduleSyncVolumePaneLayout()
             } else {
-              const c = document.getElementById('kline-chart-container')
+              const c = chartContainerRef.value
               if (c && c.clientWidth > 0 && c.clientHeight > 0) {
                 initChart()
               }
@@ -5165,7 +5166,7 @@ registerOverlay({
       }
       if (_wmTimer) { clearInterval(_wmTimer); _wmTimer = null }
       if (_wmObserver) { _wmObserver.disconnect(); _wmObserver = null }
-      const chartContainer = document.getElementById('kline-chart-container')
+      const chartContainer = chartContainerRef.value
       if (chartContainer && shiftMeasurePointerDownHandler) {
         chartContainer.removeEventListener('pointerdown', shiftMeasurePointerDownHandler, true)
         shiftMeasurePointerDownHandler = null
@@ -5184,6 +5185,7 @@ registerOverlay({
       error,
       loadingHistory,
       chartRef,
+      chartContainerRef,
       chartTheme,
       themeConfig,
       wmCanvasRef,

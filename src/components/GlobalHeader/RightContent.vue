@@ -1,6 +1,13 @@
 <template>
   <div :class="wrpCls">
     <avatar-dropdown :menu="true" :current-user="currentUser" :class="prefixCls" />
+    <a-tooltip :title="$t('taskCenter.title')">
+      <span :class="prefixCls" @click="$router.push('/tasks').catch(() => {})">
+        <a-badge :count="activeTaskCount" :overflow-count="99" :offset="[3, -2]">
+          <a-icon type="profile" style="font-size: 16px;" />
+        </a-badge>
+      </span>
+    </a-tooltip>
     <notice-icon :class="prefixCls" />
     <select-lang :class="prefixCls" />
     <a-tooltip :title="$t('app.setting.tooltip')">
@@ -16,6 +23,7 @@ import AvatarDropdown from './AvatarDropdown'
 import SelectLang from '@/components/SelectLang'
 import NoticeIcon from '@/components/NoticeIcon'
 import { mapGetters } from 'vuex'
+import { listTasks } from '@/api/domain'
 
 export default {
   name: 'RightContent',
@@ -44,12 +52,29 @@ export default {
   },
   data () {
     return {
-      apiBase: 'https://api.quantdinger.com/'
+      apiBase: 'https://api.quantdinger.com/',
+      activeTaskCount: 0,
+      taskTimer: null
     }
+  },
+  mounted () {
+    this.refreshTaskCount()
+    this.taskTimer = setInterval(this.refreshTaskCount, 30000)
+  },
+  beforeDestroy () {
+    if (this.taskTimer) clearInterval(this.taskTimer)
   },
   methods: {
     handleSettingClick () {
       this.$root.$emit('show-setting-drawer')
+    },
+    async refreshTaskCount () {
+      try {
+        const response = await listTasks({ limit: 50 })
+        if (response && response.code === 1) {
+          this.activeTaskCount = (response.data || []).filter(item => !['SUCCEEDED', 'FAILED', 'CANCELLED', 'TIMED_OUT'].includes(item.status)).length
+        }
+      } catch (error) {}
     }
   },
   computed: {

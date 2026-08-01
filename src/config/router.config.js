@@ -19,7 +19,19 @@ export const asyncRouterMap = [
         path: '/ai-asset-analysis',
         name: 'AIAssetAnalysis',
         component: () => import('@/views/ai-asset-analysis'),
-        meta: { title: 'menu.dashboard.aiAssetAnalysis', keepAlive: true, icon: 'appstore', permission: ['dashboard'] }
+        meta: { title: 'menu.dashboard.market', keepAlive: true, icon: 'appstore', permission: ['dashboard'] }
+      },
+      {
+        path: '/trend-chart',
+        name: 'TrendChart',
+        component: () => import('@/views/trend-chart'),
+        meta: { title: 'menu.dashboard.trendChart', keepAlive: true, icon: 'stock', permission: ['dashboard'] }
+      },
+      {
+        path: '/market-screener',
+        name: 'MarketScreener',
+        component: () => import('@/views/market-screener'),
+        meta: { title: 'menu.dashboard.marketScreener', keepAlive: true, icon: 'filter', permission: ['dashboard'] }
       },
       // Unified strategy workspace entry.
       {
@@ -33,13 +45,14 @@ export const asyncRouterMap = [
         path: '/indicator-community',
         name: 'IndicatorCommunity',
         component: () => import('@/views/indicator-community'),
-        meta: { title: 'menu.dashboard.community', keepAlive: false, icon: 'shop', permission: ['dashboard'] }
+        meta: { title: 'menu.dashboard.strategyMarket', keepAlive: false, icon: 'shop', permission: ['dashboard'] }
       },
       // Strategy IDE.
       {
         path: '/strategy-ide',
         name: 'StrategyIDE',
         component: () => import('@/views/strategy-ide'),
+        hidden: true,
         meta: { title: 'menu.dashboard.strategyIde', keepAlive: true, icon: 'code', permission: ['dashboard'] }
       },
       {
@@ -57,8 +70,45 @@ export const asyncRouterMap = [
       {
         path: '/czsc-workbench',
         name: 'CzscWorkbench',
-        component: () => import('@/views/czsc-workbench'),
-        meta: { title: 'menu.dashboard.czscWorkbench', keepAlive: true, icon: 'line-chart', permission: ['dashboard'] }
+        redirect: to => {
+          const query = to.query || {}
+          const tab = String(query.tab || query.activeTab || 'structure')
+          const common = {}
+          if (query.symbol) common.symbol = query.symbol
+          if (query.timeframe) common.timeframe = query.timeframe
+          if (tab === 'structure') return { path: '/trend-chart', query: common }
+          if (tab === 'multi-period') return { path: '/trend-chart', query: { ...common, mode: 'multi-period' } }
+          if (['scan', 'watchlist'].includes(tab)) return { path: '/market-screener', query: common }
+          if (['factor-lab', 'quality', 'backtest'].includes(tab)) {
+            return {
+              path: '/backtest-center',
+              query: {
+                view: tab === 'backtest' ? 'portfolio' : 'factor',
+                ...(tab !== 'backtest' ? { sourceId: 'research:cnstock-factors' } : {}),
+                ...(tab === 'quality' ? { researchType: 'quality' } : {})
+              }
+            }
+          }
+          if (tab === 'strategy') return { path: '/strategy-center', query: common }
+          if (tab === 'research-ops') return { path: '/tasks', query: { task_type: 'research' } }
+          if (tab === 'review') return { path: '/signal-reviews' }
+          return { path: '/ai-asset-analysis', query: { view: tab } }
+        },
+        hidden: true,
+        meta: { title: 'menu.dashboard.trendChart', keepAlive: false, icon: 'line-chart', permission: ['dashboard'] }
+      },
+      {
+        path: '/tasks',
+        name: 'TaskCenter',
+        component: () => import('@/views/task-center'),
+        meta: { title: 'menu.dashboard.taskCenter', keepAlive: true, icon: 'profile', permission: ['dashboard'] }
+      },
+      {
+        path: '/signal-reviews',
+        name: 'SignalReviews',
+        component: () => import('@/views/signal-reviews'),
+        hidden: true,
+        meta: { title: 'menu.dashboard.signalReviews', keepAlive: true, icon: 'audit', permission: ['dashboard'] }
       },
       {
         path: '/universe-manager',
