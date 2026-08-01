@@ -27,7 +27,9 @@
           >
             <!-- Card top: symbol + market -->
             <div class="rc-head">
-              <span class="rc-symbol">{{ opp.symbol }}</span>
+              <span class="rc-symbol">
+                {{ opp.symbol }}<template v-if="opp.name || opp.symbol_name"> · {{ opp.name || opp.symbol_name }}</template>
+              </span>
               <span class="rc-market" :class="'rc-market-' + (opp.market || '').toLowerCase()">
                 {{ getMarketLabel(opp.market) }}
               </span>

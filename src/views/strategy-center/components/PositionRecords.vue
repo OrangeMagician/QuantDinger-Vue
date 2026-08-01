@@ -26,7 +26,7 @@
         :scroll="{ x: 960 }"
       >
         <template slot="symbol" slot-scope="text, record">
-          <strong>{{ record.symbol || text }}</strong>
+          <strong>{{ record.symbol || text }}<template v-if="record.name || record.symbol_name"> · {{ record.name || record.symbol_name }}</template></strong>
         </template>
         <template slot="side" slot-scope="text, record">
           <a-tag :color="$marketColor(record.side || text)">
@@ -324,6 +324,7 @@ export default {
             return {
               id: position.id || index,
               symbol: position.symbol || '',
+              name: position.name || position.symbol_name || position.symbolName || '',
               side: position.side || 'long',
               size: size > 0 ? size.toString() : '0',
               entry_price: entryPrice > 0 ? entryPrice.toString() : '0',

@@ -138,7 +138,8 @@ export default {
     limit: { type: Number, required: true },
     templates: { type: Array, default: () => [] },
     systemTemplates: { type: Array, default: () => [] },
-    templateId: { type: String, required: true }
+    templateId: { type: String, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return { loading: false, error: '', evaluation: null, simpleEmptyImage: Empty.PRESENTED_IMAGE_SIMPLE }

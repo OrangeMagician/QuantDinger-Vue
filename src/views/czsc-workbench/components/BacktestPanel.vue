@@ -104,7 +104,8 @@ export default {
     timeframe: { type: String, required: true },
     templates: { type: Array, default: () => [] },
     templateId: { type: String, required: true },
-    dark: { type: Boolean, default: false }
+    dark: { type: Boolean, default: false },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -205,7 +206,7 @@ export default {
     },
     historyLabel (item) {
       const name = this.isChinese ? item.template.name_zh : item.template.name_en
-      return `${formatCzscSymbolLabel(item)} · ${name} · ${this.percent(item.metrics.total_return)}`
+      return `${formatCzscSymbolLabel(item, this.workbenchSymbolMeta)} · ${name} · ${this.percent(item.metrics.total_return)}`
     },
     templateName (item) {
       return this.isChinese ? item.name_zh : item.name_en

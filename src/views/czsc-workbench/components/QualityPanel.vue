@@ -77,7 +77,8 @@ export default {
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {

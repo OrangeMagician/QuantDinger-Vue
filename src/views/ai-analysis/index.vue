@@ -146,7 +146,7 @@
                         class="cal-ai-asset"
                         :class="asset.bias"
                       >
-                        {{ asset.symbol }} · {{ isZhLocale ? asset.bias_label : asset.bias_label_en }}
+                        {{ asset.symbol }}<template v-if="asset.name || asset.symbol_name"> · {{ asset.name || asset.symbol_name }}</template> · {{ isZhLocale ? asset.bias_label : asset.bias_label_en }}
                       </span>
                     </div>
                   </div>
@@ -755,6 +755,7 @@ class="analyze-button">
                       {{ getMarketName(item.market) }}
                     </a-tag>
                     <strong>{{ item.symbol }}</strong>
+                    <span v-if="item.name || item.symbol_name" class="history-symbol-name"> · {{ item.name || item.symbol_name }}</span>
                     <a-tag
                       :color="item.decision === 'BUY' || item.decision === 'SELL' ? $marketColor(item.decision) : 'blue'"
                       style="margin-left: 12px;"

@@ -767,7 +767,7 @@
                       <a-tag :color="task.status === 'running' ? 'green' : 'orange'">{{ task.status === 'running' ? $t('indicatorIde.signalAlert.running') : $t('indicatorIde.signalAlert.paused') }}</a-tag>
                     </div>
                     <div class="signal-alert-task-card__meta">
-                      <span>{{ task.market }} · {{ task.symbol }} · {{ task.timeframe }}</span>
+                      <span>{{ task.market }} · {{ task.symbol }}<template v-if="task.name || task.symbol_name"> · {{ task.name || task.symbol_name }}</template> · {{ task.timeframe }}</span>
                       <span>{{ $t('indicatorIde.signalAlert.triggerCount', { count: task.trigger_count || 0 }) }}</span>
                       <span v-if="task.last_error" class="danger">{{ $t('indicatorIde.signalAlert.error', { error: task.last_error }) }}</span>
                     </div>

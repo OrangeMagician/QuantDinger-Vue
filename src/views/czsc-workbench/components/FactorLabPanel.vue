@@ -73,7 +73,8 @@ export default {
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -157,7 +158,7 @@ export default {
       return this.isChinese ? factor.risk_tip_zh : factor.risk_tip_en
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item)
+      return formatCzscSymbolLabel(item, this.workbenchSymbolMeta)
     },
     formatNumber (value) {
       const number = Number(value)

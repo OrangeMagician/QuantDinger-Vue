@@ -272,7 +272,7 @@
           @click="openRun(item)"
         >
           <span class="run-card__top">
-            <strong><a-icon v-if="historyDetailLoading && Number(historyDetailRunId) === Number(item.id)" type="loading" />{{ mode === 'factor' ? (item.source_name || item.factor_id) : (item.strategy_name || item.symbol) }}</strong>
+            <strong><a-icon v-if="historyDetailLoading && Number(historyDetailRunId) === Number(item.id)" type="loading" />{{ mode === 'factor' ? (item.source_name || item.factor_id) : historySymbolLabel(item) }}</strong>
             <em>{{ mode === 'factor' ? 'FR-' : '#' }}{{ item.id }}</em>
           </span>
           <span class="run-card__meta">{{ item.market }} · {{ item.timeframe }} · {{ formatDate(item.created_at) }}</span>
@@ -736,7 +736,15 @@ export default {
       const marketType = String(item.market_type || item.marketType || '').toLowerCase()
       const marketTypeKey = marketType ? `marketContext.${marketType}` : ''
       const marketTypeLabel = marketTypeKey && this.$te(marketTypeKey) ? this.$t(marketTypeKey) : marketType
-      return [item.symbol, marketTypeLabel].filter(Boolean).join(' · ')
+      const symbolName = item.symbol_name || item.symbolName || item.name || ''
+      const symbolLabel = [item.symbol, symbolName && symbolName !== item.symbol ? symbolName : ''].filter(Boolean).join(' · ')
+      return [symbolLabel, marketTypeLabel].filter(Boolean).join(' · ')
+    },
+    historySymbolLabel (item) {
+      if (!item) return '-'
+      const symbol = item.symbol || '-'
+      const name = item.symbol_name || item.symbolName || item.name || ''
+      return name && name !== symbol ? `${symbol} · ${name}` : symbol
     },
     parameterLabel (item) {
       if (!item.labelKey) return item.name

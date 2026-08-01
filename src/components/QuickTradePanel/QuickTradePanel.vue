@@ -393,7 +393,7 @@
                       <a-tag :color="$marketColor(t.side)" size="small">
                         {{ t.side === 'buy' ? 'LONG' : 'SHORT' }}
                       </a-tag>
-                      <span class="qt-trade-symbol">{{ t.symbol }}</span>
+                      <span class="qt-trade-symbol">{{ t.symbol }}<template v-if="t.name || t.symbol_name"> · {{ t.name || t.symbol_name }}</template></span>
                       <span class="qt-trade-amount">${{ formatPrice(t.amount) }}</span>
                     </div>
                     <div class="qt-trade-meta">

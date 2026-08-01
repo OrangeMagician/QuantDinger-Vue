@@ -111,7 +111,8 @@ export default {
   name: 'CzscReviewPanel',
   props: {
     candidate: { type: Object, default: null },
-    templates: { type: Array, default: () => [] }
+    templates: { type: Array, default: () => [] },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -274,7 +275,7 @@ export default {
       }
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item)
+      return formatCzscSymbolLabel(item, this.workbenchSymbolMeta)
     }
   }
 }

@@ -33,8 +33,7 @@
         <div class="watchlist-items">
           <article v-for="item in watchlist" :key="item.symbol" class="watchlist-item">
             <div>
-              <strong>{{ symbolCode(item.symbol) }}</strong>
-              <span v-if="symbolName(item)">{{ symbolName(item) }}</span>
+              <strong class="symbol-label">{{ formatSymbolLabel(item) }}</strong>
               <small>{{ item.reason }}</small>
             </div>
             <a-button size="small" icon="delete" @click="removeItem(item)" />
@@ -75,7 +74,7 @@
           :scroll="{ x: 900 }"
         >
           <template slot="symbol" slot-scope="value, row">
-            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
+            <strong class="symbol-label">{{ formatSymbolLabel(row) }}</strong>
           </template>
           <template slot="score" slot-scope="value">
             <a-tag :color="Number(value) >= 70 ? 'green' : Number(value) >= 55 ? 'blue' : ''">{{ Number(value || 0).toFixed(1) }}</a-tag>
@@ -111,7 +110,8 @@ export default {
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -266,10 +266,10 @@ export default {
       return czscSymbolCode(value)
     },
     symbolName (item) {
-      return czscSymbolName(item, this.symbolMeta)
+      return czscSymbolName(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item, this.symbolMeta)
+      return formatCzscSymbolLabel(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     }
   }
 }
@@ -289,8 +289,9 @@ export default {
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
 .watchlist-items { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .watchlist-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid #eceef1; border-radius: 7px; background: #fff; }
-.watchlist-item strong, .watchlist-item span, .watchlist-item small { display: block; }
-.watchlist-item span, .watchlist-item small, .ant-table small { color: #8c8c8c; font-size: 10px; }
+.watchlist-item strong, .watchlist-item small { display: block; }
+.watchlist-item small, .ant-table small { color: #8c8c8c; font-size: 10px; }
+.symbol-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); margin: 14px 0; border-top: 1px solid #e5e7eb; border-left: 1px solid #e5e7eb; }
 .metric-grid > div { display: flex; min-height: 58px; flex-direction: column; justify-content: center; padding: 8px 14px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; }
 .metric-grid span { color: #8c8c8c; font-size: 10px; }

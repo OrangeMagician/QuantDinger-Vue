@@ -73,7 +73,8 @@ export default {
   name: 'CzscMultiPeriodPanel',
   props: {
     symbol: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {

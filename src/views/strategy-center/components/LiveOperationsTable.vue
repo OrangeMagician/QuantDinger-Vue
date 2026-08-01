@@ -49,7 +49,7 @@
           >
             <span class="row-main">
               <strong>{{ strategy.strategy_name || '-' }}</strong>
-              <small>{{ symbol(strategy) || '-' }}<template v-if="timeframe(strategy)"> · {{ timeframe(strategy) }}</template><template v-if="liveExchangeName(strategy)"> · {{ liveExchangeName(strategy) }}</template></small>
+              <small>{{ symbolLabel(strategy) }}<template v-if="timeframe(strategy)"> · {{ timeframe(strategy) }}</template><template v-if="liveExchangeName(strategy)"> · {{ liveExchangeName(strategy) }}</template></small>
             </span>
             <span class="row-status">
               <i :class="statusClass(strategy)"></i>{{ statusLabel(strategy) }}
@@ -73,7 +73,7 @@
           <div>
             <div class="detail-title-line">
               <h2>{{ selectedStrategy.strategy_name || '-' }}</h2>
-              <span class="detail-symbol">{{ symbol(selectedStrategy) }}</span>
+              <span class="detail-symbol">{{ symbolLabel(selectedStrategy) }}</span>
               <span class="status-pill" :class="statusClass(selectedStrategy)">{{ statusLabel(selectedStrategy) }}</span>
               <span class="execution-pill" :class="executionMode(selectedStrategy)">{{ executionLabel(selectedStrategy) }}</span>
               <span v-if="liveExchangeName(selectedStrategy)" class="exchange-pill">
@@ -480,6 +480,12 @@ export default {
     tradingConfig (strategy) { return strategyTradingConfig(strategy) },
     executionLabel (strategy) { return this.executionMode(strategy) === 'live' ? this.$t('systemOverview.live') : this.$t('systemOverview.signal') },
     symbol (strategy) { return strategySymbol(strategy) },
+    symbolLabel (strategy) {
+      const code = this.symbol(strategy) || '-'
+      const config = this.tradingConfig(strategy)
+      const name = strategy && (strategy.symbol_name || strategy.symbolName) || config.symbol_name || config.symbolName || ''
+      return name && name !== code ? `${code} · ${name}` : code
+    },
     timeframe (strategy) {
       return String(strategyTradingConfig(strategy).timeframe || strategy.timeframe || '')
     },

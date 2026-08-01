@@ -94,7 +94,7 @@
           :pagination="{ pageSize: 10, hideOnSinglePage: true }"
         >
           <template slot="symbol" slot-scope="value, row">
-            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
+            <strong class="symbol-label">{{ formatSymbolLabel(row) }}</strong>
           </template>
           <template slot="status" slot-scope="value">
             <a-tag :color="value === 'PASS' ? 'green' : value === 'WARN' ? 'orange' : 'red'">{{ value }}</a-tag>
@@ -158,7 +158,8 @@ export default {
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -201,7 +202,8 @@ export default {
       return (this.result && this.result.pretrade_validation) || {}
     },
     selectedSymbolItems () {
-      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
+      const symbolMeta = { ...this.workbenchSymbolMeta, ...this.symbolMeta }
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(symbolMeta[symbol] || symbol, symbolMeta))
     },
     directionCards () {
       const result = this.result || {}
@@ -285,10 +287,10 @@ export default {
       return czscSymbolCode(value)
     },
     symbolName (item) {
-      return czscSymbolName(item, this.symbolMeta)
+      return czscSymbolName(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item, this.symbolMeta)
+      return formatCzscSymbolLabel(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     updateResultSymbolMeta (result) {
       this.symbolMeta = updateCzscSymbolMeta(this.symbolMeta, [
@@ -399,7 +401,7 @@ export default {
 .ops-head, .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .ops-head h2, .section-heading h3, .ops-table-region h3 { margin: 0 0 4px; font-size: 15px; }
 .ops-head p { margin: 0; color: #8c8c8c; font-size: 12px; }
-.ops-config { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; margin-bottom: 16px; }
+.ops-config { display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.45fr) minmax(320px, 1fr); gap: 14px; margin-bottom: 16px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
 .selected-symbols-preview { display: flex; flex-wrap: wrap; gap: 5px; }
 .ai-config-card, .workflow-card { padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fbfbfc; }
@@ -424,8 +426,11 @@ export default {
 .mini-row { display: grid; grid-template-columns: 150px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; }
 .mini-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-row span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
+.symbol-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pretrade-box { padding: 12px; border: 1px solid #eceef1; border-radius: 8px; background: #fbfbfc; }
 .pretrade-box p { margin: 8px 0 0; color: #595959; font-size: 12px; }
+.workflow-selector >>> .selector-head { grid-template-columns: 1fr; }
+.workflow-selector >>> .selector-tools { grid-template-columns: minmax(0, 1fr) 86px; }
 .theme-dark .research-ops-panel { color: #e5e7eb; background: #171a20; }
 .theme-dark .ai-config-card, .theme-dark .workflow-card, .theme-dark .direction-card, .theme-dark .pretrade-box { border-color: #30343b; background: #1c2027; }
 .theme-dark .ops-summary, .theme-dark .ops-summary > div, .theme-dark .ops-table-region, .theme-dark .mini-row { border-color: #30343b; }

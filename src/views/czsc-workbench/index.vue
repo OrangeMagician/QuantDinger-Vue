@@ -13,34 +13,38 @@
       <div class="toolbar-controls">
         <label class="control-field symbol-field">
           <span>{{ $t('czsc.symbol') }}</span>
-          <a-select
-            v-model="symbolInput"
-            mode="combobox"
-            show-search
-            allow-clear
-            option-label-prop="label"
-            dropdown-class-name="czsc-symbol-dropdown"
-            :placeholder="$t('czsc.symbolPlaceholder')"
-            :filter-option="false"
-            :not-found-content="symbolSearching ? undefined : $t('czsc.noSymbolFound')"
-            @focus="loadSymbolOptions"
-            @search="handleSymbolSearch"
-            @change="handleSymbolChange"
-          >
-            <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
-            <a-select-option
-              v-for="item in symbolOptions"
-              :key="item.symbol"
-              :value="item.symbol"
-              :label="formatSymbolLabel(item)"
+          <div class="symbol-input-shell">
+            <a-select
+              v-model="symbolInput"
+              mode="combobox"
+              show-search
+              allow-clear
+              option-label-prop="label"
+              dropdown-class-name="czsc-symbol-dropdown"
+              :placeholder="$t('czsc.symbolPlaceholder')"
+              :filter-option="false"
+              :not-found-content="symbolSearching ? undefined : $t('czsc.noSymbolFound')"
+              @focus="loadSymbolOptions"
+              @search="handleSymbolSearch"
+              @change="handleSymbolChange"
+              @clear="clearSymbol"
+              @keydown.native="handleSymbolKeydown"
             >
-              <div class="symbol-option">
-                <strong>{{ symbolCode(item.symbol) }}</strong>
-                <span>{{ symbolName(item) }}</span>
-              </div>
-            </a-select-option>
-          </a-select>
-          <small v-if="currentSymbolName" class="symbol-current-name">{{ currentSymbolName }}</small>
+              <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
+              <a-select-option
+                v-for="item in symbolOptions"
+                :key="item.symbol"
+                :value="symbolCode(item.symbol)"
+                :label="formatSymbolLabel(item)"
+              >
+                <div class="symbol-option">
+                  <strong>{{ symbolCode(item.symbol) }}</strong>
+                  <span>{{ symbolName(item) }}</span>
+                </div>
+              </a-select-option>
+            </a-select>
+            <span v-if="currentSymbolName" class="symbol-input-name" :title="currentSymbolName">{{ currentSymbolName }}</span>
+          </div>
         </label>
         <label class="control-field timeframe-field">
           <span>{{ $t('czsc.timeframe') }}</span>
@@ -153,6 +157,7 @@
           :symbol="normalizedSymbol"
           :timeframe="timeframe"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
           @prepare-review="prepareReview"
           @view-chart="viewChart"
           @backtest-row="backtestRow"
@@ -164,6 +169,7 @@
         <multi-period-panel
           :symbol="normalizedSymbol"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
           @prepare-review="prepareReview"
         />
       </a-tab-pane>
@@ -174,6 +180,7 @@
           :symbol="normalizedSymbol"
           :timeframe="timeframe"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
         />
       </a-tab-pane>
 
@@ -183,6 +190,7 @@
           :symbol="normalizedSymbol"
           :timeframe="timeframe"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
         />
       </a-tab-pane>
 
@@ -192,6 +200,7 @@
           :symbol="normalizedSymbol"
           :timeframe="timeframe"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
           @prepare-review="prepareReview"
           @view-chart="viewChart"
           @backtest-row="backtestRow"
@@ -204,6 +213,7 @@
           :symbol="normalizedSymbol"
           :timeframe="timeframe"
           :limit="limit"
+          :workbench-symbol-meta="symbolMeta"
         />
       </a-tab-pane>
 
@@ -217,6 +227,7 @@
           :templates="templates"
           :system-templates="systemTemplates"
           :template-id.sync="selectedTemplateId"
+          :workbench-symbol-meta="symbolMeta"
           @prepare-review="prepareReview"
         />
       </a-tab-pane>
@@ -228,6 +239,7 @@
           :limit="limit"
           :templates="templates"
           :template-id.sync="selectedTemplateId"
+          :workbench-symbol-meta="symbolMeta"
           @prepare-review="prepareReview"
           @view-chart="viewChart"
           @backtest-row="backtestRow"
@@ -242,6 +254,7 @@
           :templates="templates"
           :template-id.sync="selectedTemplateId"
           :dark="isDarkTheme"
+          :workbench-symbol-meta="symbolMeta"
         />
       </a-tab-pane>
 
@@ -250,6 +263,7 @@
         <review-panel
           :candidate="reviewCandidate"
           :templates="templates"
+          :workbench-symbol-meta="symbolMeta"
           @import-context="importTradingViewContext"
         />
       </a-tab-pane>
@@ -338,7 +352,7 @@ export default {
       return this.formatSymbolLabel(this.analysis || this.normalizedSymbol)
     },
     currentSymbolName () {
-      return this.symbolName(this.analysis || this.normalizedSymbol)
+      return this.symbolName(this.normalizedSymbol)
     },
     summary () {
       return (this.analysis && this.analysis.summary) || {
@@ -454,14 +468,41 @@ export default {
     },
     handleSymbolSearch (keyword) {
       if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
+      const nextValue = String(keyword || '').trim().toUpperCase()
+      if (!nextValue) {
+        this.clearSymbol()
+        return
+      }
+      this.symbolInput = nextValue
       this.symbolSearchTimer = setTimeout(() => {
         this.symbolSearchTimer = null
         this.searchSymbols(keyword)
       }, 240)
     },
     handleSymbolChange (value) {
+      if (!value) {
+        this.clearSymbol()
+        return
+      }
       const normalized = this.normalizeCzscSymbol(value)
       this.symbolInput = normalized ? this.symbolCode(normalized) : String(value || '').trim().toUpperCase()
+      this.persistWorkbenchState()
+    },
+    handleSymbolKeydown (event) {
+      if (event && (event.key === 'Backspace' || event.key === 'Delete')) {
+        event.preventDefault()
+        this.clearSymbol()
+      }
+    },
+    clearSymbol () {
+      if (this.symbolSearchTimer) {
+        clearTimeout(this.symbolSearchTimer)
+        this.symbolSearchTimer = null
+      }
+      this.symbolInput = ''
+      this.analysis = null
+      this.error = ''
+      this.symbolOptions = []
       this.persistWorkbenchState()
     },
     async searchSymbols (keyword) {
@@ -588,19 +629,29 @@ export default {
 .service-status i { width: 7px; height: 7px; border-radius: 50%; background: #bfbfbf; }
 .service-status.online i { background: #08979c; }
 .service-status.offline i { background: #fa541c; }
-.toolbar-controls { flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.toolbar-controls { flex: 1; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .control-field { display: flex; flex-direction: column; gap: 4px; color: #595959; font-size: 11px; }
-.symbol-field { width: 220px; }
+.symbol-field { width: 260px; }
+.symbol-input-shell { position: relative; min-width: 0; }
+.symbol-input-shell >>> .ant-select { width: 100%; }
+.symbol-input-shell >>> .ant-select-selection--single .ant-select-selection__rendered { margin-right: 8px; }
+.symbol-input-shell >>> .ant-select-search__field { padding-right: 96px; }
+.symbol-input-name { position: absolute; top: 50%; right: 26px; max-width: 48%; overflow: hidden; padding-left: 7px; transform: translateY(-50%); color: #8c8c8c; background: #fff; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; }
 .symbol-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .symbol-option strong { color: #262626; font-variant-numeric: tabular-nums; }
 .symbol-option span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
-.symbol-current-name { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
 .timeframe-field { min-width: 210px; }
 .limit-field { width: 92px; }
 .icon-button { width: 32px; padding: 0; }
 .workbench-tabs { background: #fff; }
 .workbench-tabs >>> .ant-tabs-bar { margin: 0; padding: 0 20px; background: #fff; }
-.workbench-tabs >>> .ant-tabs-tab { padding-top: 12px; padding-bottom: 12px; }
+.workbench-tabs >>> .ant-tabs-nav-container,
+.workbench-tabs >>> .ant-tabs-nav-wrap,
+.workbench-tabs >>> .ant-tabs-nav-scroll { overflow: visible; }
+.workbench-tabs >>> .ant-tabs-nav { display: flex; width: 100%; }
+.workbench-tabs >>> .ant-tabs-tab { flex: 1 1 auto; justify-content: center; min-width: 0; margin: 0; padding: 12px 9px; white-space: nowrap; }
+.workbench-tabs >>> .ant-tabs-tab-prev,
+.workbench-tabs >>> .ant-tabs-tab-next { display: none; }
 .structure-controls { min-height: 42px; gap: 22px; padding: 7px 20px; border-bottom: 1px solid #e4e6e9; background: #fafafa; }
 .active-symbol { margin-left: auto; color: #595959; font-variant-numeric: tabular-nums; font-size: 12px; }
 .analysis-error, .template-error { margin: 12px 20px 0; }
@@ -636,6 +687,7 @@ export default {
 .theme-dark .workbench-tabs >>> .ant-tabs-bar, .theme-dark .structure-controls, .theme-dark .summary-region { border-color: #30343b; background: #1c2027; }
 .theme-dark .toolbar-title h1, .theme-dark .summary-region h2, .theme-dark .summary-grid dd { color: #f3f4f6; }
 .theme-dark .control-field, .theme-dark .active-symbol, .theme-dark .metadata-list dd, .theme-dark .stroke-row { color: #c5cad3; }
+.theme-dark .symbol-input-name { color: #9da5b1; background: #171a20; }
 .theme-dark .summary-grid, .theme-dark .summary-grid > div, .theme-dark .metadata-list > div, .theme-dark .recent-strokes, .theme-dark .stroke-row, .theme-dark .enhanced-signal-list, .theme-dark .enhanced-signal-card { border-color: #30343b; }
 .theme-dark .enhanced-signal-card { background: #1c2027; }
 .theme-dark .enhanced-signal-card strong { color: #f3f4f6; }
@@ -652,7 +704,11 @@ export default {
   .symbol-field { width: 100%; }
   .timeframe-field { order: 5; width: 100%; }
   .workbench-tabs >>> .ant-tabs-bar { padding: 0 8px; overflow-x: auto; }
-  .workbench-tabs >>> .ant-tabs-nav { white-space: nowrap; }
+  .workbench-tabs >>> .ant-tabs-nav-container,
+  .workbench-tabs >>> .ant-tabs-nav-wrap,
+  .workbench-tabs >>> .ant-tabs-nav-scroll { overflow-x: auto; }
+  .workbench-tabs >>> .ant-tabs-nav { width: max-content; min-width: 100%; white-space: nowrap; }
+  .workbench-tabs >>> .ant-tabs-tab { flex: 0 0 auto; min-width: 82px; padding: 12px 10px; }
   .structure-controls { flex-wrap: wrap; gap: 10px 16px; padding: 8px 12px; }
   .active-symbol { width: 100%; margin-left: 0; }
   .workbench-grid { grid-template-columns: 1fr; height: auto; overflow: visible; }

@@ -42,7 +42,7 @@
             :data-source="result.top_candidates"
             :pagination="{ pageSize: 10, hideOnSinglePage: true }"
           >
-            <template slot="symbol" slot-scope="value, row"><strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small></template>
+            <template slot="symbol" slot-scope="value, row"><strong class="symbol-label">{{ formatSymbolLabel(row) }}</strong></template>
             <template slot="score" slot-scope="value"><a-tag :color="Number(value) >= 70 ? 'green' : 'blue'">{{ Number(value || 0).toFixed(1) }}</a-tag></template>
             <template slot="signal" slot-scope="value, row">{{ topSignalLabel(row) }}</template>
             <template slot="operation" slot-scope="value, row">
@@ -106,7 +106,8 @@ export default {
   props: {
     symbol: { type: String, required: true },
     timeframe: { type: String, required: true },
-    limit: { type: Number, required: true }
+    limit: { type: Number, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -125,7 +126,8 @@ export default {
   },
   computed: {
     selectedSymbolItems () {
-      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
+      const symbolMeta = { ...this.workbenchSymbolMeta, ...this.symbolMeta }
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(symbolMeta[symbol] || symbol, symbolMeta))
     },
     reviewGroups () {
       const retraq = (this.result && this.result.retraq) || {}
@@ -167,10 +169,10 @@ export default {
       return czscSymbolCode(value)
     },
     symbolName (item) {
-      return czscSymbolName(item, this.symbolMeta)
+      return czscSymbolName(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item, this.symbolMeta)
+      return formatCzscSymbolLabel(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     updateResultSymbolMeta (result) {
       const retraq = (result && result.retraq) || {}
@@ -252,16 +254,16 @@ export default {
 .negative { color: #fa541c; }
 .cockpit-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); gap: 24px; }
 .cockpit-grid h3, .resonance-strip h3 { margin: 0 0 10px; font-size: 13px; }
-.ant-table small { display: block; color: #8c8c8c; font-size: 10px; }
+.symbol-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; }
 .review-columns { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .review-group { padding: 10px; border: 1px solid #eceef1; border-radius: 8px; background: #fbfbfc; }
 .review-group header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.review-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-top: 1px solid #eceef1; font-size: 11px; }
+.review-row { display: grid; grid-template-columns: 175px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-top: 1px solid #eceef1; font-size: 11px; }
 .review-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-row span { overflow: hidden; color: #8c8c8c; text-overflow: ellipsis; white-space: nowrap; }
 .resonance-strip { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5e7eb; }
-.resonance-card { display: grid; grid-template-columns: 140px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; font-size: 12px; }
+.resonance-card { display: grid; grid-template-columns: 175px 80px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eceef1; font-size: 12px; }
 .resonance-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resonance-card span { overflow: hidden; color: #595959; text-overflow: ellipsis; white-space: nowrap; }
 .theme-dark .research-panel { color: #e5e7eb; background: #171a20; }

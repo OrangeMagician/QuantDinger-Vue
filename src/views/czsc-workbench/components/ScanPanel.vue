@@ -23,7 +23,7 @@
             @focus="searchSymbols('')"
           >
             <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
-            <a-select-option v-for="item in symbolOptions" :key="item.symbol" :value="item.symbol" :label="formatSymbolLabel(item)">
+            <a-select-option v-for="item in symbolOptions" :key="item.symbol" :value="symbolCode(item.symbol)" :label="formatSymbolLabel(item)">
               <div class="symbol-option"><strong>{{ symbolCode(item.symbol) }}</strong><span>{{ symbolName(item) }}</span></div>
             </a-select-option>
           </a-select>
@@ -103,7 +103,7 @@
           :scroll="{ x: 1050 }"
         >
           <template slot="symbol" slot-scope="value, row">
-            <strong>{{ symbolCode(value) }}</strong><small>{{ symbolName(row) }}</small>
+            <strong class="symbol-label">{{ formatSymbolLabel(row) }}</strong>
           </template>
           <template slot="score" slot-scope="value, row">
             <a-tag v-if="row.score !== undefined" :color="Number(row.score) >= 70 ? 'green' : Number(row.score) >= 55 ? 'blue' : ''">
@@ -172,7 +172,8 @@ export default {
     timeframe: { type: String, required: true },
     limit: { type: Number, required: true },
     templates: { type: Array, default: () => [] },
-    templateId: { type: String, required: true }
+    templateId: { type: String, required: true },
+    workbenchSymbolMeta: { type: Object, default: () => ({}) }
   },
   data () {
     return {
@@ -216,7 +217,8 @@ export default {
       return this.resultMode === 'screener' ? this.$t('czsc.factorScreener') : this.$t('czsc.templateScan')
     },
     selectedSymbolItems () {
-      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(this.symbolMeta[symbol] || symbol, this.symbolMeta))
+      const symbolMeta = { ...this.workbenchSymbolMeta, ...this.symbolMeta }
+      return this.parsedSymbols().map(symbol => czscSymbolDisplayItem(symbolMeta[symbol] || symbol, symbolMeta))
     },
     legacyConditions () {
       const conditions = []
@@ -286,10 +288,10 @@ export default {
       return czscSymbolCode(value)
     },
     symbolName (item) {
-      return czscSymbolName(item, this.symbolMeta)
+      return czscSymbolName(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     formatSymbolLabel (item) {
-      return formatCzscSymbolLabel(item, this.symbolMeta)
+      return formatCzscSymbolLabel(item, { ...this.workbenchSymbolMeta, ...this.symbolMeta })
     },
     handleSymbolSearch (keyword) {
       if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
@@ -533,7 +535,7 @@ export default {
 
 <style scoped>
 .scan-panel { min-height: 620px; background: #fff; }
-.scan-layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); min-height: 620px; }
+.scan-layout { display: grid; grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); min-height: 620px; }
 .scan-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 28px; border-right: 1px solid #e5e7eb; background: #fbfbfc; }
 .factor-workspace { min-width: 0; padding: 18px 20px 32px; }
 .field { display: flex; flex-direction: column; gap: 5px; color: #595959; font-size: 11px; }
@@ -559,6 +561,7 @@ export default {
 .scan-summary span { color: #8c8c8c; font-size: 10px; }
 .scan-summary strong { font-size: 17px; }
 .scan-table strong, .scan-table small { display: block; }
+.symbol-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scan-table small { color: #8c8c8c; font-size: 10px; }
 .factor-cell strong { font-size: 12px; }
 .factor-cell small { margin-top: 3px; }
