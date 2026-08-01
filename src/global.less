@@ -1,5 +1,28 @@
 @import '@/styles/antd-vars.less';
 
+:root {
+  --market-rise-color: #f92855;
+  --market-rise-strong: #f92855;
+  --market-rise-soft: rgba(249, 40, 85, 0.12);
+  --market-rise-border: rgba(249, 40, 85, 0.3);
+  --market-fall-color: #2dc08e;
+  --market-fall-strong: #2dc08e;
+  --market-fall-soft: rgba(45, 192, 142, 0.12);
+  --market-fall-border: rgba(45, 192, 142, 0.3);
+  --market-neutral-color: #8c8c8c;
+}
+
+:root[data-market-color-convention='rise-green-fall-red'] {
+  --market-rise-color: #2dc08e;
+  --market-rise-strong: #2dc08e;
+  --market-rise-soft: rgba(45, 192, 142, 0.12);
+  --market-rise-border: rgba(45, 192, 142, 0.3);
+  --market-fall-color: #f92855;
+  --market-fall-strong: #f92855;
+  --market-fall-soft: rgba(249, 40, 85, 0.12);
+  --market-fall-border: rgba(249, 40, 85, 0.3);
+}
+
 html,
 body,
 #app,
@@ -113,6 +136,15 @@ ol {
 
 body.dark,
 body.realdark {
+  --market-rise-color: #f92855;
+  --market-rise-strong: #f92855;
+  --market-rise-soft: rgba(249, 40, 85, 0.16);
+  --market-rise-border: rgba(249, 40, 85, 0.36);
+  --market-fall-color: #2dc08e;
+  --market-fall-strong: #2dc08e;
+  --market-fall-soft: rgba(45, 192, 142, 0.16);
+  --market-fall-border: rgba(45, 192, 142, 0.36);
+
   .ant-layout-sider-dark,
   .ant-pro-sider-menu-sider,
   .ant-pro-sider-menu-sider.ant-layout-sider-dark,
@@ -305,4 +337,16 @@ body.realdark {
       &-selected { background: var(--primary-color-soft, rgba(24, 144, 255, 0.1)) !important; color: var(--primary-color, #1890ff) !important; }
     }
   }
+}
+
+html[data-market-color-convention='rise-green-fall-red'] body.dark,
+html[data-market-color-convention='rise-green-fall-red'] body.realdark {
+  --market-rise-color: #2dc08e;
+  --market-rise-strong: #2dc08e;
+  --market-rise-soft: rgba(45, 192, 142, 0.16);
+  --market-rise-border: rgba(45, 192, 142, 0.36);
+  --market-fall-color: #f92855;
+  --market-fall-strong: #f92855;
+  --market-fall-soft: rgba(249, 40, 85, 0.16);
+  --market-fall-border: rgba(249, 40, 85, 0.36);
 }

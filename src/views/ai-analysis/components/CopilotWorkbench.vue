@@ -41,6 +41,11 @@
             <span class="eyebrow">{{ text.title }}</span>
             <p>{{ text.subtitle }}</p>
           </div>
+          <div class="hero-actions">
+            <a-button size="small" icon="api" @click="openAiInterfaceSettings">
+              {{ text.aiInterface }}
+            </a-button>
+          </div>
         </div>
       </header>
 
@@ -744,7 +749,8 @@ export default {
         strategyExampleStateful: t('strategyExampleStateful', 'Stateful risk script'),
         strategyExampleGrid: t('strategyExampleGrid', 'Grid strategy template'),
         strategyExampleTrendTemplate: t('strategyExampleTrendTemplate', 'Trend strategy template'),
-        calendarUnavailable: t('calendarUnavailable', 'Calendar unavailable')
+        calendarUnavailable: t('calendarUnavailable', 'Calendar unavailable'),
+        aiInterface: t('aiInterface', this.isZh ? 'AI 接口' : 'AI API')
       }
     },
     uploadImageLabel () {
@@ -1202,12 +1208,21 @@ export default {
     },
     async loadMarketModules () {
       const options = await loadEnabledMarketOptions({ includeFeatures: ['research'] })
-      this.markets = options.map(item => ({
+      const normalized = options.map(item => ({
         value: item.value,
         label: item.label || item.value,
         i18nKey: item.i18nKey,
         module: item.module
       }))
+      if (!normalized.some(item => item.value === 'CNStock')) {
+        normalized.splice(Math.min(1, normalized.length), 0, {
+          value: 'CNStock',
+          label: this.isZh ? 'A 股' : 'China A-shares',
+          i18nKey: 'dashboard.analysis.market.CNStock',
+          module: { key: 'CNStock', enabled: true, features: ['research', 'backtest', 'paper'] }
+        })
+      }
+      this.markets = normalized
       const values = this.markets.map(item => item.value)
       if (!values.includes(this.addWatchMarket)) {
         this.addWatchMarket = firstMarketValue(this.markets)
@@ -1215,6 +1230,10 @@ export default {
       if (this.context.market && !values.includes(this.context.market)) {
         this.context = { market: '', symbol: '' }
       }
+    },
+    openAiInterfaceSettings () {
+      if (!this.$router) return
+      this.$router.push({ path: '/settings', query: { section: 'ai', provider: 'custom' } }).catch(() => {})
     },
     async loadAiSkills () {
       this.loadingSkills = true
@@ -1395,7 +1414,15 @@ export default {
         if (this.context.market) params.market = this.context.market
         const res = await searchSymbols(params)
         const data = res.data || {}
-        const list = Array.isArray(data) ? data : (data.results || data.symbols || data.items || [])
+        let list = Array.isArray(data) ? data : (data.results || data.symbols || data.items || [])
+        if (!this.context.market) {
+          try {
+            const cnRes = await searchSymbols({ market: 'CNStock', keyword: kw, limit: 8 })
+            const cnData = cnRes.data || {}
+            const cnList = Array.isArray(cnData) ? cnData : (cnData.results || cnData.symbols || cnData.items || [])
+            list = cnList.concat(list || [])
+          } catch (_) {}
+        }
         this.symbolOptions = list.map(x => this.normalizeSymbolOption(x)).filter(Boolean)
       } catch (_) {
         const inferred = this.inferSymbolFromText(kw)
@@ -4386,11 +4413,21 @@ export default {
 }
 
 .hero-main {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .hero-copy {
   min-width: 0;
+}
+
+.hero-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .eyebrow {
@@ -5342,13 +5379,13 @@ export default {
 }
 
 .watch-change.up {
-  color: var(--qd-green);
-  background: rgba(10, 163, 117, 0.12);
+  color: var(--market-rise-color);
+  background: var(--market-rise-soft);
 }
 
 .watch-change.down {
-  color: var(--qd-red);
-  background: rgba(229, 75, 75, 0.12);
+  color: var(--market-fall-color);
+  background: var(--market-fall-soft);
 }
 
 .watch-actions {
@@ -5409,11 +5446,11 @@ export default {
 }
 
 .up {
-  color: var(--qd-green);
+  color: var(--market-rise-color);
 }
 
 .down {
-  color: var(--qd-red);
+  color: var(--market-fall-color);
 }
 
 .event-title-row {

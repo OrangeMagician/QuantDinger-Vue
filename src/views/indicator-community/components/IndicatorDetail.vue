@@ -1735,8 +1735,8 @@ export default {
             margin-left: 2px;
           }
 
-          &.positive { color: #52c41a; }
-          &.negative { color: #f5222d; }
+          &.positive { color: var(--market-rise-color); }
+          &.negative { color: var(--market-fall-color); }
         }
 
         &--score {
@@ -1830,8 +1830,8 @@ export default {
         .tag-market--swap { background: rgba(114, 46, 209, 0.1); color: #722ed1; }
         .tag-leverage { background: rgba(250, 140, 22, 0.12); color: #d46b08; }
         .tag-duration { background: rgba(47, 84, 235, 0.1); color: #2f54eb; }
-        .positive { color: #52c41a; font-weight: 600; }
-        .negative { color: #f5222d; font-weight: 600; }
+        .positive { color: var(--market-rise-color); font-weight: 600; }
+        .negative { color: var(--market-fall-color); font-weight: 600; }
       }
 
       &__meta-sep {
@@ -2099,8 +2099,8 @@ export default {
           color: rgba(255, 255, 255, 0.45);
         }
 
-        &.positive { color: #95de64; }
-        &.negative { color: #ff7875; }
+        &.positive { color: var(--market-rise-color); }
+        &.negative { color: var(--market-fall-color); }
       }
 
       &--score {
@@ -2157,8 +2157,8 @@ export default {
         .tag-market--swap { background: rgba(114, 46, 209, 0.22); color: #b37feb; }
         .tag-leverage { background: rgba(250, 140, 22, 0.18); color: #ffc069; }
         .tag-duration { background: rgba(47, 84, 235, 0.2); color: #85a5ff; }
-        .positive { color: #95de64; }
-        .negative { color: #ff7875; }
+        .positive { color: var(--market-rise-color); }
+        .negative { color: var(--market-fall-color); }
       }
 
       &__meta-sep {
@@ -2341,8 +2341,8 @@ export default {
       .perf-value {
         color: rgba(255, 255, 255, 0.88);
         .perf-unit { color: rgba(255, 255, 255, 0.45); }
-        &.positive { color: #95de64; }
-        &.negative { color: #ff7875; }
+        &.positive { color: var(--market-rise-color); }
+        &.negative { color: var(--market-fall-color); }
       }
 
       &--score {
@@ -2372,8 +2372,8 @@ export default {
         .tag-market--swap { background: rgba(114, 46, 209, 0.22); color: #b37feb; }
         .tag-leverage { background: rgba(250, 140, 22, 0.18); color: #ffc069; }
         .tag-duration { background: rgba(47, 84, 235, 0.2); color: #85a5ff; }
-        .positive { color: #95de64; }
-        .negative { color: #ff7875; }
+        .positive { color: var(--market-rise-color); }
+        .negative { color: var(--market-fall-color); }
       }
       &__meta-sep { color: rgba(255, 255, 255, 0.25); }
       &__hint { color: rgba(255, 255, 255, 0.4); }

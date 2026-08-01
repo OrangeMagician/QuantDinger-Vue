@@ -121,7 +121,7 @@
               </div>
               <div v-if="detailNotice.payload.action" class="extra-item">
                 <span class="label">{{ $t('notice.action') }}:</span>
-                <a-tag :color="detailNotice.payload.action === 'BUY' ? 'green' : 'red'">
+                <a-tag :color="$marketColor(detailNotice.payload.action)">
                   {{ detailNotice.payload.action }}
                 </a-tag>
               </div>
@@ -299,8 +299,8 @@ export default {
         price_alert: '#faad14',
         signal: 'var(--primary-color, #1890ff)',
         indicator_signal: '#ff4d4f',
-        buy: '#52c41a',
-        sell: '#f5222d',
+        buy: this.$marketColor('buy'),
+        sell: this.$marketColor('sell'),
         hold: '#faad14',
         trade: '#13c2c2',
         security_login: '#fa541c',
@@ -322,8 +322,8 @@ export default {
     },
     getDecisionColor (decision) {
       const colorMap = {
-        BUY: 'green',
-        SELL: 'red',
+        BUY: this.$marketColor('buy'),
+        SELL: this.$marketColor('sell'),
         HOLD: 'orange'
       }
       return colorMap[decision] || 'blue'
@@ -751,8 +751,8 @@ export default {
   --qd-report-soft-text: #334155;
   --qd-report-header-bg: linear-gradient(135deg, #ffffff 0%, #f6f8fb 100%);
   --qd-report-panel-bg: #ffffff;
-  --qd-report-buy-bg: linear-gradient(180deg, rgba(34, 197, 94, 0.13), #ffffff 74%);
-  --qd-report-sell-bg: linear-gradient(180deg, rgba(239, 68, 68, 0.13), #ffffff 74%);
+  --qd-report-buy-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-rise-color) 13%, transparent), #ffffff 74%);
+  --qd-report-sell-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-fall-color) 13%, transparent), #ffffff 74%);
   --qd-report-hold-bg: linear-gradient(180deg, rgba(234, 179, 8, 0.16), #ffffff 74%);
   --qd-report-focus-bg: rgba(239, 68, 68, 0.07);
   --qd-report-focus-text: #991b1b;
@@ -970,11 +970,11 @@ export default {
 }
 
 .notice-detail-modal .qd-rec-card.buy:before {
-  background: #22c55e;
+  background: var(--market-rise-strong);
 }
 
 .notice-detail-modal .qd-rec-card.sell:before {
-  background: #ef4444;
+  background: var(--market-fall-strong);
 }
 
 .notice-detail-modal .qd-rec-card.hold:before {
@@ -1039,11 +1039,11 @@ export default {
 }
 
 .notice-detail-modal .qd-pos-symbol .icon.buy {
-  background: #16a34a;
+  background: var(--market-rise-color);
 }
 
 .notice-detail-modal .qd-pos-symbol .icon.sell {
-  background: #dc2626;
+  background: var(--market-fall-color);
 }
 
 .notice-detail-modal .qd-pos-symbol .icon.hold {
@@ -1072,15 +1072,15 @@ export default {
 }
 
 .notice-detail-modal .qd-pos-decision .decision-tag.buy {
-  border: 1px solid rgba(34, 197, 94, 0.28);
-  background: rgba(34, 197, 94, 0.14);
-  color: #22c55e;
+  border: 1px solid var(--market-rise-border);
+  background: var(--market-rise-soft);
+  color: var(--market-rise-color);
 }
 
 .notice-detail-modal .qd-pos-decision .decision-tag.sell {
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.14);
-  color: #f87171;
+  border: 1px solid var(--market-fall-border);
+  background: var(--market-fall-soft);
+  color: var(--market-fall-color);
 }
 
 .notice-detail-modal .qd-pos-decision .decision-tag.hold {
@@ -1113,14 +1113,14 @@ export default {
 .notice-detail-modal .qd-stat-card .value.positive,
 .notice-detail-modal .qd-pos-stats .stat .value.positive,
 .notice-detail-modal .qd-rec-card.buy .count {
-  color: #22c55e;
+  color: var(--market-rise-color);
 }
 
 .notice-detail-modal .qd-header-panel .value.negative,
 .notice-detail-modal .qd-stat-card .value.negative,
 .notice-detail-modal .qd-pos-stats .stat .value.negative,
 .notice-detail-modal .qd-rec-card.sell .count {
-  color: #ef4444;
+  color: var(--market-fall-color);
 }
 
 .notice-detail-modal .qd-rec-card.hold .count {
@@ -1237,11 +1237,11 @@ export default {
 }
 
 .notice-detail-modal .qd-notice-card--buy {
-  --qd-card-accent: #16a34a;
+  --qd-card-accent: var(--market-rise-color);
 }
 
 .notice-detail-modal .qd-notice-card--sell {
-  --qd-card-accent: #ef4444;
+  --qd-card-accent: var(--market-fall-color);
 }
 
 .notice-detail-modal .qd-notice-card--watch {
@@ -1454,8 +1454,8 @@ body.realdark,
     --qd-report-soft-text: #c7d0df;
     --qd-report-header-bg: linear-gradient(135deg, #191e28 0%, #121722 100%);
     --qd-report-panel-bg: #10151d;
-    --qd-report-buy-bg: linear-gradient(180deg, rgba(34, 197, 94, 0.12), #10151d 70%);
-    --qd-report-sell-bg: linear-gradient(180deg, rgba(239, 68, 68, 0.13), #10151d 70%);
+    --qd-report-buy-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-rise-color) 13%, transparent), #10151d 70%);
+    --qd-report-sell-bg: linear-gradient(180deg, color-mix(in srgb, var(--market-fall-color) 13%, transparent), #10151d 70%);
     --qd-report-hold-bg: linear-gradient(180deg, rgba(234, 179, 8, 0.13), #10151d 70%);
     --qd-report-focus-bg: rgba(239, 68, 68, 0.08);
     --qd-report-focus-text: #fecaca;

@@ -969,6 +969,9 @@ export default {
     },
     '$route.query.group' () {
       this.applyRouteSection()
+    },
+    '$route.query.provider' () {
+      this.applyRouteProvider()
     }
   },
   methods: {
@@ -1192,6 +1195,12 @@ export default {
         this.selectedLlmProvider = value || 'openrouter'
       }
     },
+    normalizeRouteProvider (value) {
+      const provider = String(value || '').trim().toLowerCase()
+      const llmItem = ((this.schema.ai && this.schema.ai.items) || []).find(item => item.key === 'LLM_PROVIDER')
+      const allowed = this.getSelectOptions(llmItem).map(item => item.value)
+      return allowed.includes(provider) ? provider : ''
+    },
     normalizeRouteSection (value) {
       const key = String(value || '').toLowerCase()
       const map = {
@@ -1213,6 +1222,19 @@ export default {
         this.activeGroupKey = target
         this.searchKeyword = ''
       }
+      this.applyRouteProvider()
+    },
+    applyRouteProvider () {
+      const provider = this.normalizeRouteProvider(this.$route.query.provider)
+      if (!provider) return
+      if (!this.values.ai) this.$set(this.values, 'ai', {})
+      this.$set(this.values.ai, 'LLM_PROVIDER', provider)
+      this.selectedLlmProvider = provider
+      this.$nextTick(() => {
+        try {
+          this.form.setFieldsValue({ LLM_PROVIDER: provider })
+        } catch (error) {}
+      })
     },
     // - string[]: ['openrouter','openai', ...]
     // - {value,label}[]: [{value:'openrouter',label:'OpenRouter'}, ...]
@@ -1269,6 +1291,7 @@ export default {
         } else if (keys.length && (!this.activeGroupKey || !keys.includes(this.activeGroupKey))) {
           this.activeGroupKey = keys[0]
         }
+        this.applyRouteProvider()
       } catch (error) {
         this.$message.error(this.$t('settings.loadFailed'))
       } finally {

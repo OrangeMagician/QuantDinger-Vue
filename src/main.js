@@ -14,8 +14,16 @@ import './utils/filter' // global filter
 import './global.less' // global style
 import './qd-layout-dark-override.less'
 import './mobile-responsive.less'
+import { marketDirectionColor, signedMarketColor } from './utils/marketColors'
 
 Vue.config.productionTip = false
+
+Vue.prototype.$marketColor = function (direction, dark = false) {
+  return marketDirectionColor(direction, dark, this.$store.state.app.marketColorConvention)
+}
+Vue.prototype.$signedMarketColor = function (value, dark = false) {
+  return signedMarketColor(value, dark, this.$store.state.app.marketColorConvention)
+}
 
 // Suppress noisy ResizeObserver loop errors (harmless in most cases on responsive layouts)
 if (typeof window !== 'undefined') {

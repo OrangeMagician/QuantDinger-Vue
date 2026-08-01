@@ -621,8 +621,8 @@ export default {
     },
     directionModeColor (mode) {
       return {
-        long_only: 'green',
-        short_only: 'red',
+        long_only: this.$marketColor('long'),
+        short_only: this.$marketColor('short'),
         both: 'blue',
         neutral: 'purple'
       }[normalizeDirectionMode(mode)] || 'default'

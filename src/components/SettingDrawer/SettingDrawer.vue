@@ -40,6 +40,23 @@
               </div>
             </a-tooltip>
           </div>
+
+          <h3 class="setting-drawer-index-title setting-drawer-market-title">{{ $t('app.setting.marketColors') }}</h3>
+          <a-radio-group
+            class="setting-drawer-market-colors"
+            :value="currentMarketColorConvention"
+            button-style="solid"
+            @change="handleMarketColorConvention"
+          >
+            <a-radio-button :value="marketColorConventions.RISE_RED_FALL_GREEN">
+              <span class="market-color-pair" aria-hidden="true"><i class="rise-red"></i><i class="fall-green"></i></span>
+              {{ $t('app.setting.marketColors.riseRed') }}
+            </a-radio-button>
+            <a-radio-button :value="marketColorConventions.RISE_GREEN_FALL_RED">
+              <span class="market-color-pair" aria-hidden="true"><i class="rise-green"></i><i class="fall-red"></i></span>
+              {{ $t('app.setting.marketColors.riseGreen') }}
+            </a-radio-button>
+          </a-radio-group>
         </div>
 
         <!-- Theme color selector controls app-level accent styles. -->
@@ -167,6 +184,7 @@ import SettingItem from './SettingItem'
 import config from '@/config/defaultSettings'
 import { updateTheme, updateColorWeak, getColorList } from './settingConfig'
 import { baseMixin } from '@/store/app-mixin'
+import { MARKET_COLOR_CONVENTIONS } from '@/utils/marketColors'
 
 export default {
   components: {
@@ -181,7 +199,8 @@ export default {
   mixins: [baseMixin],
   data () {
     return {
-      visible: false
+      visible: false,
+      marketColorConventions: MARKET_COLOR_CONVENTIONS
     }
   },
   computed: {
@@ -214,6 +233,9 @@ export default {
     },
     currentMultiTab () {
       return this.settings.multiTab !== undefined ? this.settings.multiTab : (this.multiTab || false)
+    },
+    currentMarketColorConvention () {
+      return this.settings.marketColorConvention || this.marketColorConvention || MARKET_COLOR_CONVENTIONS.RISE_RED_FALL_GREEN
     },
     isDarkDrawer () {
       return this.isDarkNavTheme
@@ -254,11 +276,15 @@ export default {
     handleMenuTheme (theme) {
       this.$emit('change', { type: 'theme', value: theme })
     },
+    handleMarketColorConvention (event) {
+      this.$emit('change', { type: 'marketColorConvention', value: event.target.value })
+    },
     doCopy () {
       // get current settings from mixin or this.$store.state.app, pay attention to the property name
       const text = `export default {
   primaryColor: '${this.currentPrimaryColor}', // primary color of ant design
   navTheme: '${this.currentNavTheme}', // theme for nav menu
+  marketColorConvention: '${this.currentMarketColorConvention}', // market rise / fall colors
   layout: '${this.layoutMode}', // nav menu position: sidemenu or topmenu
   contentWidth: '${this.currentContentWidth}', // layout of content: Fluid or Fixed, only works when layout is topmenu
   fixedHeader: ${this.currentFixedHeader}, // sticky header
@@ -395,6 +421,54 @@ export default {
       align-items: center;
     }
 
+    .setting-drawer-market-title {
+      margin-top: 22px;
+    }
+
+    .setting-drawer-market-colors {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      width: 100%;
+
+      :deep(.ant-radio-button-wrapper) {
+        display: flex;
+        width: 100%;
+        height: 36px;
+        align-items: center;
+        padding: 0 12px;
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        border-radius: 4px;
+        line-height: 34px;
+
+        &::before {
+          display: none;
+        }
+      }
+
+      :deep(.ant-radio-button-wrapper-checked) {
+        border-color: var(--primary-color, #1890ff);
+        box-shadow: 0 0 0 1px var(--primary-color, #1890ff);
+      }
+    }
+
+    .market-color-pair {
+      display: inline-flex;
+      gap: 3px;
+      margin-right: 8px;
+
+      i {
+        width: 9px;
+        height: 16px;
+        border-radius: 2px;
+      }
+
+      .rise-red,
+      .fall-red { background: #f92855; }
+      .rise-green,
+      .fall-green { background: #2dc08e; }
+    }
+
     .setting-drawer-theme-color-colorBlock {
       display: inline-flex;
     }
@@ -484,6 +558,18 @@ export default {
       .setting-drawer-theme-color-swatch {
         border-color: rgba(255, 255, 255, 0.14);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.32);
+      }
+
+      .setting-drawer-market-colors :deep(.ant-radio-button-wrapper) {
+        border-color: rgba(255, 255, 255, 0.14);
+        color: rgba(226, 232, 240, 0.82);
+        background: #222;
+      }
+
+      .setting-drawer-market-colors :deep(.ant-radio-button-wrapper-checked) {
+        border-color: var(--primary-color, #1890ff);
+        color: #fff;
+        background: color-mix(in srgb, var(--primary-color, #1890ff) 24%, #222);
       }
     }
   }

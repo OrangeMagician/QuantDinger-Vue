@@ -18,7 +18,7 @@
       :scroll="{ x: 820 }"
     >
       <template slot="side" slot-scope="text, record">
-        <a-tag :color="(record.side || record.action || '').toLowerCase() === 'buy' ? 'green' : 'red'">
+        <a-tag :color="$marketColor((record.side || record.action || '').toLowerCase())">
           {{ String(record.side || record.action || '--').toUpperCase() }}
         </a-tag>
       </template>

@@ -997,9 +997,9 @@
 
             <!-- Correct/Incorrect -->
             <template slot="accuracyInfo" slot-scope="text, record">
-              <span class="text-profit">{{ record.correct || 0 }}</span>
+              <span class="text-success">{{ record.correct || 0 }}</span>
               <span class="text-muted"> / </span>
-              <span class="text-loss">{{ record.incorrect || 0 }}</span>
+              <span class="text-error">{{ record.incorrect || 0 }}</span>
             </template>
 
             <!-- Feedback -->
@@ -3151,8 +3151,8 @@ export default {
       .summary-icon-v2 { background: #6657d9; }
       .summary-icon-running { background: #16a37a; }
       .summary-icon-capital { background: #d84f91; }
-      .summary-icon-profit { background: #16a37a; }
-      .summary-icon-loss { background: #e5484d; }
+      .summary-icon-profit { background: var(--market-rise-color); }
+      .summary-icon-loss { background: var(--market-fall-color); }
 
       .summary-info {
         flex: 1;
@@ -3369,12 +3369,22 @@ export default {
 
   // PnL colors
   .text-profit {
-    color: #52c41a;
+    color: var(--market-rise-color);
     font-weight: 600;
   }
 
   .text-loss {
-    color: #ff4d4f;
+    color: var(--market-fall-color);
+    font-weight: 600;
+  }
+
+  .text-success {
+    color: #389e0d;
+    font-weight: 600;
+  }
+
+  .text-error {
+    color: #cf1322;
     font-weight: 600;
   }
 

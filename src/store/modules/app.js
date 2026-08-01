@@ -11,10 +11,12 @@ import {
   TOGGLE_COLOR,
   TOGGLE_WEAK,
   TOGGLE_MULTI_TAB,
+  TOGGLE_MARKET_COLOR_CONVENTION,
   // i18n
   APP_LANGUAGE
 } from '@/store/mutation-types'
 import { loadLanguageAsync } from '@/locales'
+import { applyMarketColorConvention, normalizeMarketColorConvention } from '@/utils/marketColors'
 
 const app = {
   state: {
@@ -29,6 +31,7 @@ const app = {
     color: storage.get(TOGGLE_COLOR, '#52C41A'), // 从 localStorage 读取主题色，默认 '#52C41A'
     weak: false,
     multiTab: true,
+    marketColorConvention: normalizeMarketColorConvention(storage.get(TOGGLE_MARKET_COLOR_CONVENTION)),
     lang: 'en-US',
     _antLocale: {}
   },
@@ -80,6 +83,11 @@ const app = {
     [TOGGLE_MULTI_TAB]: (state, bool) => {
       storage.set(TOGGLE_MULTI_TAB, bool)
       state.multiTab = bool
+    },
+    [TOGGLE_MARKET_COLOR_CONVENTION]: (state, convention) => {
+      const nextConvention = applyMarketColorConvention(convention)
+      state.marketColorConvention = nextConvention
+      storage.set(TOGGLE_MARKET_COLOR_CONVENTION, nextConvention)
     }
   },
   actions: {

@@ -247,6 +247,7 @@ export default {
     }
   },
   computed: {
+    marketColorConvention () { return this.$store.state.app.marketColorConvention },
     auditPassed () { return Boolean(this.result.audit && this.result.audit.passed) },
     legacyBackfilled () { return Boolean(this.result.compatibility && this.result.compatibility.legacyBackfill) },
     initialCapital () {
@@ -409,7 +410,8 @@ export default {
   },
   watch: {
     result: { deep: true, handler () { this.$nextTick(this.renderChart) } },
-    isDark () { this.$nextTick(this.renderChart) }
+    isDark () { this.$nextTick(this.renderChart) },
+    marketColorConvention () { this.$nextTick(this.renderReviewMarkers) }
   },
   mounted () { this.renderChart(); window.addEventListener('resize', this.resizeChart) },
   beforeDestroy () {
@@ -503,7 +505,7 @@ export default {
             price: entryPrice,
             text: this.$t('strategyV2.backtest.entryMarker'),
             side: isShort ? 'sell' : 'buy',
-            color: isShort ? '#f6465d' : '#0ecb81'
+            color: this.$marketColor(isShort ? 'sell' : 'buy')
           }))
         }
         if (Number.isFinite(exitPrice)) {
@@ -512,7 +514,7 @@ export default {
             price: exitPrice,
             text: this.$t('strategyV2.backtest.exitMarker'),
             side: isShort ? 'buy' : 'sell',
-            color: isShort ? '#0ecb81' : '#f6465d'
+            color: this.$marketColor(isShort ? 'buy' : 'sell')
           }))
         }
         this.focusReviewRange(chart, entryTime, exitTime)
@@ -596,8 +598,8 @@ export default {
 .metric-label { display: inline-flex; align-items: center; gap: 5px; }
 .metric-label .anticon { cursor: help; }
 .metric-card strong { color: #20324a; font-size: 18px; font-variant-numeric: tabular-nums; }
-.positive { color: #16a34a !important; }
-.negative { color: #dc2626 !important; }
+.positive { color: var(--market-rise-color) !important; }
+.negative { color: var(--market-fall-color) !important; }
 .neutral { color: #94a3b8 !important; }
 .chart-card { margin-top: 12px; padding: 13px; border: 1px solid #edf0f4; border-radius: 8px; }
 .chart-heading { display: flex; justify-content: space-between; gap: 16px; }

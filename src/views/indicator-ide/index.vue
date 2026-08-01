@@ -2936,8 +2936,8 @@ export default {
         '    {\'name\': \'EMA Slow\', \'data\': ema_slow.fillna(0).tolist(), \'color\': \'#1890ff\', \'overlay\': True}\n' +
         '  ],\n' +
         '  \'signals\': [\n' +
-        '    {\'type\': \'buy\', \'text\': \'Golden\', \'data\': buy_marks, \'color\': \'#52c41a\'},\n' +
-        '    {\'type\': \'sell\', \'text\': \'Death\', \'data\': sell_marks, \'color\': \'#ff4d4f\'}\n' +
+        '    {\'type\': \'buy\', \'text\': \'Golden\', \'data\': buy_marks},\n' +
+        '    {\'type\': \'sell\', \'text\': \'Death\', \'data\': sell_marks}\n' +
         '  ],\n' +
         '  \'layers\': []\n' +
         '}\n'
@@ -5282,8 +5282,8 @@ body.dark .ide-signal-alert-modal-wrap {
     }
     .metric-label { font-size: 10px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.35px; font-weight: 600; }
     .metric-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0f172a; line-height: 1.2; }
-    &.positive .metric-value { color: #52c41a; }
-    &.negative .metric-value { color: #f5222d; }
+    &.positive .metric-value { color: var(--market-rise-color); }
+    &.negative .metric-value { color: var(--market-fall-color); }
   }
 }
 .publish-form {
@@ -5639,8 +5639,8 @@ body.dark .ide-signal-alert-modal-wrap {
       }
       .metric-label { color: rgba(255, 255, 255, 0.5); }
       .metric-value { color: rgba(255, 255, 255, 0.9); }
-      &.positive .metric-value { color: #49aa19; }
-      &.negative .metric-value { color: #d32029; }
+      &.positive .metric-value { color: var(--market-rise-color); }
+      &.negative .metric-value { color: var(--market-fall-color); }
     }
   }
   .eq-title, .trades-title { color: rgba(255,255,255,0.85); .trades-count { color: rgba(255,255,255,0.45); } }

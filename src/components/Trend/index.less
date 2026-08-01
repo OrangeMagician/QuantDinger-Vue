@@ -26,19 +26,19 @@
   }
 
   .up {
-    color: @red-6;
+    color: var(--market-rise-color);
   }
 
   .down {
     top: -1px;
-    color: @green-6;
+    color: var(--market-fall-color);
   }
 
   &.reverse-color .up {
-    color: @green-6;
+    color: var(--market-fall-color);
   }
 
   &.reverse-color .down {
-    color: @red-6;
+    color: var(--market-rise-color);
   }
 }

@@ -229,7 +229,8 @@ import {
   TOGGLE_HIDE_HEADER,
   TOGGLE_COLOR,
   TOGGLE_WEAK,
-  TOGGLE_MULTI_TAB
+  TOGGLE_MULTI_TAB,
+  TOGGLE_MARKET_COLOR_CONVENTION
 } from '@/store/mutation-types'
 
 import defaultSettings from '@/config/defaultSettings'
@@ -269,6 +270,7 @@ export default {
         contentWidth: defaultSettings.layout === 'sidemenu' ? CONTENT_WIDTH_TYPE.Fluid : defaultSettings.contentWidth,
         theme: defaultSettings.navTheme,
         primaryColor: defaultSettings.primaryColor,
+        marketColorConvention: this.$store.state.app.marketColorConvention,
         fixedHeader: defaultSettings.fixedHeader,
         fixSiderbar: defaultSettings.fixSiderbar,
         colorWeak: defaultSettings.colorWeak,
@@ -373,6 +375,7 @@ export default {
     // menus is now a computed property - no need to set here
     this.settings.theme = this.$store.state.app.theme
     this.settings.primaryColor = this.$store.state.app.color || defaultSettings.primaryColor
+    this.settings.marketColorConvention = this.$store.state.app.marketColorConvention
     this.$watch('collapsed', () => {
       this.$store.commit(SIDEBAR_TYPE, this.collapsed)
     })
@@ -402,6 +405,9 @@ export default {
           }
         }
       }
+    }, { immediate: true })
+    this.$watch('$store.state.app.marketColorConvention', (val) => {
+      if (val) this.settings.marketColorConvention = val
     }, { immediate: true })
     this.$watch('settings.theme', (val) => {
       if (val === 'dark' || val === 'realdark') {
@@ -581,6 +587,14 @@ export default {
           title: this.$t('menu.dashboard.indicatorIde') || 'Indicators',
           icon: 'line-chart',
           paths: ['/indicator-ide'],
+          singleAsItem: true
+        },
+        {
+          name: 'MenuGroupCzsc',
+          path: '/menu-group/czsc-workbench',
+          title: this.$t('menu.dashboard.czscWorkbench') || 'CZSC',
+          icon: 'line-chart',
+          paths: ['/czsc-workbench'],
           singleAsItem: true
         },
         {
@@ -864,6 +878,9 @@ export default {
           break
         case 'primaryColor':
           this.$store.commit(TOGGLE_COLOR, value)
+          break
+        case 'marketColorConvention':
+          this.$store.commit(TOGGLE_MARKET_COLOR_CONVENTION, value)
           break
         case 'layout':
           this.$store.commit(TOGGLE_LAYOUT, value)

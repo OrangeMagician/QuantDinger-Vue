@@ -71,10 +71,10 @@ export default {
       }
 
       &.up {
-        color: #f5222d;
+        color: var(--market-rise-color);
       }
       &.down {
-        color: #52c41a;
+        color: var(--market-fall-color);
         top: -1px;
       }
     }

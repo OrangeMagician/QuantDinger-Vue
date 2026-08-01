@@ -55,6 +55,12 @@ export const asyncRouterMap = [
         meta: { title: 'menu.dashboard.indicatorIde', keepAlive: true, icon: 'line-chart', permission: ['dashboard'] }
       },
       {
+        path: '/czsc-workbench',
+        name: 'CzscWorkbench',
+        component: () => import('@/views/czsc-workbench'),
+        meta: { title: 'menu.dashboard.czscWorkbench', keepAlive: true, icon: 'line-chart', permission: ['dashboard'] }
+      },
+      {
         path: '/universe-manager',
         name: 'UniverseManager',
         component: () => import('@/views/universe-manager'),

@@ -14,7 +14,8 @@ const baseMixin = {
 
       isMobile: state => state.app.isMobile,
       sideCollapsed: state => state.app.sideCollapsed,
-      multiTab: state => state.app.multiTab
+      multiTab: state => state.app.multiTab,
+      marketColorConvention: state => state.app.marketColorConvention
     }),
     isTopMenu () {
       return this.layout === 'topmenu'
