@@ -21,7 +21,8 @@ test('navigation is organized by product tasks and has no visible CZSC entry', a
   for (const route of ['/trend-chart', '/market-screener', '/strategy-center', '/backtest-center', '/tasks']) {
     assert.match(routes, new RegExp(`path: '${route.replaceAll('/', '\\/')}'`))
   }
-  assert.match(layout, /paths: \['\/trend-chart'\]/)
+  assert.match(routes, /path: '\/trend-chart'[\s\S]*hidden: true/)
+  assert.doesNotMatch(layout, /paths: \['\/trend-chart'\]/)
   assert.match(layout, /paths: \['\/backtest-center'\]/)
   assert.doesNotMatch(layout, /title:\s*['"]CZSC['"]/)
   assert.doesNotMatch(layout, /paths:\s*\['\/czsc-workbench'\]/)
@@ -31,7 +32,7 @@ test('legacy workbench URLs redirect to the corresponding unified pages', async 
   const routes = await source('config/router.config.js')
 
   assert.match(routes, /path: '\/czsc-workbench'[\s\S]*hidden: true/)
-  assert.match(routes, /tab === 'structure'[\s\S]*path: '\/trend-chart'/)
+  assert.match(routes, /tab === 'structure'[\s\S]*path: '\/indicator-ide'[\s\S]*builtin: 'czsc'/)
   assert.match(routes, /tab === 'multi-period'[\s\S]*mode: 'multi-period'/)
   assert.match(routes, /\['scan', 'watchlist'\][\s\S]*path: '\/market-screener'/)
   assert.match(routes, /\['factor-lab', 'quality', 'backtest'\][\s\S]*path: '\/backtest-center'/)
@@ -47,6 +48,7 @@ test('unified domain client uses v2 product APIs instead of frontend CZSC routes
     '/api/v2/engines',
     '/api/v2/market/bars',
     '/api/v2/chart-layer-runs',
+    '/api/v2/chart-layers/compute',
     '/api/v2/multi-period-runs',
     '/api/v2/backtests',
     '/api/v2/factor-research',
@@ -64,30 +66,38 @@ test('unified domain client uses v2 product APIs instead of frontend CZSC routes
   await fileDoesNotExist('api/czsc.js')
 })
 
-test('trend chart owns base bars, CZSC structure layers and multi-period analysis', async () => {
-  const page = await source('views/trend-chart/index.vue')
+test('CZSC is a selectable built-in indicator and the legacy trend page keeps multi-period analysis', async () => {
+  const [page, ide, chart] = await Promise.all([
+    source('views/trend-chart/index.vue'),
+    source('views/indicator-ide/index.vue'),
+    source('views/indicator-analysis/components/KlineChart.vue')
+  ])
 
-  assert.match(page, /<czsc-chart/)
-  assert.match(page, /getMarketBars/)
-  assert.match(page, /createChartLayerRun/)
   assert.match(page, /createMultiPeriodRun/)
   assert.match(page, /query\.mode === 'multi-period'/)
-  assert.match(page, /engineSource/)
-  assert.match(page, /workerAvailable/)
-  assert.match(page, /normalizeEpochMilliseconds/)
+  assert.match(ide, /czscIndicatorEnabled/)
+  assert.match(ide, /indicatorIde\.czsc\.name/)
+  assert.match(ide, /:czsc-enabled="czscIndicatorEnabled"/)
+  assert.match(ide, /czscLayerVisibility/)
+  assert.match(chart, /computeChartLayers/)
+  assert.match(chart, /bars: bars\.map/)
 })
 
 test('structure chart renders volume, MACD and aligned CZSC overlays', async () => {
-  const chart = await source('components/charts/StructureChart.vue')
+  const [chart, layers] = await Promise.all([
+    source('components/charts/StructureChart.vue'),
+    source('utils/czscChartLayers.js')
+  ])
 
   assert.match(chart, /createIndicator\('VOL'/)
   assert.match(chart, /createIndicator\('MACD'/)
-  assert.match(chart, /name: 'czscStroke'/)
-  assert.match(chart, /name: 'czscFractal'/)
-  assert.match(chart, /name: 'czscSignalMarker'/)
+  assert.match(chart, /renderCzscOverlays/)
+  assert.match(layers, /name: 'czscStroke'/)
+  assert.match(layers, /name: 'czscFractal'/)
+  assert.match(layers, /name: 'czscSignalMarker'/)
   assert.match(chart, /timestamp: normalizeEpochMilliseconds\(bar\.timestamp\)/)
-  assert.match(chart, /normalizeEpochMilliseconds\(stroke\.start_timestamp\)/)
-  assert.match(chart, /normalizeEpochMilliseconds\(fractal\.timestamp\)/)
+  assert.match(layers, /normalizeEpochMilliseconds\(stroke\.start_timestamp\)/)
+  assert.match(layers, /normalizeEpochMilliseconds\(fractal\.timestamp\)/)
 })
 
 test('research workflows use one task center and product task IDs', async () => {

@@ -68,7 +68,7 @@
           :data-source="results"
           :pagination="{ pageSize: 20 }"
           size="middle">
-          <template slot="symbol" slot-scope="value, row"><router-link :to="{ path: '/trend-chart', query: { symbol: value, timeframe } }"><strong>{{ value }}</strong><small>{{ row.name || '' }}</small></router-link></template>
+          <template slot="symbol" slot-scope="value, row"><router-link :to="{ path: '/indicator-ide', query: { market: 'CNStock', symbol: value, timeframe, builtin: 'czsc' } }"><strong>{{ value }}</strong><small>{{ row.name || '' }}</small></router-link></template>
           <template slot="score" slot-scope="value"><b :class="Number(value) >= 70 ? 'score-high' : ''">{{ Number(value || 0).toFixed(1) }}</b></template>
           <template slot="signals" slot-scope="value"><a-tag v-for="item in (value || []).slice(0, 3)" :key="item.signal_type">{{ item.signal_type_label || item.signal_type }}</a-tag></template>
           <template slot="action" slot-scope="value, row"><a-tooltip :title="$t('marketScreener.addWatchlist')"><a-button type="link" icon="star" @click="addResultToWatchlist(row)" /></a-tooltip></template>

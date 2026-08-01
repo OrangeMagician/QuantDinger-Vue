@@ -22,6 +22,15 @@ export function createChartLayerRun (data, idempotencyKey) {
   })
 }
 
+export function computeChartLayers (data) {
+  return request({
+    url: '/api/v2/chart-layers/compute',
+    method: 'post',
+    data,
+    timeout: 60000
+  })
+}
+
 export function createMultiPeriodRun (data, idempotencyKey) {
   return request({
     url: '/api/v2/multi-period-runs',

@@ -25,6 +25,20 @@ export const asyncRouterMap = [
         path: '/trend-chart',
         name: 'TrendChart',
         component: () => import('@/views/trend-chart'),
+        hidden: true,
+        beforeEnter: (to, from, next) => {
+          const query = to.query || {}
+          if (['multi', 'multi-period'].includes(String(query.mode || ''))) return next()
+          return next({
+            path: '/indicator-ide',
+            query: {
+              market: query.market || 'CNStock',
+              symbol: query.symbol,
+              timeframe: query.timeframe,
+              builtin: 'czsc'
+            }
+          })
+        },
         meta: { title: 'menu.dashboard.trendChart', keepAlive: true, icon: 'stock', permission: ['dashboard'] }
       },
       {
@@ -76,7 +90,7 @@ export const asyncRouterMap = [
           const common = {}
           if (query.symbol) common.symbol = query.symbol
           if (query.timeframe) common.timeframe = query.timeframe
-          if (tab === 'structure') return { path: '/trend-chart', query: common }
+          if (tab === 'structure') return { path: '/indicator-ide', query: { ...common, market: 'CNStock', builtin: 'czsc' } }
           if (tab === 'multi-period') return { path: '/trend-chart', query: { ...common, mode: 'multi-period' } }
           if (['scan', 'watchlist'].includes(tab)) return { path: '/market-screener', query: common }
           if (['factor-lab', 'quality', 'backtest'].includes(tab)) {

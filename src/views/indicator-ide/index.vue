@@ -375,8 +375,33 @@
                         <div slot="overlay" class="ide-indicator-overlay" @mousedown.stop @click.stop>
                           <div class="ide-indicator-overlay-hint">{{ $t('indicatorIde.chartPickHint') }}</div>
                           <a-spin v-if="loadingIndicators" size="small" style="padding: 12px;" />
-                          <div v-else-if="!indicators.length" class="ide-indicator-overlay-empty">{{ $t('indicatorIde.noIndicatorsYet') }}</div>
                           <div v-else class="ide-indicator-overlay-list">
+                            <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.builtinIndicators') }}</div>
+                            <div class="ide-indicator-row ide-indicator-row--builtin">
+                              <a-checkbox
+                                :checked="czscIndicatorEnabled"
+                                @change="e => setCzscIndicatorEnabled(e.target.checked)"
+                              />
+                              <span class="ide-indicator-name" @click="setCzscIndicatorEnabled(!czscIndicatorEnabled)">
+                                {{ $t('indicatorIde.czsc.name') }}
+                              </span>
+                              <a-tag color="blue" class="ide-indicator-purchased-tag">{{ $t('indicatorIde.czsc.builtin') }}</a-tag>
+                              <a-spin v-if="czscLayerState.state === 'loading'" size="small" />
+                              <a-tooltip v-else-if="czscLayerState.state === 'error'" :title="czscLayerState.message">
+                                <a-icon type="warning" class="ide-czsc-warning" />
+                              </a-tooltip>
+                            </div>
+                            <div v-if="czscIndicatorEnabled" class="ide-czsc-layer-options">
+                              <a-checkbox v-model="czscLayerVisibility.fractals">{{ $t('trendChart.fractals') }}</a-checkbox>
+                              <a-checkbox v-model="czscLayerVisibility.strokes">{{ $t('trendChart.strokes') }}</a-checkbox>
+                              <a-checkbox v-model="czscLayerVisibility.unfinished">{{ $t('trendChart.unfinished') }}</a-checkbox>
+                              <a-checkbox v-model="czscLayerVisibility.signals">{{ $t('trendChart.signals') }}</a-checkbox>
+                              <a-button type="link" size="small" icon="branches" @click="openCzscMultiPeriod">
+                                {{ $t('indicatorIde.czsc.multiPeriod') }}
+                              </a-button>
+                            </div>
+                            <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.customIndicators') }}</div>
+                            <div v-if="!indicators.length" class="ide-indicator-overlay-empty">{{ $t('indicatorIde.noIndicatorsYet') }}</div>
                             <div
                               v-for="ind in indicators"
                               :key="'ind-row-' + ind.id"
@@ -414,9 +439,12 @@
                     :timeframe="timeframe"
                     :theme="chartTheme"
                     :activeIndicators="activeIndicators"
+                    :czsc-enabled="czscIndicatorEnabled"
+                    :czsc-visibility="czscLayerVisibility"
                     :userId="userId"
                     :realtime-enabled="klineRealtimeEnabled"
                     @indicator-toggle="handleIndicatorToggle"
+                    @czsc-state-change="handleCzscStateChange"
                   />
                 </div>
               </div>
@@ -1025,6 +1053,9 @@ export default {
 
       activeIndicators: [],
       chartIndicatorRunning: true,
+      czscIndicatorEnabled: false,
+      czscLayerVisibility: { fractals: true, strokes: true, unfinished: true, signals: true },
+      czscLayerState: { state: 'idle', message: '' },
       quickTradeDrawerVisible: false,
       paramDrawerVisible: false,
       indicatorParamOverrides: {},
@@ -1203,9 +1234,10 @@ export default {
     indicatorToolbarSummary () {
       const ed = this.selectedIndicatorObj
       const edLabel = this.indicatorDisplayName(ed)
-      const n = (this.chartVisibleIndicatorIds && this.chartVisibleIndicatorIds.length) || 0
-      if (!this.indicators.length) return this.$t('indicatorIde.noIndicatorsYet')
-      if (!n) return `${edLabel} · ${this.$t('indicatorIde.indicatorPickPlaceholder')}`
+      const customCount = (this.chartVisibleIndicatorIds && this.chartVisibleIndicatorIds.length) || 0
+      const n = customCount + (this.czscIndicatorEnabled ? 1 : 0)
+      if (!n) return this.$t('indicatorIde.indicatorPickPlaceholder')
+      if (!customCount) return `${this.$t('indicatorIde.czsc.name')} · ${this.$t('indicatorIde.indicatorCountOnChart', { n })}`
       return `${edLabel} · ${this.$t('indicatorIde.indicatorCountOnChart', { n })}`
     }
   },
@@ -1219,6 +1251,7 @@ export default {
     this.restoreIdeUiState()
     this.restoreIdeSelectionPreference()
     this.applyIndicatorRouteSelection()
+    this.applyChartRouteContext()
     this.autoSelectFirstIndicator()
     this.loadSignalAlertNotificationDefaults()
     this.loadSignalAlertTasks()
@@ -1339,6 +1372,15 @@ export default {
         if (Array.isArray(s.activeIndicators)) {
           this.activeIndicators = this.normalizePersistedChartIndicators(s.activeIndicators)
         }
+        if (typeof s.czscIndicatorEnabled === 'boolean') {
+          this.czscIndicatorEnabled = s.czscIndicatorEnabled
+        }
+        if (s.czscLayerVisibility && typeof s.czscLayerVisibility === 'object') {
+          this.czscLayerVisibility = {
+            ...this.czscLayerVisibility,
+            ...s.czscLayerVisibility
+          }
+        }
         if (Array.isArray(s.chartVisibleIndicatorIds)) {
           hadChartVisibleKey = true
           const valid = s.chartVisibleIndicatorIds
@@ -1400,7 +1442,9 @@ export default {
       try {
         const payload = {
           timeframe: this.timeframe,
-          activeIndicators: this.serializeChartIndicators()
+          activeIndicators: this.serializeChartIndicators(),
+          czscIndicatorEnabled: this.czscIndicatorEnabled,
+          czscLayerVisibility: { ...this.czscLayerVisibility }
         }
         storage.set(ideUiCacheStorageKey(this.userId), JSON.stringify(payload))
       } catch (_) { /* ignore quota */ }
@@ -1426,6 +1470,15 @@ export default {
         }
 
         const indicatorId = Number(saved.indicatorId)
+        if (typeof saved.czscIndicatorEnabled === 'boolean') {
+          this.czscIndicatorEnabled = saved.czscIndicatorEnabled
+        }
+        if (saved.czscLayerVisibility && typeof saved.czscLayerVisibility === 'object') {
+          this.czscLayerVisibility = {
+            ...this.czscLayerVisibility,
+            ...saved.czscLayerVisibility
+          }
+        }
         if (indicatorId && this.indicators.some(item => Number(item.id) === indicatorId)) {
           this.selectedIndicatorId = indicatorId
           const visibleIds = Array.isArray(saved.visibleIndicatorIds)
@@ -1446,7 +1499,9 @@ export default {
           symbol: this.symbol,
           instrumentId: this.currentInstrumentId,
           indicatorId: this.selectedIndicatorId,
-          visibleIndicatorIds: this.chartVisibleIndicatorIds
+          visibleIndicatorIds: this.chartVisibleIndicatorIds,
+          czscIndicatorEnabled: this.czscIndicatorEnabled,
+          czscLayerVisibility: { ...this.czscLayerVisibility }
         }))
       } catch (_) { /* ignore quota */ }
     },
@@ -1499,6 +1554,48 @@ export default {
         this.chartVisibleIndicatorIds = [targetId]
       }
       this.onIndicatorChange(targetId)
+    },
+    applyChartRouteContext () {
+      const query = this.$route && this.$route.query ? this.$route.query : {}
+      if (query.market) this.market = String(query.market)
+      if (query.symbol) {
+        this.symbol = String(query.symbol)
+        this.qtSymbol = this.symbol
+      }
+      if (query.timeframe) {
+        const raw = String(query.timeframe).toLowerCase()
+        const matched = Object.keys(TF_MAX_DAYS).find(item => item.toLowerCase() === raw)
+        if (matched) this.timeframe = matched
+      }
+      const builtin = String(query.builtin || query.indicator || '').toLowerCase()
+      if (['czsc', 'czsc-structure', 'true', '1'].includes(builtin)) {
+        this.czscIndicatorEnabled = true
+      }
+      if (this.market && this.symbol) {
+        this.selectedWatchlistKey = marketContextKey({
+          market: this.market,
+          symbol: this.symbol,
+          exchange_id: this.cryptoExchangeId,
+          market_type: this.cryptoMarketType,
+          instrument_id: this.currentInstrumentId
+        })
+      }
+    },
+    setCzscIndicatorEnabled (enabled) {
+      this.czscIndicatorEnabled = Boolean(enabled)
+      this.persistIdeSelectionPreference()
+    },
+    handleCzscStateChange (state) {
+      this.czscLayerState = state && typeof state === 'object'
+        ? { state: state.state || 'idle', message: state.message || '' }
+        : { state: 'idle', message: '' }
+    },
+    openCzscMultiPeriod () {
+      this.indicatorDropdownVisible = false
+      this.$router.push({
+        path: '/trend-chart',
+        query: { symbol: this.symbol, timeframe: this.timeframe, mode: 'multi-period' }
+      }).catch(() => {})
     },
     pruneChartVisibleIndicatorIds () {
       const set = new Set(this.indicators.map(i => Number(i.id)))
@@ -3381,6 +3478,15 @@ export default {
       this.applyIndicatorRouteSelection()
     },
     chartVisibleIndicatorIds: {
+      deep: true,
+      handler () {
+        this.schedulePersistIdeUiState()
+      }
+    },
+    czscIndicatorEnabled () {
+      this.schedulePersistIdeUiState()
+    },
+    czscLayerVisibility: {
       deep: true,
       handler () {
         this.schedulePersistIdeUiState()
@@ -6406,6 +6512,13 @@ body.dark .ide-param-modal-wrap {
 .ide-indicator-overlay-list {
   padding: 0 4px;
 }
+.ide-indicator-section-label {
+  padding: 7px 8px 3px;
+  color: #8c8c8c;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
 .ide-indicator-row {
   display: flex;
   align-items: center;
@@ -6415,6 +6528,29 @@ body.dark .ide-param-modal-wrap {
   &:hover {
     background: #f5f5f5;
   }
+}
+.ide-indicator-row--builtin {
+  background: #f7faff;
+}
+.ide-czsc-layer-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin: 2px 8px 6px 32px;
+  padding: 8px;
+  border-left: 2px solid #91caff;
+  background: #fafcff;
+  font-size: 11px;
+  .ant-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+    height: 22px;
+    padding: 0;
+    font-size: 11px;
+  }
+}
+.ide-czsc-warning {
+  color: #faad14;
 }
 .ide-indicator-name {
   flex: 1;
@@ -6446,8 +6582,13 @@ body.dark .ide-param-modal-wrap {
     background: #1f1f1f;
   }
   .ide-indicator-overlay-hint,
-  .ide-indicator-overlay-empty {
+  .ide-indicator-overlay-empty,
+  .ide-indicator-section-label {
     color: rgba(255, 255, 255, 0.45);
+  }
+  .ide-indicator-row--builtin,
+  .ide-czsc-layer-options {
+    background: rgba(24, 144, 255, 0.08);
   }
   .ide-indicator-row:hover {
     background: rgba(255, 255, 255, 0.06);

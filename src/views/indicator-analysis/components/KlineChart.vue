@@ -69,6 +69,11 @@
             </a-tooltip>
           </div>
         </div>
+        <div v-if="czscEnabled && czscState !== 'ready'" class="czsc-layer-status" aria-live="polite">
+          <a-spin v-if="czscState === 'loading'" size="small" />
+          <a-icon v-else-if="czscState === 'error'" type="warning" />
+          <span>{{ czscState === 'error' ? czscError : $t('indicatorIde.czsc.computing') }}</span>
+        </div>
         <div
           ref="chartContainerRef"
           class="kline-chart-container"
@@ -172,6 +177,8 @@ import ExchangeKlineWs from '@/utils/exchangeWs'
 import { splitIndicatorPlotsByPane } from '@/utils/indicatorPlotGrouping'
 import { klineChartMarketStyles, marketPalette } from '@/utils/marketColors'
 import { usePyodide } from '@/services/pyodide/usePyodide'
+import { computeChartLayers } from '@/api/domain'
+import { clearCzscOverlays, registerCzscOverlays, renderCzscOverlays } from '@/utils/czscChartLayers'
 import {
   calculateSMA,
   calculateEMA,
@@ -224,6 +231,14 @@ export default {
       type: Array,
       default: () => []
     },
+    czscEnabled: {
+      type: Boolean,
+      default: false
+    },
+    czscVisibility: {
+      type: Object,
+      default: () => ({ fractals: true, strokes: true, unfinished: true, signals: true })
+    },
     realtimeEnabled: {
       type: Boolean,
       default: false
@@ -245,7 +260,7 @@ export default {
       default: null
     }
   },
-  emits: ['retry', 'price-change', 'load', 'indicator-toggle', 'indicators-updated'],
+  emits: ['retry', 'price-change', 'load', 'indicator-toggle', 'indicators-updated', 'czsc-state-change'],
   setup (props, { emit }) {
     const klineData = shallowRef([])
     const loading = ref(false)
@@ -523,6 +538,12 @@ export default {
 
     const addedIndicatorIds = ref([])
     const addedSignalOverlayIds = ref([])
+    const czscOverlayIds = ref([])
+    const czscResult = shallowRef(null)
+    const czscState = ref('idle')
+    const czscError = ref('')
+    let czscLoadGeneration = 0
+    let czscContextKey = ''
     const addedBacktestOverlayIds = ref([])
     const addedDrawingOverlayIds = ref([])
     const activeDrawingTool = ref(null)
@@ -560,6 +581,100 @@ export default {
         } catch (err) {
         }
       })
+    }
+
+    const setCzscState = (state, message = '') => {
+      czscState.value = state
+      czscError.value = message
+      emit('czsc-state-change', { state, message })
+    }
+
+    const clearCzscLayerOverlays = () => {
+      czscOverlayIds.value = clearCzscOverlays(chartRef.value, czscOverlayIds.value)
+    }
+
+    const renderCurrentCzscLayers = () => {
+      clearCzscLayerOverlays()
+      if (!props.czscEnabled || !chartRef.value || !czscResult.value) return
+      czscOverlayIds.value = renderCzscOverlays({
+        chart: chartRef.value,
+        result: czscResult.value,
+        visibility: props.czscVisibility,
+        dark: chartTheme.value === 'dark',
+        marketColorConvention: marketColorConvention.value,
+        translate: key => proxy.$t(key)
+      })
+    }
+
+    const loadCzscLayers = async () => {
+      if (!props.czscEnabled) {
+        czscLoadGeneration += 1
+        czscResult.value = null
+        czscContextKey = ''
+        clearCzscLayerOverlays()
+        setCzscState('idle')
+        return
+      }
+      const bars = (klineData.value || []).slice(-1000)
+      if (!props.symbol || bars.length < 20) {
+        czscResult.value = null
+        czscContextKey = ''
+        clearCzscLayerOverlays()
+        setCzscState('error', proxy.$t('indicatorIde.czsc.notEnoughBars'))
+        return
+      }
+
+      const contextKey = JSON.stringify([
+        props.market,
+        props.symbol,
+        props.timeframe,
+        props.exchangeId,
+        props.marketType,
+        bars.length,
+        bars[bars.length - 1] && bars[bars.length - 1].timestamp
+      ])
+      if (contextKey === czscContextKey) {
+        if (czscState.value === 'loading') return
+        if (czscResult.value) {
+          renderCurrentCzscLayers()
+          setCzscState('ready')
+          return
+        }
+      }
+      czscContextKey = contextKey
+      const generation = ++czscLoadGeneration
+
+      setCzscState('loading')
+      try {
+        const response = await computeChartLayers({
+          market: props.market || '',
+          symbol: props.symbol,
+          name: props.symbol,
+          timeframe: props.timeframe,
+          bars: bars.map(item => ({
+            timestamp: Number(item.timestamp),
+            open: Number(item.open),
+            high: Number(item.high),
+            low: Number(item.low),
+            close: Number(item.close),
+            volume: Number(item.volume || 0),
+            turnover: Number(item.turnover || item.amount || 0)
+          }))
+        })
+        if (generation !== czscLoadGeneration) return
+        if (!response || response.code !== 1 || !response.data) {
+          throw new Error((response && response.msg) || proxy.$t('indicatorIde.czsc.failed'))
+        }
+        czscResult.value = response.data
+        renderCurrentCzscLayers()
+        setCzscState('ready')
+      } catch (error) {
+        if (generation !== czscLoadGeneration) return
+        czscResult.value = null
+        czscContextKey = ''
+        clearCzscLayerOverlays()
+        setCzscState('error', error.backendMessage || error.message || proxy.$t('indicatorIde.czsc.failed'))
+      }
     }
 
     const { proxy } = getCurrentInstance()
@@ -2329,6 +2444,11 @@ registerOverlay({
 
       stopRealtime()
       clearBacktestOverlays()
+      czscLoadGeneration += 1
+      czscContextKey = ''
+      czscResult.value = null
+      clearCzscLayerOverlays()
+      if (props.czscEnabled) setCzscState('loading')
 
       loading.value = true
       error.value = null
@@ -2405,6 +2525,9 @@ registerOverlay({
 
           if (props.realtimeEnabled) {
             startRealtime()
+          }
+          if (props.czscEnabled) {
+            setTimeout(() => loadCzscLayers(), 120)
           }
         })
       } catch (err) {
@@ -3184,6 +3307,7 @@ registerOverlay({
 
             nextTick(() => {
               maybeUpdateIndicators(true)
+              if (props.czscEnabled) loadCzscLayers()
             })
           }
         }
@@ -4993,6 +5117,7 @@ registerOverlay({
       if (chartRef.value) {
         updateChartTheme()
         updateIndicators()
+        renderCurrentCzscLayers()
       }
       nextTick(() => _ensureWmLayer())
     })
@@ -5001,6 +5126,7 @@ registerOverlay({
       if (!chartRef.value) return
       updateChartTheme()
       updateIndicators()
+      renderCurrentCzscLayers()
     })
 
     watch(() => props.activeIndicators, (newVal, oldVal) => {
@@ -5019,6 +5145,22 @@ registerOverlay({
       }
     }, { deep: true })
 
+    watch(() => props.czscEnabled, () => {
+      if (props.czscEnabled) {
+        loadCzscLayers()
+      } else {
+        czscLoadGeneration += 1
+        czscResult.value = null
+        czscContextKey = ''
+        clearCzscLayerOverlays()
+        setCzscState('idle')
+      }
+    })
+
+    watch(() => props.czscVisibility, () => {
+      renderCurrentCzscLayers()
+    }, { deep: true })
+
     watch(() => props.realtimeEnabled, (newVal) => {
       if (newVal) {
         startRealtime()
@@ -5028,6 +5170,7 @@ registerOverlay({
     })
 
     onMounted(async () => {
+      registerCzscOverlays()
       await nextTick()
       if (props.theme && (props.theme === 'dark' || props.theme === 'light')) {
         chartTheme.value = props.theme
@@ -5144,6 +5287,8 @@ registerOverlay({
     }
 
     onBeforeUnmount(() => {
+      czscLoadGeneration += 1
+      clearCzscLayerOverlays()
       stopRealtime()
       wsClient = null
       if (realtimeChartRafId != null) {
@@ -5230,6 +5375,8 @@ registerOverlay({
       selectDrawingTool,
       clearAllDrawings,
       addedSignalOverlayIds,
+      czscState,
+      czscError,
       addedBacktestOverlayIds,
       getChartInstance,
       clearBacktestOverlays,
@@ -5416,6 +5563,36 @@ registerOverlay({
 .indicator-active-chip__label {
   cursor: pointer;
   font-weight: 600;
+}
+
+.czsc-layer-status {
+  position: absolute;
+  top: 56px;
+  right: 12px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 5px 8px;
+  border: 1px solid #ffd591;
+  border-radius: 6px;
+  background: rgba(255, 251, 230, 0.94);
+  color: #ad6800;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.czsc-layer-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-left.theme-dark .czsc-layer-status {
+  border-color: #613400;
+  background: rgba(47, 33, 5, 0.94);
+  color: #ffc53d;
 }
 
 .indicator-active-chip__action {

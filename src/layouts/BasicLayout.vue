@@ -533,14 +533,6 @@ export default {
           singleAsItem: true
         },
         {
-          name: 'MenuGroupTrendChart',
-          path: '/menu-group/trend-chart',
-          title: this.$t('menu.dashboard.trendChart') || 'Trend Chart',
-          icon: 'stock',
-          paths: ['/trend-chart'],
-          singleAsItem: true
-        },
-        {
           name: 'MenuGroupStrategy',
           path: '/menu-group/strategy-lab',
           title: this.$t('menu.group.strategyLab') || 'Strategy Lab',
