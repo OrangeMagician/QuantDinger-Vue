@@ -8,6 +8,7 @@ import {
   MARKET_COLOR_CONVENTIONS,
   MARKET_COLORS,
   applyMarketColorConvention,
+  klineChartMarketStyles,
   marketColorWithAlpha,
   marketDirectionColor,
   marketPalette,
@@ -51,6 +52,24 @@ test('swaps rise and fall palettes for the international convention', () => {
   assert.equal(signedMarketColor(1, true, riseGreen), MARKET_COLORS[riseRed].dark.fall)
   assert.equal(signedMarketColor(-1, true, riseGreen), MARKET_COLORS[riseRed].dark.rise)
   assert.equal(marketColorWithAlpha('rise', 0.25, false, riseGreen), 'rgba(45, 192, 142, 0.25)')
+})
+
+test('applies the selected convention to every directional kline chart surface', () => {
+  const chineseStyles = klineChartMarketStyles(false, riseRed, '#d9d9d9')
+  assert.equal(chineseStyles.candleBar.upColor, '#f92855')
+  assert.equal(chineseStyles.candleBar.upBorderColor, '#f92855')
+  assert.equal(chineseStyles.candleBar.upWickColor, '#f92855')
+  assert.equal(chineseStyles.candleBar.downColor, '#2dc08e')
+  assert.equal(chineseStyles.lastPriceMark.upColor, '#f92855')
+  assert.equal(chineseStyles.indicator.bars[0].upColor, '#f92855')
+  assert.equal(chineseStyles.indicator.bars[0].downColor, '#2dc08e')
+  assert.equal(chineseStyles.indicator.ohlc.noChangeColor, '#d9d9d9')
+
+  const internationalStyles = klineChartMarketStyles(true, riseGreen)
+  assert.equal(internationalStyles.candleBar.upColor, '#2dc08e')
+  assert.equal(internationalStyles.candleBar.downWickColor, '#f92855')
+  assert.equal(internationalStyles.lastPriceMark.downColor, '#f92855')
+  assert.equal(internationalStyles.indicator.circles[0].upColor, '#2dc08e')
 })
 
 test('normalizes, applies, and exposes the persisted convention on the root element', () => {

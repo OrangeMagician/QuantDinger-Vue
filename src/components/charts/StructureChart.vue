@@ -4,7 +4,7 @@
 
 <script>
 import { init, registerOverlay } from 'klinecharts'
-import { marketPalette } from '@/utils/marketColors'
+import { klineChartMarketStyles, marketPalette } from '@/utils/marketColors'
 import { normalizeEpochMilliseconds } from '@/utils/timestamps'
 
 let overlaysRegistered = false
@@ -187,24 +187,18 @@ export default {
     applyTheme () {
       if (!this.chart) return
       const dark = this.dark
-      const market = marketPalette(dark, this.marketColorConvention)
+      const marketStyles = klineChartMarketStyles(dark, this.marketColorConvention)
       this.chart.setStyles({
         grid: {
           horizontal: { color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(31,41,55,0.08)', style: 'dashed' },
           vertical: { color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(31,41,55,0.05)' }
         },
         candle: {
-          bar: {
-            upColor: market.rise,
-            downColor: market.fall,
-            noChangeColor: '#8c8c8c',
-            upBorderColor: market.rise,
-            downBorderColor: market.fall,
-            upWickColor: market.rise,
-            downWickColor: market.fall
-          },
+          bar: marketStyles.candleBar,
+          priceMark: { last: marketStyles.lastPriceMark },
           tooltip: { showRule: 'always', showType: 'standard' }
         },
+        indicator: marketStyles.indicator,
         xAxis: { axisLine: { color: dark ? '#30363d' : '#d9d9d9' }, tickText: { color: dark ? '#9ca3af' : '#595959' } },
         yAxis: { axisLine: { color: dark ? '#30363d' : '#d9d9d9' }, tickText: { color: dark ? '#9ca3af' : '#595959' } },
         separator: { color: dark ? '#30363d' : '#e8e8e8' }

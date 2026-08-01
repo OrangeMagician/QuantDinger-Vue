@@ -170,7 +170,7 @@ import { init, registerIndicator, registerOverlay } from 'klinecharts'
 import request from '@/utils/request'
 import ExchangeKlineWs from '@/utils/exchangeWs'
 import { splitIndicatorPlotsByPane } from '@/utils/indicatorPlotGrouping'
-import { marketPalette } from '@/utils/marketColors'
+import { klineChartMarketStyles, marketPalette } from '@/utils/marketColors'
 import { usePyodide } from '@/services/pyodide/usePyodide'
 import {
   calculateSMA,
@@ -3214,7 +3214,7 @@ registerOverlay({
 
       const theme = themeConfig.value
       const isDark = chartTheme.value === 'dark'
-      const market = marketPalette(isDark, marketColorConvention.value)
+      const marketStyles = klineChartMarketStyles(isDark, marketColorConvention.value, theme.borderColor)
 
       chartRef.value.setStyles({
         grid: {
@@ -3242,7 +3242,8 @@ registerOverlay({
             low: {
               show: true,
               color: theme.axisLabelColor
-            }
+            },
+            last: marketStyles.lastPriceMark
           },
           tooltip: {
             showRule: 'always',
@@ -3268,16 +3269,13 @@ registerOverlay({
               ]
             }
           },
-          bar: {
-            upColor: market.rise,
-            downColor: market.fall,
-            noChangeColor: theme.borderColor
-          },
+          bar: marketStyles.candleBar,
           area: {
             point: { animation: false, animationDuration: 0 }
           }
         },
         indicator: {
+          ...marketStyles.indicator,
           tooltip: {
             showRule: 'always',
             showType: 'standard'

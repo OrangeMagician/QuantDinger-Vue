@@ -101,3 +101,31 @@ export function marketColorWithAlpha (direction, alpha, dark = false, convention
   const opacity = Math.max(0, Math.min(1, Number(alpha)))
   return `rgba(${parseInt(match[1], 16)}, ${parseInt(match[2], 16)}, ${parseInt(match[3], 16)}, ${opacity})`
 }
+
+export function klineChartMarketStyles (dark = false, convention = currentMarketColorConvention(), neutralColor = '') {
+  const colors = marketPalette(dark, convention)
+  const neutral = neutralColor || colors.neutral
+  const directional = {
+    upColor: colors.rise,
+    downColor: colors.fall,
+    noChangeColor: neutral
+  }
+
+  return {
+    candleBar: {
+      ...directional,
+      upBorderColor: colors.rise,
+      downBorderColor: colors.fall,
+      noChangeBorderColor: neutral,
+      upWickColor: colors.rise,
+      downWickColor: colors.fall,
+      noChangeWickColor: neutral
+    },
+    lastPriceMark: { ...directional },
+    indicator: {
+      ohlc: { ...directional },
+      bars: [{ ...directional }],
+      circles: [{ ...directional }]
+    }
+  }
+}
