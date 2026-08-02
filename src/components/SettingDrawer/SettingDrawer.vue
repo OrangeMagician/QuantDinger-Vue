@@ -263,7 +263,6 @@ export default {
     // Apply the saved theme color without showing the loading message.
     document.documentElement.style.setProperty('--primary-color', this.currentPrimaryColor)
     updateTheme(this.currentPrimaryColor, true)
-    updateTheme(this.currentPrimaryColor, true)
     if (this.currentColorWeak !== config.colorWeak) {
       updateColorWeak(this.currentColorWeak)
     }

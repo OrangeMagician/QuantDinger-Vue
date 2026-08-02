@@ -48,7 +48,28 @@
 
           <div v-if="isCzscSource" class="form-grid engine-fields">
             <a-form-item :label="$t('unifiedBacktest.symbol')">
-              <a-input v-model="form.symbol" placeholder="000333.SZ" />
+              <a-select
+                v-model="form.symbol"
+                class="full-width"
+                show-search
+                allow-clear
+                option-label-prop="label"
+                :filter-option="false"
+                :loading="symbolSearching"
+                :placeholder="$t('unifiedBacktest.symbol')"
+                @search="searchBacktestSymbols"
+                @focus="searchBacktestSymbols('')"
+                @change="handleBacktestSymbolChange"
+              >
+                <a-select-option
+                  v-for="item in symbolOptions"
+                  :key="item.symbol"
+                  :value="item.symbol"
+                  :label="symbolOptionLabel(item)"
+                >
+                  {{ symbolOptionLabel(item) }}
+                </a-select-option>
+              </a-select>
             </a-form-item>
             <a-form-item :label="$t('unifiedBacktest.timeframe')">
               <a-select v-model="form.timeframe">
@@ -74,6 +95,10 @@
               <div><span>{{ $t('strategyV2.markets') }}</span><strong>{{ (manifest.markets || []).join(', ') || '-' }}</strong></div>
               <div><span>{{ $t('strategyV2.universe') }}</span><strong>{{ universeLabel }}</strong></div>
             </div>
+            <p v-if="universeContractHint" class="universe-contract-hint">
+              <a-icon type="info-circle" />
+              {{ universeContractHint }}
+            </p>
           </div>
 
           <div class="panel-heading runtime-heading">
@@ -359,8 +384,15 @@ import {
   getTask,
   listResearchResults,
   listUnifiedStrategies,
-  registerCzscStrategies
+  registerCzscStrategies,
+  searchMarketSymbols
 } from '@/api/domain'
+import {
+  DEFAULT_CZSC_SYMBOL_ITEMS,
+  czscSymbolDisplayItem,
+  formatCzscSymbolLabel,
+  normalizeCzscSymbol
+} from '@/utils/czscSymbols'
 import PortfolioResult from './PortfolioResult.vue'
 import FactorResearchResult from './FactorResearchResult.vue'
 import EngineFactorResult from './EngineFactorResult.vue'
@@ -391,6 +423,13 @@ export default {
       historyDetailRunId: null,
       equityChart: null,
       chartResizeObserver: null,
+      symbolOptions: DEFAULT_CZSC_SYMBOL_ITEMS.map(item => ({ ...item })),
+      symbolNames: DEFAULT_CZSC_SYMBOL_ITEMS.reduce((output, item) => {
+        output[item.symbol] = item.name
+        return output
+      }, {}),
+      symbolSearching: false,
+      symbolSearchTimer: null,
       form: {
         sourceId: null,
         startDate: moment().subtract(1, 'year'),
@@ -424,8 +463,9 @@ export default {
       return this.mode === 'portfolio' ? this.result : this.factorResult
     },
     availableSources () {
-      if (this.mode !== 'factor') return this.sources.filter(item => !item.research_asset)
-      return this.sources.filter(item => item.research_asset || (item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy'))
+      const runnable = item => item.engine === 'czsc' || item.code_hidden || String(item.code || '').trim()
+      if (this.mode !== 'factor') return this.sources.filter(item => !item.research_asset && runnable(item))
+      return this.sources.filter(item => item.research_asset || (item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy' && runnable(item)))
     },
     isCzscSource () {
       return Boolean(this.source && this.source.engine === 'czsc')
@@ -514,12 +554,19 @@ export default {
     },
     universeLabel () {
       const universe = (this.manifest && this.manifest.universe) || {}
-      if (universe.reference) return universe.reference
+      if (universe.reference) return this.$t('strategyV2.referenceUniverse', { reference: universe.reference })
       const instruments = Array.isArray(universe.instruments) ? universe.instruments : []
       if (this.manifest && this.manifest.strategyType === 'cta' && instruments.length) {
         return instruments.map(this.formatInstrument).join(', ')
       }
       return this.$t('strategyV2.symbolCount', { count: instruments.length })
+    },
+    universeContractHint () {
+      const universe = (this.manifest && this.manifest.universe) || {}
+      if (universe.reference) return this.$t('strategyV2.referenceUniverseHint')
+      const instruments = Array.isArray(universe.instruments) ? universe.instruments : []
+      if (!this.isCzscSource && instruments.length) return this.$t('strategyV2.fixedUniverseHint')
+      return ''
     },
     paramDefinitions () {
       const schema = this.parseObject(this.source && this.source.param_schema)
@@ -637,6 +684,7 @@ export default {
   beforeDestroy () {
     window.removeEventListener('resize', this.resizeEquityChart)
     this.stopRunTimer()
+    if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
     if (this.chartResizeObserver) this.chartResizeObserver.disconnect()
     if (this.equityChart) this.equityChart.dispose()
   },
@@ -829,6 +877,10 @@ export default {
       this.selectedRun = null
       this.form.leverageEnabled = false
       this.form.leverage = 1
+      this.source = null
+      this.manifest = null
+      this.backtestRangePolicy = null
+      this.params = {}
       const selected = this.sources.find(item => String(item.id) === String(sourceId))
       if (selected && selected.engine === 'czsc') {
         this.source = selected
@@ -841,10 +893,11 @@ export default {
         return
       }
       const response = await getScriptSourceDetail(sourceId)
-      this.source = { ...response.data, engine: 'native' }
       const compiled = await compileScriptSource({ sourceId })
+      this.source = { ...response.data, engine: 'native' }
       this.manifest = compiled.data && compiled.data.manifest
       this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+      await this.hydrateManifestSymbolNames()
       this.applyBacktestRangePolicy()
       this.params = this.paramDefinitions.reduce((output, item) => {
         output[item.name] = item.default
@@ -861,15 +914,67 @@ export default {
       const marketType = String(item.market_type || item.marketType || '').toLowerCase()
       const marketTypeKey = marketType ? `marketContext.${marketType}` : ''
       const marketTypeLabel = marketTypeKey && this.$te(marketTypeKey) ? this.$t(marketTypeKey) : marketType
-      const symbolName = item.symbol_name || item.symbolName || item.name || ''
+      const normalizedSymbol = normalizeCzscSymbol(item.symbol)
+      const symbolName = item.symbol_name || item.symbolName || item.name || this.symbolNames[normalizedSymbol] || ''
       const symbolLabel = [item.symbol, symbolName && symbolName !== item.symbol ? symbolName : ''].filter(Boolean).join(' · ')
       return [symbolLabel, marketTypeLabel].filter(Boolean).join(' · ')
     },
     historySymbolLabel (item) {
       if (!item) return '-'
       const symbol = item.symbol || '-'
-      const name = item.symbol_name || item.symbolName || item.name || ''
+      const name = item.symbol_name || item.symbolName || item.name || this.symbolNames[normalizeCzscSymbol(symbol)] || ''
       return name && name !== symbol ? `${symbol} · ${name}` : symbol
+    },
+    symbolOptionLabel (item) {
+      return formatCzscSymbolLabel(item, this.symbolNames)
+    },
+    rememberSymbolOptions (items) {
+      const next = (items || []).map(item => czscSymbolDisplayItem(item)).filter(Boolean)
+      const bySymbol = new Map(this.symbolOptions.map(item => [item.symbol, item]))
+      const names = { ...this.symbolNames }
+      next.forEach(item => {
+        bySymbol.set(item.symbol, item)
+        if (item.name) names[item.symbol] = item.name
+      })
+      this.symbolOptions = Array.from(bySymbol.values())
+      this.symbolNames = names
+    },
+    async hydrateManifestSymbolNames () {
+      const universe = (this.manifest && this.manifest.universe) || {}
+      if (!this.manifest || this.manifest.strategyType !== 'cta') return
+      const symbols = (Array.isArray(universe.instruments) ? universe.instruments : [])
+        .map(item => normalizeCzscSymbol(item.symbol))
+        .filter(symbol => symbol && !this.symbolNames[symbol])
+      if (!symbols.length) return
+      const responses = await Promise.all(symbols.map(symbol => searchMarketSymbols({
+        market: 'CNStock',
+        keyword: symbol.slice(0, 6),
+        limit: 10
+      }).catch(() => null)))
+      const rows = []
+      responses.forEach((response, index) => {
+        if (!response || response.code !== 1 || !Array.isArray(response.data)) return
+        const exact = response.data.find(item => normalizeCzscSymbol(item.symbol || item.code) === symbols[index])
+        if (exact) rows.push(exact)
+      })
+      this.rememberSymbolOptions(rows)
+    },
+    searchBacktestSymbols (keyword) {
+      if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
+      this.symbolSearchTimer = setTimeout(async () => {
+        this.symbolSearching = true
+        try {
+          const response = await searchMarketSymbols({ market: 'CNStock', keyword: keyword || '', limit: 30 })
+          if (response && response.code === 1) {
+            this.rememberSymbolOptions(Array.isArray(response.data) ? response.data : [])
+          }
+        } finally {
+          this.symbolSearching = false
+        }
+      }, keyword ? 250 : 0)
+    },
+    handleBacktestSymbolChange (value) {
+      this.form.symbol = value ? normalizeCzscSymbol(value) : ''
     },
     parameterLabel (item) {
       if (!item.labelKey) return item.name
@@ -1363,6 +1468,7 @@ export default {
 .manifest-grid div, .metric-card { display: flex; flex-direction: column; gap: 3px; }
 .manifest-grid span, .metric-card span, .assumption-strip span { color: #7c8ca1; font-size: 11px; }
 .manifest-grid strong { color: #23344d; overflow-wrap: anywhere; }
+.universe-contract-hint { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 0; padding-top: 9px; border-top: 1px solid #e5edf5; color: #60758b; font-size: 11px; line-height: 1.55; }
 .section-hint { margin: 7px 0 10px; font-size: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
 .range-limit-alert { margin: 0 0 14px; }

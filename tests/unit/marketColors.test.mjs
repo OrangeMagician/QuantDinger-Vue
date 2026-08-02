@@ -88,6 +88,12 @@ test('normalizes, applies, and exposes the persisted convention on the root elem
   assert.match(cssSource, /--market-fall-color: #f92855/)
 })
 
+test('applies the saved primary color during application bootstrap', () => {
+  const bootstrapSource = readFileSync(fileURLToPath(new URL('../../src/core/bootstrap.js', import.meta.url)), 'utf8')
+  assert.match(bootstrapSource, /import themeColor from '@\/components\/SettingDrawer\/themeColor'/)
+  assert.match(bootstrapSource, /store\.commit\(TOGGLE_COLOR, nextColor\)[\s\S]*themeColor\.changeColor\(nextColor\)/)
+})
+
 test('localized indicator examples defer default signal colors to the selected convention', () => {
   const locales = ['en-US', 'ar-SA', 'de-DE', 'fr-FR', 'ja-JP', 'ko-KR', 'ru-RU', 'th-TH', 'vi-VN', 'zh-CN', 'zh-TW']
   for (const locale of locales) {

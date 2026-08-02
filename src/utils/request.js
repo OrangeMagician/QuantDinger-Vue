@@ -149,6 +149,9 @@ function normalizeBusinessErrorMessage (message, error) {
       { cell, captures, required, fee }
     )
   }
+  if (/^[A-Za-z][A-Za-z0-9_.-]+$/.test(message)) {
+    return tt(message, message)
+  }
   return message
 }
 

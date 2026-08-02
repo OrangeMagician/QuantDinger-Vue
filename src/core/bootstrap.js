@@ -11,6 +11,7 @@ import {
 } from '@/store/mutation-types'
 import { printANSI } from '@/utils/screenLog'
 import defaultSettings from '@/config/defaultSettings'
+import themeColor from '@/components/SettingDrawer/themeColor'
 
 export default function Initializer () {
   printANSI() // 请自行移除该行.  please remove this line
@@ -34,6 +35,7 @@ export default function Initializer () {
   store.commit(TOGGLE_NAV_THEME, nextTheme)
   store.commit(TOGGLE_WEAK, storage.get(TOGGLE_WEAK, defaultSettings.colorWeak))
   store.commit(TOGGLE_COLOR, nextColor)
+  themeColor.changeColor(nextColor)
   store.commit(TOGGLE_MULTI_TAB, storage.get(TOGGLE_MULTI_TAB, defaultSettings.multiTab))
   store.commit(TOGGLE_MARKET_COLOR_CONVENTION, storage.get(TOGGLE_MARKET_COLOR_CONVENTION))
   let token = storage.get(ACCESS_TOKEN)

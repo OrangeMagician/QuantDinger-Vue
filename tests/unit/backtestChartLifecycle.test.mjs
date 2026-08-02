@@ -51,6 +51,17 @@ test('CTA source summary exposes the concrete instrument instead of only its cou
   assert.match(source, /this\.manifest\.strategyType === 'cta' && instruments\.length/)
   assert.match(source, /instruments\.map\(this\.formatInstrument\)\.join\(', '\)/)
   assert.match(source, /marketContext\.\$\{marketType\}/)
+  assert.match(source, /this\.symbolNames\[normalizedSymbol\]/)
+  assert.match(source, /formatCzscSymbolLabel\(item, this\.symbolNames\)/)
+})
+
+test('backtest target search shows stock names and excludes empty native sources', () => {
+  assert.match(source, /searchMarketSymbols\(\{ market: 'CNStock'/)
+  assert.match(source, /await this\.hydrateManifestSymbolNames\(\)/)
+  assert.match(source, /const exact = response\.data\.find/)
+  assert.match(source, /option-label-prop="label"/)
+  assert.match(source, /item\.code_hidden \|\| String\(item\.code \|\| ''\)\.trim\(\)/)
+  assert.match(source, /strategyV2\.referenceUniverseHint/)
 })
 
 test('portfolio drawdown chart uses initial capital and backend drawdown points', () => {
