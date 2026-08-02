@@ -46,7 +46,7 @@
             </a-select-option>
           </a-select>
 
-          <div v-if="isCzscSource" class="form-grid engine-fields">
+          <div v-if="needsChartSymbol" class="form-grid engine-fields">
             <a-form-item :label="$t('unifiedBacktest.symbol')">
               <a-select
                 v-model="form.symbol"
@@ -463,12 +463,18 @@ export default {
       return this.mode === 'portfolio' ? this.result : this.factorResult
     },
     availableSources () {
-      const runnable = item => item.engine === 'czsc' || item.code_hidden || String(item.code || '').trim()
+      const runnable = item => item.engine === 'czsc' || item.asset_type === 'graph_strategy' || item.code_hidden || String(item.code || '').trim()
       if (this.mode !== 'factor') return this.sources.filter(item => !item.research_asset && runnable(item))
       return this.sources.filter(item => item.research_asset || (item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy' && runnable(item)))
     },
     isCzscSource () {
-      return Boolean(this.source && this.source.engine === 'czsc')
+      return Boolean(this.source && this.source.engine === 'czsc' && this.source.source_kind !== 'graph' && this.source.asset_type !== 'graph_strategy')
+    },
+    isGraphSource () {
+      return Boolean(this.source && (this.source.source_kind === 'graph' || this.source.asset_type === 'graph_strategy'))
+    },
+    needsChartSymbol () {
+      return this.isCzscSource || this.isGraphSource
     },
     history () {
       return this.mode === 'factor' ? this.factorHistory : this.portfolioHistory
@@ -785,17 +791,23 @@ export default {
       await Promise.all([this.loadSources(), this.loadHistory()])
     },
     async loadSources () {
-      const nativeRequest = getScriptSourceList()
-      const czscRequest = registerCzscStrategies()
-        .then(() => listUnifiedStrategies({ engine: 'czsc' }))
-        .catch(() => ({ data: [] }))
+      await registerCzscStrategies().catch(() => null)
       const factorRequest = getFactorCatalog().catch(() => ({ data: {} }))
-      const [nativeResponse, czscResponse, factorResponse] = await Promise.all([nativeRequest, czscRequest, factorRequest])
-      const nativeSources = ((nativeResponse.data && nativeResponse.data.items) || []).map(item => ({
+      const [nativeResponse, czscResponse, factorResponse] = await Promise.all([
+        getScriptSourceList(),
+        listUnifiedStrategies({ engine: 'czsc' }).catch(() => ({ data: [] })),
+        factorRequest
+      ])
+      const nativeSources = ((nativeResponse.data && nativeResponse.data.items) || [])
+        .filter(item => String(item.engine || '').toLowerCase() !== 'czsc' || item.source_kind === 'graph' || item.asset_type === 'graph_strategy')
+        .map(item => ({
         ...item,
-        engine: 'native'
+        engine_origin: item.engine || 'native',
+        engine: item.source_kind === 'graph' || item.asset_type === 'graph_strategy' ? 'native' : 'native'
       }))
-      const czscSources = (Array.isArray(czscResponse.data) ? czscResponse.data : []).map(item => ({
+      const czscSources = (Array.isArray(czscResponse.data) ? czscResponse.data : [])
+        .filter(item => item.source_kind !== 'graph' && item.asset_type !== 'graph_strategy')
+        .map(item => ({
         ...item,
         id: `czsc:${item.strategy_version_id}`,
         source_id: item.id,
@@ -893,8 +905,8 @@ export default {
         return
       }
       const response = await getScriptSourceDetail(sourceId)
-      const compiled = await compileScriptSource({ sourceId })
-      this.source = { ...response.data, engine: 'native' }
+      const compiled = await compileScriptSource({ sourceId, symbol: this.form.symbol, timeframe: this.form.timeframe })
+      this.source = { ...response.data, engine_origin: response.data && response.data.engine, engine: 'native' }
       this.manifest = compiled.data && compiled.data.manifest
       this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
       await this.hydrateManifestSymbolNames()
@@ -908,7 +920,7 @@ export default {
       if (item.research_asset) return this.$t('strategyV2.factorResearch.independentMode')
       if (String(item.template_key || '').startsWith('robot_v2_')) return this.$t('strategyV2.robot')
       const kind = this.$t(item.asset_type === 'portfolio_strategy' ? 'strategyV2.portfolio' : 'strategyV2.cta')
-      return item.engine === 'czsc' ? `${kind} · CZSC` : kind
+      return item.engine === 'czsc' || item.engine_origin === 'czsc' ? `${kind} · CZSC` : kind
     },
     formatInstrument (item) {
       const marketType = String(item.market_type || item.marketType || '').toLowerCase()
@@ -1039,6 +1051,8 @@ export default {
           ? await this.runCzscBacktest()
           : await runStrategyBacktest({
             sourceId: this.form.sourceId,
+            symbol: this.form.symbol,
+            timeframe: this.form.timeframe,
             startDate: this.form.startDate.format('YYYY-MM-DD'),
             endDate: this.form.endDate.format('YYYY-MM-DD'),
             initialCapital: this.form.initialCapital,
