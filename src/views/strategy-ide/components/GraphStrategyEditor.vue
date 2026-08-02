@@ -20,6 +20,8 @@
       <a-button size="small" icon="plus" @click="addNode('signal')">{{ isZh ? '信号' : 'Signal' }}</a-button>
       <a-button size="small" icon="plus" @click="addNode('condition_group')">{{ isZh ? '条件组' : 'Condition' }}</a-button>
       <a-button size="small" icon="plus" @click="addNode('event')">{{ isZh ? '事件' : 'Event' }}</a-button>
+      <a-button size="small" icon="plus" @click="addNode('position_rule')">{{ isZh ? '仓位' : 'Position' }}</a-button>
+      <a-button size="small" icon="plus" @click="addNode('protection')">{{ isZh ? '保护' : 'Protection' }}</a-button>
       <a-button size="small" icon="plus" @click="addNode('action')">{{ isZh ? '动作' : 'Action' }}</a-button>
       <span class="graph-editor__status" :class="{ 'is-ok': validation && validation.valid }">
         {{ statusText }}
@@ -42,12 +44,43 @@
               size="small"
               show-search
               :placeholder="isZh ? '选择统一信号' : 'Select signal'"
-              @change="emitChange"
+              @change="handleSignalChange(node)"
             >
               <a-select-option v-for="item in signalOptions" :key="item.signal_id" :value="item.signal_id">
                 {{ signalLabel(item) }}
               </a-select-option>
             </a-select>
+            <template v-if="node.type === 'signal'">
+              <div v-for="key in signalParameterKeys(node)" :key="`${node.id}-${key}`" class="graph-param">
+                <label>{{ parameterLabel(node, key) }}</label>
+                <a-select
+                  v-if="parameterSchema(node, key).enum"
+                  v-model="node.config.params[key]"
+                  size="small"
+                  @change="emitChange"
+                >
+                  <a-select-option v-for="option in parameterSchema(node, key).enum" :key="String(option)" :value="option">
+                    {{ option }}
+                  </a-select-option>
+                </a-select>
+                <a-input-number
+                  v-else-if="['integer', 'number'].includes(parameterSchema(node, key).type)"
+                  v-model="node.config.params[key]"
+                  size="small"
+                  :min="parameterSchema(node, key).minimum"
+                  :max="parameterSchema(node, key).maximum"
+                  :step="parameterSchema(node, key).type === 'integer' ? 1 : 0.05"
+                  @change="emitChange"
+                />
+                <a-switch
+                  v-else-if="parameterSchema(node, key).type === 'boolean'"
+                  v-model="node.config.params[key]"
+                  size="small"
+                  @change="emitChange"
+                />
+                <a-input v-else v-model="node.config.params[key]" size="small" @change="emitChange" />
+              </div>
+            </template>
             <a-input v-if="node.type === 'subscription'" v-model="node.config.market" size="small" :placeholder="isZh ? '市场，如 Crypto' : 'Market, e.g. Crypto'" @change="emitChange" />
             <a-input v-if="node.type === 'subscription'" v-model="node.config.symbol" size="small" :placeholder="isZh ? '标的，如 BTC/USDT' : 'Symbol, e.g. BTC/USDT'" @change="emitChange" />
             <a-input v-if="node.type === 'subscription'" v-model="node.config.frequency" size="small" placeholder="1d" @change="emitChange" />
@@ -59,6 +92,45 @@
             <a-select v-if="node.type === 'event'" v-model="node.config.action" size="small" @change="emitChange">
               <a-select-option v-for="item in eventActions" :key="item" :value="item">{{ item }}</a-select-option>
             </a-select>
+            <a-select v-if="node.type === 'position_rule'" v-model="node.config.mode" size="small" @change="emitChange">
+              <a-select-option value="target">target</a-select-option>
+              <a-select-option value="delta">delta</a-select-option>
+              <a-select-option value="scale">scale</a-select-option>
+              <a-select-option value="max_position">max_position</a-select-option>
+            </a-select>
+            <a-input-number
+              v-if="node.type === 'position_rule'"
+              v-model="node.config.target_percent"
+              size="small"
+              :min="-1"
+              :max="1"
+              :step="0.05"
+              @change="emitChange"
+            />
+            <a-select v-if="node.type === 'protection'" v-model="node.config.kind" size="small" @change="emitChange">
+              <a-select-option value="stop_loss">stop_loss</a-select-option>
+              <a-select-option value="take_profit">take_profit</a-select-option>
+              <a-select-option value="trailing_stop">trailing_stop</a-select-option>
+              <a-select-option value="time_exit">time_exit</a-select-option>
+              <a-select-option value="cooldown">cooldown</a-select-option>
+            </a-select>
+            <a-input-number
+              v-if="node.type === 'protection' && !['time_exit', 'cooldown'].includes(node.config.kind)"
+              v-model="node.config.percent"
+              size="small"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              @change="emitChange"
+            />
+            <a-input-number
+              v-if="node.type === 'protection' && ['time_exit', 'cooldown'].includes(node.config.kind)"
+              v-model="node.config.bars"
+              size="small"
+              :min="1"
+              :step="1"
+              @change="emitChange"
+            />
             <a-select v-if="node.type === 'action'" v-model="node.config.kind" size="small" @change="emitChange">
               <a-select-option value="target_percent">target_percent</a-select-option>
               <a-select-option value="target_value">target_value</a-select-option>
@@ -93,7 +165,7 @@
           <a-input v-model="previewSymbol" size="small" :placeholder="isZh ? '标的' : 'Symbol'" />
           <a-input v-model="previewTimeframe" size="small" placeholder="1d" />
           <a-button block size="small" icon="eye" :loading="previewing" @click="preview">
-            {{ isZh ? '运行当前 K 线预览' : 'Run bar preview' }}
+            {{ isZh ? `运行当前 K 线预览（至少 ${previewMinimumBars} 根）` : `Run bar preview (min ${previewMinimumBars})` }}
           </a-button>
           <a-alert
             v-if="previewResult"
@@ -138,6 +210,7 @@ export default {
       compiling: false,
       previewing: false,
       previewResult: null,
+      previewProvenance: null,
       previewError: '',
       previewBars: 0,
       previewMarket: '',
@@ -161,7 +234,28 @@ export default {
       const decisions = Array.isArray(this.previewResult && this.previewResult.decisions)
         ? this.previewResult.decisions.length
         : 0
-      return `${this.previewMarket || '-'}:${this.previewSymbol || '-'} · ${this.previewTimeframe || '-'} · ${this.previewBars} bars · ${decisions} decisions`
+      const providers = this.previewResult && this.previewResult.diagnostics && this.previewResult.diagnostics.provider_versions
+      const providerText = providers && providers.length ? ` · ${providers.join(', ')}` : ''
+      const snapshot = this.previewProvenance && this.previewProvenance.snapshot_id
+        ? ` · ${this.previewProvenance.snapshot_id.slice(0, 18)}...`
+        : ''
+      return `${this.previewMarket || '-'}:${this.previewSymbol || '-'} · ${this.previewTimeframe || '-'} · ${this.previewBars} bars · ${decisions} decisions${providerText}${snapshot}`
+    },
+    previewMinimumBars () {
+      const minimums = (this.local.nodes || [])
+        .filter(node => node && node.type === 'signal')
+        .map(node => {
+          const definition = this.signalDefinition(node)
+          if (!definition) return 0
+          const params = node.config && node.config.params ? node.config.params : {}
+          const schema = definition.parameter_schema || {}
+          const parameterMinimum = Object.keys(schema)
+            .filter(key => ['integer', 'number'].includes(schema[key] && schema[key].type))
+            .map(key => Number(params[key] || (schema[key] && schema[key].default) || 0))
+          return Math.max(Number(definition.minimum_bars || 0), ...parameterMinimum)
+        })
+        .filter(value => value > 0)
+      return minimums.length ? Math.max(...minimums) : 20
     },
     previewJson () {
       return JSON.stringify(this.previewResult, null, 2)
@@ -177,11 +271,13 @@ export default {
       deep: true,
       handler (value) {
         this.local = clone(value)
+        this.normalizeLocalNodes()
         this.syncPreviewTarget()
       }
     }
   },
   mounted () {
+    this.normalizeLocalNodes()
     this.loadCatalog()
     this.syncPreviewTarget()
   },
@@ -198,10 +294,46 @@ export default {
     signalLabel (item) {
       return `${this.isZh ? (item.name_zh || item.name_en) : (item.name_en || item.name_zh)} · ${item.signal_id}`
     },
+    signalDefinition (node) {
+      const signalId = node && node.config && node.config.signal_id
+      return this.signalOptions.find(item => item.signal_id === signalId) || null
+    },
+    normalizeLocalNodes () {
+      if (!Array.isArray(this.local.nodes)) this.$set(this.local, 'nodes', [])
+      this.local.nodes.forEach(node => {
+        if (!node.config) this.$set(node, 'config', {})
+        if (node.type === 'signal' && !node.config.params) this.$set(node.config, 'params', {})
+      })
+    },
+    signalParameterKeys (node) {
+      const schema = this.signalDefinition(node)
+      return schema && schema.parameter_schema ? Object.keys(schema.parameter_schema) : []
+    },
+    parameterSchema (node, key) {
+      const definition = this.signalDefinition(node)
+      return definition && definition.parameter_schema && definition.parameter_schema[key]
+        ? definition.parameter_schema[key]
+        : {}
+    },
+    parameterLabel (node, key) {
+      const schema = this.parameterSchema(node, key)
+      return schema.title || key
+    },
+    handleSignalChange (node) {
+      const definition = this.signalDefinition(node)
+      const schema = definition && definition.parameter_schema ? definition.parameter_schema : {}
+      const params = { ...(node.config.params || {}) }
+      Object.entries(schema).forEach(([key, item]) => {
+        if (typeof params[key] === 'undefined' && item && Object.prototype.hasOwnProperty.call(item, 'default')) params[key] = item.default
+      })
+      this.$set(node.config, 'params', params)
+      this.emitChange()
+    },
     emitChange () {
       this.validation = null
       this.validationError = ''
       this.previewResult = null
+      this.previewProvenance = null
       this.previewError = ''
       this.$emit('input', clone(this.local))
       this.$emit('change', clone(this.local))
@@ -220,15 +352,26 @@ export default {
     },
     addNode (type) {
       const id = `${type}_${this.idSeed++}`
-      const config = type === 'subscription'
-        ? { market: 'Crypto', symbol: 'BTC/USDT', frequency: '1d' }
-        : type === 'signal'
-          ? { signal_id: this.signalOptions[0] ? this.signalOptions[0].signal_id : 'qd.technical.close_above_sma.v1' }
-          : type === 'condition_group'
-            ? { operator: 'AND' }
-            : type === 'event'
-              ? { action: 'open_long' }
-              : { kind: 'target_percent', value: 1 }
+      const firstSignal = this.signalOptions[0]
+      const signalParams = firstSignal && firstSignal.parameter_schema
+        ? Object.fromEntries(Object.entries(firstSignal.parameter_schema).filter(([, item]) => item && Object.prototype.hasOwnProperty.call(item, 'default')).map(([key, item]) => [key, item.default]))
+        : {}
+      let config
+      if (type === 'subscription') {
+        config = { market: 'Crypto', symbol: 'BTC/USDT', frequency: '1d' }
+      } else if (type === 'signal') {
+        config = { signal_id: firstSignal ? firstSignal.signal_id : 'qd.technical.close_above_sma.v1', params: signalParams }
+      } else if (type === 'condition_group') {
+        config = { operator: 'AND' }
+      } else if (type === 'event') {
+        config = { action: 'open_long' }
+      } else if (type === 'position_rule') {
+        config = { mode: 'target', target_percent: 1 }
+      } else if (type === 'protection') {
+        config = { kind: 'stop_loss', percent: 0.03 }
+      } else {
+        config = { kind: 'target_percent', value: 1 }
+      }
       this.local.nodes = [...(this.local.nodes || []), { id, type, config, position: {} }]
       this.emitChange()
     },
@@ -284,6 +427,7 @@ export default {
       this.previewing = true
       this.previewError = ''
       this.previewResult = null
+      this.previewProvenance = null
       this.previewBars = 0
       try {
         this.syncPreviewTarget()
@@ -296,17 +440,19 @@ export default {
         })
         const barsPayload = (barsResponse && barsResponse.data) || barsResponse || {}
         const bars = Array.isArray(barsPayload.bars) ? barsPayload.bars : []
-        if (bars.length < 20) throw new Error(this.isZh ? '预览至少需要 20 根 K 线' : 'Preview needs at least 20 bars')
+        if (bars.length < this.previewMinimumBars) throw new Error(this.isZh ? `预览至少需要 ${this.previewMinimumBars} 根 K 线` : `Preview needs at least ${this.previewMinimumBars} bars`)
         const response = await evaluateSignalGraph({
           graph: this.local,
           market: this.previewMarket,
           symbol: this.previewSymbol,
           timeframe: this.previewTimeframe || '1d',
           bars,
+          snapshot_id: barsPayload.data_provenance && barsPayload.data_provenance.snapshot_id,
           timestamp: bars[bars.length - 1] && bars[bars.length - 1].timestamp
         })
         const payload = (response && response.data) || response || {}
         this.previewResult = payload.evaluation || payload
+        this.previewProvenance = payload.data_provenance || barsPayload.data_provenance || null
         this.previewBars = bars.length
         this.$emit('previewed', clone(this.previewResult))
         return true
