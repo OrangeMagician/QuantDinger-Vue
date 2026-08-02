@@ -74,6 +74,11 @@ test('CZSC is a selectable built-in indicator and the legacy trend page keeps mu
   ])
 
   assert.match(page, /createMultiPeriodRun/)
+  assert.match(page, /marketOptions/)
+  assert.match(page, /computeChartLayers/)
+  assert.match(page, /marketRequest\(this\.timeframe\)/)
+  assert.match(page, /loadMultiPeriodFromBars/)
+  assert.doesNotMatch(page, /createChartLayerRun/)
   assert.match(page, /query\.mode === 'multi-period'/)
   assert.match(ide, /czscIndicatorEnabled/)
   assert.match(ide, /indicatorIde\.czsc\.name/)

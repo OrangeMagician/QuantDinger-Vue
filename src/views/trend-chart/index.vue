@@ -2,6 +2,11 @@
   <div class="trend-page" :class="{ 'trend-page--dark': isDarkTheme }">
     <header class="trend-toolbar">
       <div class="symbol-control">
+        <a-select v-model="market" size="small" class="market-select" @change="changeMarket">
+          <a-select-option v-for="item in marketOptions" :key="item.value" :value="item.value">
+            {{ marketLabel(item) }}
+          </a-select-option>
+        </a-select>
         <a-select
           v-model="symbol"
           show-search
@@ -10,7 +15,7 @@
           option-label-prop="label"
           class="symbol-select"
           @search="searchSymbols"
-          @change="reload"
+          @change="selectSymbol"
         >
           <a-spin v-if="symbolSearching" slot="notFoundContent" size="small" />
           <a-select-option
@@ -136,25 +141,41 @@
 <script>
 import { mapState } from 'vuex'
 import StructureChart from '@/components/charts/StructureChart.vue'
-import { createChartLayerRun, createMultiPeriodRun, getMarketBars, getTask, searchMarketSymbols } from '@/api/domain'
+import { computeChartLayers, createMultiPeriodRun, getMarketBars, getTask, searchMarketSymbols } from '@/api/domain'
 import { normalizeCzscSymbol } from '@/utils/czscSymbols'
 import { normalizeEpochMilliseconds } from '@/utils/timestamps'
+import { loadEnabledMarketOptions } from '@/utils/marketModules'
 
 export default {
   name: 'TrendChart',
   components: { CzscChart: StructureChart },
   data () {
     return {
+      market: 'CNStock',
+      marketOptions: [
+        { value: 'Crypto', label: 'Crypto', i18nKey: 'dashboard.analysis.market.Crypto' },
+        { value: 'CNStock', label: 'China A-shares', i18nKey: 'dashboard.analysis.market.CNStock' },
+        { value: 'USStock', label: 'US Stocks', i18nKey: 'dashboard.analysis.market.USStock' },
+        { value: 'HKStock', label: 'Hong Kong Stocks', i18nKey: 'dashboard.analysis.market.HKStock' },
+        { value: 'Forex', label: 'Forex', i18nKey: 'dashboard.analysis.market.Forex' },
+        { value: 'Futures', label: 'Futures', i18nKey: 'dashboard.analysis.market.Futures' }
+      ],
+      exchangeId: 'binance',
+      marketType: 'spot',
       symbol: '000333',
       symbolOptions: [{ symbol: '000333', name: '美的集团' }],
       symbolSearching: false,
       symbolSearchTimer: null,
+      symbolSearchGeneration: 0,
       timeframe: '30m',
       timeframes: ['1m', '5m', '30m', '1d'],
       adjustment: 'qfq',
       mode: 'single',
       visibility: { fractals: true, strokes: true, unfinished: true, signals: true },
       bars: [],
+      analysisBars: [],
+      barsProvenance: null,
+      rawBars: [],
       layerResult: null,
       layerTask: null,
       barsLoading: false,
@@ -217,7 +238,7 @@ export default {
       return (this.layerResult && this.layerResult.enhanced_signals || []).slice(0, 8)
     },
     datasetVersion () {
-      return this.layerTask && this.layerTask.result && this.layerTask.result.dataset_snapshot && this.layerTask.result.dataset_snapshot.version || '-'
+      return this.barsProvenance && (this.barsProvenance.dataset_version || this.barsProvenance.datasetVersion) || '-'
     },
     multiRows () {
       return this.multiResult && this.multiResult.signal_tree || []
@@ -225,6 +246,7 @@ export default {
   },
   created () {
     this.restoreRoute()
+    this.loadMarketOptions()
     this.searchSymbols('')
   },
   mounted () {
@@ -232,30 +254,100 @@ export default {
   },
   beforeDestroy () {
     if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
+    this.symbolSearchGeneration += 1
     this.loadGeneration += 1
   },
   methods: {
     restoreRoute () {
       const query = this.$route.query || {}
-      if (query.symbol) this.symbol = String(query.symbol).split('.')[0]
+      if (query.market && this.marketOptions.some(item => item.value === query.market)) this.market = String(query.market)
+      if (query.symbol) this.symbol = this.normalizeSymbol(String(query.symbol))
       if (this.timeframes.includes(query.timeframe)) this.timeframe = query.timeframe
       if (query.mode === 'multi-period' || query.mode === 'multi') this.mode = 'multi'
+    },
+    async loadMarketOptions () {
+      const options = await loadEnabledMarketOptions({
+        includeFeatures: ['research'],
+        fallback: this.marketOptions.map(item => ({ key: item.value, label: item.label, enabled: true, features: ['research'] }))
+      })
+      if (Array.isArray(options) && options.length) {
+        this.marketOptions = options
+        if (!this.marketOptions.some(item => item.value === this.market)) {
+          this.market = this.marketOptions[0].value
+          this.symbol = this.defaultSymbol(this.market)
+        }
+      }
+    },
+    marketLabel (item) {
+      if (!item) return ''
+      const key = item.i18nKey || `dashboard.analysis.market.${item.value}`
+      const translated = this.$t(key)
+      return translated && translated !== key ? translated : (item.label || item.value)
+    },
+    defaultSymbol (market) {
+      return {
+        CNStock: '000333',
+        USStock: 'AAPL',
+        HKStock: '00700',
+        Crypto: 'BTC/USDT',
+        Forex: 'EUR/USD',
+        Futures: 'BTC/USDT'
+      }[market] || ''
+    },
+    normalizeSymbol (value) {
+      const raw = String(value || '').trim().toUpperCase()
+      return this.market === 'CNStock' ? raw.split('.')[0] : raw
+    },
+    marketRequest (timeframe, limit = 900) {
+      const params = {
+        market: this.market,
+        symbol: this.symbol,
+        timeframe,
+        limit
+      }
+      if (this.market === 'Crypto') {
+        params.exchange_id = this.exchangeId
+        params.market_type = this.marketType
+      }
+      return params
+    },
+    selectSymbol (value) {
+      const selected = this.symbolOptions.find(item => item.symbol === value)
+      if (selected && this.market === 'Crypto') {
+        this.exchangeId = selected.exchange_id || this.exchangeId
+        this.marketType = selected.market_type || this.marketType
+      }
+      this.reload()
+    },
+    changeMarket () {
+      this.symbol = this.defaultSymbol(this.market)
+      this.symbolOptions = [{ symbol: this.symbol, name: this.symbol }]
+      this.exchangeId = 'binance'
+      this.marketType = 'spot'
+      this.searchSymbols('')
+      this.reload()
     },
     symbolLabel (item) {
       return item.name ? `${item.symbol} ${item.name}` : item.symbol
     },
     searchSymbols (keyword) {
       if (this.symbolSearchTimer) clearTimeout(this.symbolSearchTimer)
+      const generation = ++this.symbolSearchGeneration
       this.symbolSearchTimer = setTimeout(async () => {
         this.symbolSearching = true
         try {
-          const response = await searchMarketSymbols({ market: 'CNStock', keyword, limit: 30 })
-          if (response && response.code === 1) {
+          const params = { market: this.market, keyword, limit: 30 }
+          if (this.market === 'Crypto') {
+            params.exchange_id = this.exchangeId
+            params.market_type = this.marketType
+          }
+          const response = await searchMarketSymbols(params)
+          if (generation === this.symbolSearchGeneration && response && response.code === 1) {
             const rows = Array.isArray(response.data) ? response.data : []
-            this.symbolOptions = rows.map(item => ({ ...item, symbol: String(item.symbol || '').split('.')[0] }))
+            this.symbolOptions = rows.map(item => ({ ...item, symbol: this.market === 'CNStock' ? String(item.symbol || '').split('.')[0] : String(item.symbol || '').toUpperCase() }))
           }
         } finally {
-          this.symbolSearching = false
+          if (generation === this.symbolSearchGeneration) this.symbolSearching = false
         }
       }, keyword ? 250 : 0)
     },
@@ -263,11 +355,11 @@ export default {
       this.syncRoute()
       if (this.mode === 'multi') return this.loadMultiPeriod()
       const generation = ++this.loadGeneration
-      this.loadBars(generation)
-      this.loadLayers(generation)
+      const barsPromise = this.loadBars(generation)
+      this.loadLayers(generation, barsPromise)
     },
     syncRoute () {
-      const query = { symbol: this.symbol, timeframe: this.timeframe }
+      const query = { market: this.market, symbol: this.symbol, timeframe: this.timeframe }
       if (this.mode === 'multi') query.mode = 'multi-period'
       this.$router.replace({ path: '/trend-chart', query }).catch(() => {})
     },
@@ -282,38 +374,69 @@ export default {
         turnover: Number(item.turnover || item.amount || 0)
       })).filter(item => Number.isFinite(item.timestamp)).sort((a, b) => a.timestamp - b.timestamp)
     },
+    normalizeAnalysisBars (rows) {
+      return (rows || []).map(item => {
+        // Preserve the provider's original unit for snapshot identity; the
+        // Worker normalizes seconds/milliseconds at its compatibility edge.
+        const output = {
+          timestamp: item.timestamp != null ? item.timestamp : item.time,
+          open: Number(item.open),
+          high: Number(item.high),
+          low: Number(item.low),
+          close: Number(item.close)
+        }
+        if (item.volume != null || item.vol != null) output.volume = Number(item.volume != null ? item.volume : item.vol)
+        if (item.turnover != null || item.amount != null) output.turnover = Number(item.turnover != null ? item.turnover : item.amount)
+        return output
+      }).filter(item => item.timestamp != null && [item.open, item.high, item.low, item.close].every(Number.isFinite))
+    },
     async loadBars (generation) {
       this.barsLoading = true
       this.barsError = ''
       try {
-        const response = await getMarketBars({ market: 'CNStock', symbol: this.symbol, timeframe: this.timeframe, limit: 900, adjustment: this.adjustment })
+        const response = await getMarketBars({ ...this.marketRequest(this.timeframe), adjustment: this.adjustment })
         if (generation !== this.loadGeneration) return
         if (!response || response.code !== 1) throw new Error(response && response.msg || this.$t('trendChart.barsFailed'))
-        this.bars = this.normalizeBars(response.data && response.data.bars)
+        const payload = response.data || {}
+        this.rawBars = Array.isArray(payload.bars) ? payload.bars : []
+        this.analysisBars = this.normalizeAnalysisBars(this.rawBars)
+        this.bars = this.normalizeBars(this.rawBars)
+        this.barsProvenance = payload.data_provenance || payload.dataProvenance || null
         if (!this.bars.length) throw new Error(this.$t('trendChart.noBars'))
+        return true
       } catch (error) {
-        if (generation === this.loadGeneration) this.barsError = error.backendMessage || error.message || String(error)
+        if (generation === this.loadGeneration) {
+          this.barsError = error.backendMessage || error.message || String(error)
+          this.rawBars = []
+          this.analysisBars = []
+          this.bars = []
+          this.barsProvenance = null
+        }
+        return false
       } finally {
         if (generation === this.loadGeneration) this.barsLoading = false
       }
     },
-    async loadLayers (generation) {
+    async loadLayers (generation, barsPromise) {
       this.layerLoading = true
       this.layerError = ''
       this.layerResult = null
       try {
-        const response = await createChartLayerRun({
-          symbol: normalizeCzscSymbol(this.symbol),
+        const loaded = await barsPromise
+        if (!loaded || generation !== this.loadGeneration) return
+        const response = await computeChartLayers({
+          market: this.market,
+          symbol: this.symbol,
           timeframe: this.timeframe,
-          limit: 1000,
+          bars: this.analysisBars,
           layers: Object.keys(this.visibility).filter(key => this.visibility[key]),
-          adjustment: this.adjustment
-        }, `trend-${this.symbol}-${this.timeframe}-${Date.now()}`)
+          snapshot_id: this.barsProvenance && (this.barsProvenance.snapshot_id || this.barsProvenance.snapshotId),
+          dataset_version: this.barsProvenance && (this.barsProvenance.dataset_version || this.barsProvenance.datasetVersion)
+        })
         if (!response || response.code !== 1) throw new Error(response && response.msg || this.$t('trendChart.layerUnavailable'))
-        const task = await this.waitForTask(response.data.task_id, generation)
         if (generation !== this.loadGeneration) return
-        this.layerTask = task
-        this.layerResult = task.result && task.result.payload || null
+        this.layerTask = { result: { dataset_snapshot: this.barsProvenance } }
+        this.layerResult = response.data || null
       } catch (error) {
         if (generation === this.loadGeneration) this.layerError = error.backendMessage || error.message || String(error)
       } finally {
@@ -326,6 +449,10 @@ export default {
       this.multiLoading = true
       this.multiError = ''
       try {
+        if (this.market !== 'CNStock') {
+          await this.loadMultiPeriodFromBars(generation)
+          return
+        }
         const response = await createMultiPeriodRun({
           symbol: normalizeCzscSymbol(this.symbol),
           timeframes: this.selectedTimeframes,
@@ -338,6 +465,47 @@ export default {
         if (generation === this.loadGeneration) this.multiError = error.backendMessage || error.message || String(error)
       } finally {
         if (generation === this.loadGeneration) this.multiLoading = false
+      }
+    },
+    async loadMultiPeriodFromBars (generation) {
+      const rows = await Promise.all(this.selectedTimeframes.map(async timeframe => {
+        const barsResponse = await getMarketBars({ ...this.marketRequest(timeframe, 1000) })
+        if (!barsResponse || barsResponse.code !== 1) throw new Error(barsResponse && barsResponse.msg || this.$t('trendChart.multiFailed'))
+        const barsPayload = barsResponse.data || {}
+        const rawBars = Array.isArray(barsPayload.bars) ? barsPayload.bars : []
+        const analysisBars = this.normalizeAnalysisBars(rawBars)
+        if (analysisBars.length < 20) throw new Error(this.$t('trendChart.noBars'))
+        const layerResponse = await computeChartLayers({
+          market: this.market,
+          symbol: this.symbol,
+          timeframe,
+          bars: analysisBars,
+          snapshot_id: barsPayload.data_provenance && (barsPayload.data_provenance.snapshot_id || barsPayload.data_provenance.snapshotId)
+        })
+        if (!layerResponse || layerResponse.code !== 1) throw new Error(layerResponse && layerResponse.msg || this.$t('trendChart.multiFailed'))
+        const payload = layerResponse.data || {}
+        const strokeDirection = payload.summary && payload.summary.last_stroke_direction
+        const direction = strokeDirection === 'up' ? 'bullish' : strokeDirection === 'down' ? 'bearish' : 'neutral'
+        return {
+          timeframe,
+          direction,
+          score: payload.factor_features && payload.factor_features.score || 0,
+          features: payload.factor_features || {},
+          signals: payload.enhanced_signals || [],
+          data_provenance: payload.data_provenance || payload.dataProvenance || null
+        }
+      }))
+      if (generation !== this.loadGeneration) return
+      const bullish = rows.filter(row => row.direction === 'bullish').length
+      const bearish = rows.filter(row => row.direction === 'bearish').length
+      this.multiResult = {
+        summary: {
+          direction: bullish > bearish ? 'bullish' : bearish > bullish ? 'bearish' : 'neutral',
+          resonance_level: bullish === rows.length || bearish === rows.length ? 'strong' : bullish || bearish ? 'mixed' : 'neutral',
+          bullish_periods: bullish,
+          bearish_periods: bearish
+        },
+        signal_tree: rows
       }
     },
     async waitForTask (taskId, generation) {
@@ -370,6 +538,7 @@ export default {
 .trend-page { height: calc(100vh - 64px); min-height: 650px; padding: 12px; overflow: hidden; color: #1f2937; background: #f5f7fa; }
 .trend-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 4px; background: #fff; }
 .symbol-control, .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.market-select { width: 132px; }
 .symbol-select { width: 220px; }
 .symbol-select span { margin-left: 8px; color: #8c8c8c; font-size: 12px; }
 .adjust-select { width: 92px; }

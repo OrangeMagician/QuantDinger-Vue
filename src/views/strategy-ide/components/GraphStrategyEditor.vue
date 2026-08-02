@@ -470,6 +470,7 @@ export default {
         })
         const barsPayload = (barsResponse && barsResponse.data) || barsResponse || {}
         const bars = Array.isArray(barsPayload.bars) ? barsPayload.bars : []
+        const barsProvenance = barsPayload.data_provenance || barsPayload.dataProvenance || {}
         if (bars.length < this.previewMinimumBars) throw new Error(this.isZh ? `预览至少需要 ${this.previewMinimumBars} 根 K 线` : `Preview needs at least ${this.previewMinimumBars} bars`)
         const response = await evaluateSignalGraph({
           graph: this.local,
@@ -477,13 +478,13 @@ export default {
           symbol: this.previewSymbol,
           timeframe: this.previewTimeframe || '1d',
           bars,
-          snapshot_id: barsPayload.data_provenance && barsPayload.data_provenance.snapshot_id,
-          dataset_version: barsPayload.data_provenance && (barsPayload.data_provenance.dataset_version || barsPayload.data_provenance.datasetVersion),
-          timestamp: bars[bars.length - 1] && bars[bars.length - 1].timestamp
+          snapshot_id: barsProvenance.snapshot_id || barsProvenance.snapshotId,
+          dataset_version: barsProvenance.dataset_version || barsProvenance.datasetVersion,
+          timestamp: bars[bars.length - 1] && (bars[bars.length - 1].timestamp || bars[bars.length - 1].time)
         })
         const payload = (response && response.data) || response || {}
         this.previewResult = payload.evaluation || payload
-        this.previewProvenance = payload.data_provenance || barsPayload.data_provenance || null
+        this.previewProvenance = payload.data_provenance || payload.dataProvenance || barsProvenance || null
         this.previewBars = bars.length
         this.$emit('previewed', clone(this.previewResult))
         return true
