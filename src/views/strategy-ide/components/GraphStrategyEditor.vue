@@ -7,7 +7,8 @@
       </div>
       <div class="graph-editor__actions">
         <a-button icon="check" :loading="validating" @click="validate">{{ isZh ? '校验' : 'Validate' }}</a-button>
-        <a-button icon="code" :loading="compiling" @click="compile">{{ isZh ? '编译预览' : 'Compile' }}</a-button>
+        <a-button icon="eye" :loading="previewing" @click="preview">{{ isZh ? '信号预览' : 'Preview signal' }}</a-button>
+        <a-button icon="code" :loading="compiling" @click="compile">{{ isZh ? '编译计划' : 'Compile plan' }}</a-button>
         <a-button icon="bar-chart" @click="$emit('backtest')">{{ isZh ? '回测' : 'Backtest' }}</a-button>
         <a-button icon="thunderbolt" @click="$emit('live')">{{ isZh ? '创建运行' : 'Create run' }}</a-button>
         <a-button type="primary" icon="save" :loading="saving" @click="$emit('save')">{{ isZh ? '保存策略' : 'Save strategy' }}</a-button>
@@ -86,13 +87,32 @@
         <a-textarea :value="prettySpec" :rows="12" readonly />
         <a-alert v-if="validationError" type="error" show-icon :message="validationError" />
         <a-alert v-if="compiled" type="success" show-icon :message="isZh ? '编译器已生成 Strategy V2 计划' : 'Strategy V2 plan compiled'" />
+        <div class="graph-preview">
+          <h3>{{ isZh ? '预览标的' : 'Preview target' }}</h3>
+          <a-input v-model="previewMarket" size="small" :placeholder="isZh ? '市场' : 'Market'" />
+          <a-input v-model="previewSymbol" size="small" :placeholder="isZh ? '标的' : 'Symbol'" />
+          <a-input v-model="previewTimeframe" size="small" placeholder="1d" />
+          <a-button block size="small" icon="eye" :loading="previewing" @click="preview">
+            {{ isZh ? '运行当前 K 线预览' : 'Run bar preview' }}
+          </a-button>
+          <a-alert
+            v-if="previewResult"
+            class="graph-preview__result"
+            :type="previewResult.matched ? 'success' : 'info'"
+            show-icon
+            :message="previewResult.matched ? (isZh ? '当前 K 线命中策略' : 'Strategy matched') : (isZh ? '当前 K 线未命中' : 'No match on current bar')"
+            :description="previewMeta"
+          />
+          <a-alert v-if="previewError" class="graph-preview__result" type="error" show-icon :message="previewError" />
+          <pre v-if="previewResult" class="graph-preview__json">{{ previewJson }}</pre>
+        </div>
       </aside>
     </div>
   </section>
 </template>
 
 <script>
-import { compileSignalGraph, getSignalCatalog, validateSignalGraph } from '@/api/domain'
+import { compileSignalGraph, evaluateSignalGraph, getMarketBars, getSignalCatalog, validateSignalGraph } from '@/api/domain'
 
 const ACTIONS = ['open_long', 'close_long', 'open_short', 'close_short', 'reverse', 'emit_signal']
 
@@ -116,6 +136,13 @@ export default {
       compiled: null,
       validating: false,
       compiling: false,
+      previewing: false,
+      previewResult: null,
+      previewError: '',
+      previewBars: 0,
+      previewMarket: '',
+      previewSymbol: '',
+      previewTimeframe: '1d',
       idSeed: 1,
       eventActions: ACTIONS
     }
@@ -130,6 +157,15 @@ export default {
     prettySpec () {
       return JSON.stringify(this.local, null, 2)
     },
+    previewMeta () {
+      const decisions = Array.isArray(this.previewResult && this.previewResult.decisions)
+        ? this.previewResult.decisions.length
+        : 0
+      return `${this.previewMarket || '-'}:${this.previewSymbol || '-'} · ${this.previewTimeframe || '-'} · ${this.previewBars} bars · ${decisions} decisions`
+    },
+    previewJson () {
+      return JSON.stringify(this.previewResult, null, 2)
+    },
     statusText () {
       if (this.validation && this.validation.valid) return this.isZh ? '校验通过' : 'Valid'
       if (this.validationError) return this.isZh ? '需要修正' : 'Needs fixes'
@@ -141,11 +177,13 @@ export default {
       deep: true,
       handler (value) {
         this.local = clone(value)
+        this.syncPreviewTarget()
       }
     }
   },
   mounted () {
     this.loadCatalog()
+    this.syncPreviewTarget()
   },
   methods: {
     async loadCatalog () {
@@ -163,8 +201,22 @@ export default {
     emitChange () {
       this.validation = null
       this.validationError = ''
+      this.previewResult = null
+      this.previewError = ''
       this.$emit('input', clone(this.local))
       this.$emit('change', clone(this.local))
+    },
+    syncPreviewTarget () {
+      const node = (this.local.nodes || []).find(item => item && item.type === 'subscription')
+      const config = node && node.config ? node.config : {}
+      const configuredSymbols = config.symbols || config.instruments || config.symbol
+      const firstSymbol = Array.isArray(configuredSymbols) ? configuredSymbols[0] : configuredSymbols
+      const symbol = firstSymbol && typeof firstSymbol === 'object' ? firstSymbol.symbol : firstSymbol
+      if (!this.previewMarket) this.previewMarket = config.market || ''
+      if (!this.previewSymbol) this.previewSymbol = symbol || ''
+      if (!this.previewTimeframe || this.previewTimeframe === '1d') {
+        this.previewTimeframe = config.frequency || config.timeframe || this.previewTimeframe
+      }
     },
     addNode (type) {
       const id = `${type}_${this.idSeed++}`
@@ -225,6 +277,45 @@ export default {
       } finally {
         this.compiling = false
       }
+    },
+    async preview () {
+      const valid = await this.validate()
+      if (!valid) return false
+      this.previewing = true
+      this.previewError = ''
+      this.previewResult = null
+      this.previewBars = 0
+      try {
+        this.syncPreviewTarget()
+        if (!this.previewSymbol) throw new Error(this.isZh ? '请填写预览标的' : 'Enter a preview symbol')
+        const barsResponse = await getMarketBars({
+          market: this.previewMarket,
+          symbol: this.previewSymbol,
+          timeframe: this.previewTimeframe || '1d',
+          limit: 200
+        })
+        const barsPayload = (barsResponse && barsResponse.data) || barsResponse || {}
+        const bars = Array.isArray(barsPayload.bars) ? barsPayload.bars : []
+        if (bars.length < 20) throw new Error(this.isZh ? '预览至少需要 20 根 K 线' : 'Preview needs at least 20 bars')
+        const response = await evaluateSignalGraph({
+          graph: this.local,
+          market: this.previewMarket,
+          symbol: this.previewSymbol,
+          timeframe: this.previewTimeframe || '1d',
+          bars,
+          timestamp: bars[bars.length - 1] && bars[bars.length - 1].timestamp
+        })
+        const payload = (response && response.data) || response || {}
+        this.previewResult = payload.evaluation || payload
+        this.previewBars = bars.length
+        this.$emit('previewed', clone(this.previewResult))
+        return true
+      } catch (error) {
+        this.previewError = error.backendMessage || error.message || (this.isZh ? '信号预览失败' : 'Signal preview failed')
+        return false
+      } finally {
+        this.previewing = false
+      }
     }
   }
 }
@@ -254,5 +345,10 @@ export default {
 .graph-editor__side h3 { margin: 0 0 8px; font-size: 13px; }
 .graph-edge { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 5px; margin-bottom: 7px; }
 .graph-editor__side .ant-alert { margin-top: 10px; }
+.graph-preview { display: grid; gap: 7px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #dfe5ec; }
+.graph-preview h3 { margin: 0; }
+.graph-preview__result { margin-top: 3px; }
+.graph-preview__json { max-height: 220px; overflow: auto; margin: 0; padding: 8px; background: #111820; color: #d6e2ef; font-size: 11px; white-space: pre-wrap; }
+.graph-editor--dark .graph-preview { border-color: #354252; }
 @media (max-width: 900px) { .graph-editor__body { grid-template-columns: 1fr; } .graph-editor__status { margin-left: 0; width: 100%; } }
 </style>

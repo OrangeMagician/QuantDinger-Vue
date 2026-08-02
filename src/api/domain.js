@@ -81,6 +81,10 @@ export function compileSignalGraph (data) {
   return request({ url: '/api/v2/signals/graph/compile', method: 'post', data, timeout: 20000 })
 }
 
+export function evaluateSignalGraph (data) {
+  return request({ url: '/api/v2/signals/graph/evaluate', method: 'post', data, timeout: 60000 })
+}
+
 export function getStockPoolOptions () {
   return request({ url: '/api/v2/stock-pools/options', method: 'get', timeout: 20000 })
 }
