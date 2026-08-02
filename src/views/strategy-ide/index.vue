@@ -3,6 +3,7 @@
     <div class="strategy-ide-layout">
       <section class="script-panel script-panel--editor">
         <strategy-editor
+          v-if="currentAssetType !== 'graph_strategy'"
           ref="scriptEditor"
           :key="editorKey"
           v-model="scriptCode"
@@ -36,6 +37,7 @@
                   >
                     <a-radio-button value="script" @click="handleAssetTypeChange('script')">{{ text.ctaStrategy }}</a-radio-button>
                     <a-radio-button value="portfolio_strategy" @click="handleAssetTypeChange('portfolio_strategy')">{{ text.portfolioStrategy }}</a-radio-button>
+                    <a-radio-button value="graph_strategy" @click="handleAssetTypeChange('graph_strategy')">{{ isZh ? '图形策略' : 'Graph' }}</a-radio-button>
                   </a-radio-group>
                 </div>
                 <a-select
@@ -167,6 +169,17 @@
             </div>
           </template>
         </strategy-editor>
+        <graph-strategy-editor
+          v-else
+          ref="graphEditor"
+          v-model="graphSpec"
+          :is-dark="isDarkTheme"
+          :saving="savingScript"
+          @save="saveScript(false)"
+          @backtest="openBacktestCenter"
+          @live="createLiveFromScript"
+          @validated="graphValidated = $event"
+        />
       </section>
     </div>
 
@@ -412,6 +425,7 @@
 <script>
 import { mapState } from 'vuex'
 import StrategyEditor from './components/StrategyEditor.vue'
+import GraphStrategyEditor from './components/GraphStrategyEditor.vue'
 import FactorLibraryModal from './FactorLibraryModal.vue'
 import UniverseLibraryModal from './UniverseLibraryModal.vue'
 import ExecutorStrategies from '@/views/executor-strategies'
@@ -486,10 +500,30 @@ def rebalance(context, data):
         order_target_percent(symbol, weight, reason="momentum_top_n")
 `
 
+const DEFAULT_GRAPH_SPEC = {
+  id: 'qd.graph.strategy.v1',
+  name: 'Graph Strategy',
+  version: 1,
+  description: '',
+  nodes: [
+    { id: 'subscription', type: 'subscription', config: { market: 'Crypto', symbol: 'BTC/USDT', frequency: '1d' }, position: {} },
+    { id: 'signal', type: 'signal', config: { signal_id: 'qd.technical.close_above_sma.v1' }, position: {} },
+    { id: 'event', type: 'event', config: { action: 'open_long' }, position: {} },
+    { id: 'action', type: 'action', config: { kind: 'target_percent', value: 1 }, position: {} }
+  ],
+  edges: [
+    { from: 'subscription', to: 'signal' },
+    { from: 'signal', to: 'event' },
+    { from: 'event', to: 'action' }
+  ],
+  metadata: { source: 'graph_editor' }
+}
+
 export default {
   name: 'StrategyIde',
   components: {
     StrategyEditor,
+    GraphStrategyEditor,
     FactorLibraryModal,
     UniverseLibraryModal,
     ExecutorStrategies
@@ -502,12 +536,14 @@ export default {
       currentSourceId: null,
       currentSource: null,
       currentAssetType: 'script',
+      graphSpec: null,
+      graphValidated: false,
       scriptCode: DEFAULT_SCRIPT_CODE,
       scriptCodeHidden: false,
       scriptTemplateKey: '',
       scriptTemplateParams: {},
       scriptParamSchema: {},
-      editorInitialTemplateKey: '',
+    editorInitialTemplateKey: '',
       editorKeySeed: 0,
       scriptVerified: false,
       savingScript: false,
@@ -612,12 +648,15 @@ export default {
       return this.text.universeSelected.replace('{name}', label)
     },
     currentWorkspaceTitle () {
+      if (this.currentAssetType === 'graph_strategy') return this.isZh ? '图形策略工作区' : 'Graph strategy workspace'
       return this.currentAssetType === 'portfolio_strategy' ? this.text.portfolioWorkspaceTitle : this.text.ctaWorkspaceTitle
     },
     currentWorkspaceDescription () {
+      if (this.currentAssetType === 'graph_strategy') return this.isZh ? '用统一信号和条件节点编写策略' : 'Author with unified signals and condition nodes'
       return this.currentAssetType === 'portfolio_strategy' ? this.text.portfolioWorkspaceDescription : this.text.ctaWorkspaceDescription
     },
     currentNewScriptLabel () {
+      if (this.currentAssetType === 'graph_strategy') return this.isZh ? '新建图形策略' : 'New graph strategy'
       return this.currentAssetType === 'portfolio_strategy' ? this.text.newPortfolioStrategy : this.text.newCtaStrategy
     },
     hasUnsavedScriptChanges () {
@@ -811,7 +850,8 @@ export default {
     },
     getRouteAssetType () {
       const query = this.$route.query || {}
-      return String(query.assetType || '').trim() === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      const value = String(query.assetType || '').trim()
+      return value === 'portfolio_strategy' || value === 'graph_strategy' ? value : 'script'
     },
     isDraftRoute () {
       const query = this.$route.query || {}
@@ -908,13 +948,21 @@ export default {
       const metadata = this.parseObject(source.metadata)
       const runConfig = this.parseObject(metadata.last_run_config)
       this.currentSource = source
-      this.currentAssetType = source.asset_type === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      this.currentAssetType = source.asset_type === 'graph_strategy'
+        ? 'graph_strategy'
+        : source.asset_type === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
       this.currentSourceId = this.getScriptSourceId(source)
       this.selectedScriptId = this.currentSourceId ? String(this.currentSourceId) : undefined
       this.scriptCodeHidden = !!(source.code_hidden || metadata.code_hidden)
       this.scriptCode = this.scriptCodeHidden
         ? ''
-        : String(source.code || (this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE))
+        : this.currentAssetType === 'graph_strategy'
+          ? ''
+          : String(source.code || (this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE))
+      this.graphSpec = this.currentAssetType === 'graph_strategy'
+        ? (this.parseObject(source.graph_spec) && Object.keys(this.parseObject(source.graph_spec)).length ? this.parseObject(source.graph_spec) : JSON.parse(JSON.stringify(DEFAULT_GRAPH_SPEC)))
+        : null
+      this.graphValidated = false
       this.scriptTemplateKey = source.template_key || runConfig.script_template_key || ''
       this.scriptTemplateParams = {
         ...this.parseObject(metadata.script_template_params),
@@ -942,8 +990,12 @@ export default {
       this.currentSource = null
       this.currentSourceId = null
       this.selectedScriptId = undefined
-      this.currentAssetType = assetType === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
-      this.scriptCode = this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE
+      this.currentAssetType = assetType === 'portfolio_strategy' || assetType === 'graph_strategy' ? assetType : 'script'
+      this.scriptCode = this.currentAssetType === 'portfolio_strategy'
+        ? DEFAULT_PORTFOLIO_CODE
+        : this.currentAssetType === 'graph_strategy' ? '' : DEFAULT_SCRIPT_CODE
+      this.graphSpec = this.currentAssetType === 'graph_strategy' ? JSON.parse(JSON.stringify(DEFAULT_GRAPH_SPEC)) : null
+      this.graphValidated = false
       this.scriptCodeHidden = false
       this.scriptTemplateKey = ''
       this.scriptTemplateParams = {}
@@ -969,7 +1021,7 @@ export default {
       }
     },
     handleAssetTypeChange (assetType) {
-      const target = assetType === 'portfolio_strategy' ? 'portfolio_strategy' : 'script'
+      const target = assetType === 'portfolio_strategy' || assetType === 'graph_strategy' ? assetType : 'script'
       if (target === this.currentAssetType) return
       const switchWorkspace = async () => {
         this.currentAssetType = target
@@ -977,7 +1029,7 @@ export default {
         if (first) await this.openSource(first.id, { updateRoute: true })
         else this.createNewDraft({ openTemplate: false, updateRoute: true, assetType: target })
       }
-      const defaultCode = this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : DEFAULT_SCRIPT_CODE
+      const defaultCode = this.currentAssetType === 'portfolio_strategy' ? DEFAULT_PORTFOLIO_CODE : this.currentAssetType === 'graph_strategy' ? '' : DEFAULT_SCRIPT_CODE
       const shouldConfirm = this.currentSourceId
         ? this.hasUnsavedScriptChanges
         : String(this.scriptCode || '').trim() !== String(defaultCode).trim()
@@ -1222,8 +1274,8 @@ export default {
       const currentCode = this.getCurrentScriptCode()
       const meta = this.extractScriptMetadataFromCode(currentCode)
       const description = meta.description || (this.currentSource && this.currentSource.description) || ''
-      return {
-        name: meta.name || this.deriveScriptName(),
+      const payload = {
+        name: this.currentAssetType === 'graph_strategy' ? (this.graphSpec.name || this.currentSourceName || (this.isZh ? '图形策略' : 'Graph strategy')) : (meta.name || this.deriveScriptName()),
         description,
         code: currentCode,
         asset_type: this.currentAssetType,
@@ -1238,6 +1290,12 @@ export default {
           script_verified: this.scriptVerified
         }
       }
+      if (this.currentAssetType === 'graph_strategy') {
+        payload.graph_spec = JSON.parse(JSON.stringify(this.graphSpec || DEFAULT_GRAPH_SPEC))
+        payload.source_kind = 'graph'
+        payload.asset_type = 'graph_strategy'
+      }
+      return payload
     },
     buildHiddenParamPayload () {
       const existingMeta = this.parseObject(this.currentSource && this.currentSource.metadata)
@@ -1259,6 +1317,13 @@ export default {
       }
     },
     scriptSnapshot () {
+      if (this.currentAssetType === 'graph_strategy') {
+        return JSON.stringify({
+          asset_type: 'graph_strategy',
+          graph_spec: this.graphSpec || {},
+          universe_id: this.selectedUniverseId || null
+        })
+      }
       if (this.scriptCodeHidden) {
         return JSON.stringify({
           id: this.currentSourceId,
@@ -1277,6 +1342,13 @@ export default {
       })
     },
     validateScriptCode () {
+      if (this.currentAssetType === 'graph_strategy') {
+        if (!this.graphSpec || !Array.isArray(this.graphSpec.nodes)) {
+          this.$message.warning(this.isZh ? '请先创建图形节点' : 'Add graph nodes first')
+          return false
+        }
+        return true
+      }
       if (this.scriptCodeHidden) return true
       if (!String(this.scriptCode || '').trim()) {
         this.$message.warning(this.text.codeRequired)
@@ -1285,6 +1357,16 @@ export default {
       return true
     },
     async verifyScriptCode (options = {}) {
+      if (this.currentAssetType === 'graph_strategy') {
+        const editor = this.$refs.graphEditor
+        const valid = editor && typeof editor.validate === 'function' ? await editor.validate() : this.graphValidated
+        if (!valid) {
+          this.$message.error(this.isZh ? '图形策略校验未通过' : 'Graph strategy validation failed')
+          return false
+        }
+        this.graphValidated = true
+        return true
+      }
       const code = String(this.scriptCode || '').trim()
       if (!code) {
         this.$message.error(this.text.verifyBlocked.replace('{reason}', this.text.codeRequired))
@@ -1324,6 +1406,10 @@ export default {
         return null
       }
       this.scriptCode = this.getCurrentScriptCode()
+      if (this.currentAssetType === 'graph_strategy') {
+        const editor = this.$refs.graphEditor
+        if (editor && typeof editor.validate === 'function' && !await editor.validate()) return null
+      }
       if (!this.validateScriptCode()) return null
       if (!forceCreate && this.currentSource && this.currentSource.status === 'running') {
         this.$message.warning(this.text.runningEditBlocked)
