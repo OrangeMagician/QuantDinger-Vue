@@ -158,6 +158,11 @@
         <h3>{{ isZh ? 'GraphSpec 预览' : 'GraphSpec preview' }}</h3>
         <a-textarea :value="prettySpec" :rows="12" readonly />
         <a-alert v-if="validationError" type="error" show-icon :message="validationError" />
+        <a-alert v-if="catalogError" type="warning" show-icon :message="catalogError">
+          <a-button slot="action" type="link" size="small" :loading="catalogLoading" @click="loadCatalog">
+            {{ isZh ? '重试' : 'Retry' }}
+          </a-button>
+        </a-alert>
         <a-alert v-if="compiled" type="success" show-icon :message="isZh ? '编译器已生成 Strategy V2 计划' : 'Strategy V2 plan compiled'" />
         <div class="graph-preview">
           <h3>{{ isZh ? '预览标的' : 'Preview target' }}</h3>
@@ -203,6 +208,8 @@ export default {
     return {
       local: clone(this.value),
       signals: [],
+      catalogError: '',
+      catalogLoading: false,
       validation: null,
       validationError: '',
       compiled: null,
@@ -225,7 +232,25 @@ export default {
       return String((this.$i18n && this.$i18n.locale) || '').toLowerCase().startsWith('zh')
     },
     signalOptions () {
-      return this.signals.filter(item => item && item.signal_id)
+      const rows = this.signals.filter(item => item && item.signal_id)
+      const known = new Set(rows.map(item => item.signal_id))
+      const currentNodes = this.local.nodes || []
+      currentNodes.forEach(node => {
+        const signalId = node && node.type === 'signal' && node.config && node.config.signal_id
+        if (signalId && !known.has(signalId)) {
+          rows.push({
+            signal_id: signalId,
+            name_zh: signalId,
+            name_en: signalId,
+            provider: String(signalId).startsWith('legacy.czsc.') ? 'legacy.czsc' : 'unknown',
+            status: 'catalog_unavailable',
+            minimum_bars: 20,
+            parameter_schema: {}
+          })
+          known.add(signalId)
+        }
+      })
+      return rows
     },
     prettySpec () {
       return JSON.stringify(this.local, null, 2)
@@ -283,12 +308,17 @@ export default {
   },
   methods: {
     async loadCatalog () {
+      this.catalogLoading = true
+      this.catalogError = ''
       try {
         const response = await getSignalCatalog()
         const payload = (response && response.data) || response || {}
         this.signals = Array.isArray(payload.signals) ? payload.signals : []
+        if (!this.signals.length) throw new Error(this.isZh ? '信号目录为空' : 'Signal catalog is empty')
       } catch (_) {
-        this.signals = []
+        this.catalogError = this.isZh ? '信号目录暂时不可用，已保留当前策略中的信号。' : 'Signal catalog is temporarily unavailable; existing strategy signals are preserved.'
+      } finally {
+        this.catalogLoading = false
       }
     },
     signalLabel (item) {
@@ -448,6 +478,7 @@ export default {
           timeframe: this.previewTimeframe || '1d',
           bars,
           snapshot_id: barsPayload.data_provenance && barsPayload.data_provenance.snapshot_id,
+          dataset_version: barsPayload.data_provenance && (barsPayload.data_provenance.dataset_version || barsPayload.data_provenance.datasetVersion),
           timestamp: bars[bars.length - 1] && bars[bars.length - 1].timestamp
         })
         const payload = (response && response.data) || response || {}
