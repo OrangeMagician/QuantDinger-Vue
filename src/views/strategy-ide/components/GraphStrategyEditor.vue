@@ -367,16 +367,24 @@ export default {
     },
     signalLabel (item) {
       const label = this.isZh ? (item.name_zh || item.name_en) : (item.name_en || item.name_zh)
-      const state = this.signalUnavailable(item)
-        ? ` · ${this.isZh ? '暂不可执行' : 'Execution unavailable'}`
-        : ''
-      return `${label} · ${item.signal_id}${state}`
+      const state = this.signalState(item)
+      const suffix = state === 'research_only'
+        ? ` · ${this.isZh ? '仅研究' : 'Research only'}`
+        : state === 'unavailable'
+          ? ` · ${this.isZh ? '暂不可执行' : 'Execution unavailable'}`
+          : item.provider === 'user.indicator'
+            ? ` · ${this.isZh ? '用户指标提醒' : 'User indicator alert'}`
+          : ''
+      return `${label} · ${item.signal_id}${suffix}`
     },
     signalUnavailable (item) {
-      return item && (
-        item.status === 'catalog_unavailable' ||
-        (item.metadata && item.metadata.execution_available === false)
-      )
+      return this.signalState(item) !== 'available'
+    },
+    signalState (item) {
+      if (!item) return 'unavailable'
+      if (item.status === 'catalog_unavailable' || (item.metadata && item.metadata.execution_available === false)) return 'unavailable'
+      if (item.metadata && (item.metadata.runtime_status === 'research_only' || item.metadata.execution_scope === 'multi_period_or_stateful')) return 'research_only'
+      return 'available'
     },
     signalDefinition (node) {
       const signalId = node && node.config && node.config.signal_id
@@ -412,7 +420,10 @@ export default {
     },
     parameterLabel (node, key) {
       const schema = this.parameterSchema(node, key)
-      return schema.title || key
+      if (key === 'operator') return this.isZh ? '运算符' : 'Operator'
+      if (key === 'value') return this.isZh ? '目标值' : 'Expected value'
+      if (schema.title) return schema.title
+      return key
     },
     handleSignalChange (node) {
       const definition = this.signalDefinition(node)
