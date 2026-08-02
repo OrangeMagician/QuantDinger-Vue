@@ -65,6 +65,22 @@ export function getFactorCatalog () {
   return request({ url: '/api/v2/factors/catalog', method: 'get', timeout: 20000 })
 }
 
+export function getSignalCatalog (params = {}) {
+  return request({ url: '/api/v2/signals/catalog', method: 'get', params, timeout: 20000 })
+}
+
+export function evaluateUnifiedSignal (data) {
+  return request({ url: '/api/v2/signals/evaluate', method: 'post', data, timeout: 60000 })
+}
+
+export function validateSignalGraph (data) {
+  return request({ url: '/api/v2/signals/graph/validate', method: 'post', data, timeout: 20000 })
+}
+
+export function compileSignalGraph (data) {
+  return request({ url: '/api/v2/signals/graph/compile', method: 'post', data, timeout: 20000 })
+}
+
 export function getStockPoolOptions () {
   return request({ url: '/api/v2/stock-pools/options', method: 'get', timeout: 20000 })
 }
