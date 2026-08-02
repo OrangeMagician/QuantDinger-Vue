@@ -326,7 +326,17 @@ export default {
       }
     },
     signalLabel (item) {
-      return `${this.isZh ? (item.name_zh || item.name_en) : (item.name_en || item.name_zh)} · ${item.signal_id}`
+      const label = this.isZh ? (item.name_zh || item.name_en) : (item.name_en || item.name_zh)
+      const state = this.signalUnavailable(item)
+        ? ` · ${this.isZh ? '暂不可执行' : 'Execution unavailable'}`
+        : ''
+      return `${label} · ${item.signal_id}${state}`
+    },
+    signalUnavailable (item) {
+      return item && (
+        item.status === 'catalog_unavailable' ||
+        (item.metadata && item.metadata.execution_available === false)
+      )
     },
     signalDefinition (node) {
       const signalId = node && node.config && node.config.signal_id
