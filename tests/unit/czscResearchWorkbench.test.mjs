@@ -167,4 +167,6 @@ test('graph strategy editor exposes the complete declarative action and risk con
   assert.match(editor, /positionSizingKind\(node\)/)
   assert.match(editor, /setPositionSizingValue\(node, \$event\)/)
   assert.match(editor, /handleActionKindChange\(node\)/)
+  assert.match(editor, /:disabled="signalUnavailable\(item\)"/)
+  assert.match(editor, /structuredParameterValue\(node, key\)/)
 })

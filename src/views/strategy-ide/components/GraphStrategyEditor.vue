@@ -46,7 +46,7 @@
               :placeholder="isZh ? '选择统一信号' : 'Select signal'"
               @change="handleSignalChange(node)"
             >
-              <a-select-option v-for="item in signalOptions" :key="item.signal_id" :value="item.signal_id">
+              <a-select-option v-for="item in signalOptions" :key="item.signal_id" :value="item.signal_id" :disabled="signalUnavailable(item)">
                 {{ signalLabel(item) }}
               </a-select-option>
             </a-select>
