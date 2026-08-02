@@ -12,9 +12,17 @@ const messages = {
   'ar-SA': ['ألوان السوق', 'الصعود أحمر / الهبوط أخضر', 'الصعود أخضر / الهبوط أحمر']
 }
 
-export default Object.keys(messages).reduce((locales, locale) => {
-  const [title, riseRed, riseGreen] = messages[locale]
-  locales[locale] = {
+const locale = {
+  'app.setting.marketColors': 'Market colors',
+  'app.setting.marketColors.riseRed': 'Rise red / fall green',
+  'app.setting.marketColors.riseGreen': 'Rise green / fall red'
+}
+
+export default Object.keys(messages).reduce((locales, localeName) => {
+  const [title, riseRed, riseGreen] = messages[localeName]
+  locales[localeName] = localeName === 'en-US'
+    ? locale
+    : {
     'app.setting.marketColors': title,
     'app.setting.marketColors.riseRed': riseRed,
     'app.setting.marketColors.riseGreen': riseGreen

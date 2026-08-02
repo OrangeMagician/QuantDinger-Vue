@@ -92,18 +92,35 @@
             <a-select v-if="node.type === 'event'" v-model="node.config.action" size="small" @change="emitChange">
               <a-select-option v-for="item in eventActions" :key="item" :value="item">{{ item }}</a-select-option>
             </a-select>
-            <a-select v-if="node.type === 'position_rule'" v-model="node.config.mode" size="small" @change="emitChange">
+            <a-select v-if="node.type === 'position_rule'" v-model="node.config.mode" size="small" @change="handlePositionModeChange(node)">
               <a-select-option value="target">target</a-select-option>
               <a-select-option value="delta">delta</a-select-option>
               <a-select-option value="scale">scale</a-select-option>
               <a-select-option value="max_position">max_position</a-select-option>
             </a-select>
-            <a-input-number
-              v-if="node.type === 'position_rule'"
-              v-model="node.config.target_percent"
+            <a-select
+              v-if="node.type === 'position_rule' && ['target', 'delta', 'max_position'].includes(node.config.mode)"
+              :value="positionSizingKind(node)"
               size="small"
-              :min="-1"
-              :max="1"
+              @change="setPositionSizingKind(node, $event)"
+            >
+              <a-select-option value="percent">{{ isZh ? '比例' : 'Percent' }}</a-select-option>
+              <a-select-option value="value">{{ isZh ? '金额' : 'Value' }}</a-select-option>
+              <a-select-option value="quantity">{{ isZh ? '数量' : 'Quantity' }}</a-select-option>
+            </a-select>
+            <a-input-number
+              v-if="node.type === 'position_rule' && ['target', 'delta', 'max_position'].includes(node.config.mode)"
+              :value="positionSizingValue(node)"
+              size="small"
+              :min="node.config.mode === 'max_position' ? 0 : undefined"
+              :step="0.05"
+              @change="setPositionSizingValue(node, $event)"
+            />
+            <a-input-number
+              v-if="node.type === 'position_rule' && node.config.mode === 'scale'"
+              v-model="node.config.multiplier"
+              size="small"
+              :min="0"
               :step="0.05"
               @change="emitChange"
             />
@@ -124,6 +141,16 @@
               @change="emitChange"
             />
             <a-input-number
+              v-if="node.type === 'protection' && node.config.kind === 'trailing_stop'"
+              v-model="node.config.activation_pct"
+              size="small"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              :placeholder="isZh ? '触发比例（可选）' : 'Activation (optional)'"
+              @change="emitChange"
+            />
+            <a-input-number
               v-if="node.type === 'protection' && ['time_exit', 'cooldown'].includes(node.config.kind)"
               v-model="node.config.bars"
               size="small"
@@ -131,13 +158,21 @@
               :step="1"
               @change="emitChange"
             />
-            <a-select v-if="node.type === 'action'" v-model="node.config.kind" size="small" @change="emitChange">
+            <a-select v-if="node.type === 'action'" v-model="node.config.kind" size="small" @change="handleActionKindChange(node)">
+              <a-select-option value="open">open</a-select-option>
+              <a-select-option value="close">close</a-select-option>
               <a-select-option value="target_percent">target_percent</a-select-option>
               <a-select-option value="target_value">target_value</a-select-option>
               <a-select-option value="target_quantity">target_quantity</a-select-option>
               <a-select-option value="emit_signal">emit_signal</a-select-option>
             </a-select>
-            <a-input-number v-if="node.type === 'action' && node.config.kind !== 'emit_signal'" v-model="node.config.value" size="small" :step="0.05" @change="emitChange" />
+            <a-input-number
+              v-if="node.type === 'action' && ['target_percent', 'target_value', 'target_quantity'].includes(node.config.kind)"
+              v-model="node.config.value"
+              size="small"
+              :step="node.config.kind === 'target_percent' ? 0.05 : 1"
+              @change="emitChange"
+            />
           </div>
         </article>
       </div>
@@ -192,6 +227,11 @@
 import { compileSignalGraph, evaluateSignalGraph, getMarketBars, getSignalCatalog, validateSignalGraph } from '@/api/domain'
 
 const ACTIONS = ['open_long', 'close_long', 'open_short', 'close_short', 'reverse', 'emit_signal']
+const POSITION_VALUE_KEYS = Object.freeze({
+  target: { percent: 'target_percent', value: 'target_value', quantity: 'target_quantity' },
+  delta: { percent: 'delta_percent', value: 'delta_value', quantity: 'delta_quantity' },
+  max_position: { percent: 'max_percent', value: 'max_value', quantity: 'max_quantity' }
+})
 
 function clone (value) {
   return JSON.parse(JSON.stringify(value || {}))
@@ -342,6 +382,17 @@ export default {
       const signalId = node && node.config && node.config.signal_id
       return this.signalOptions.find(item => item.signal_id === signalId) || null
     },
+    positionSizingKind (node) {
+      const mode = node && node.config ? node.config.mode : ''
+      const keys = POSITION_VALUE_KEYS[mode]
+      if (!keys) return 'percent'
+      return Object.keys(keys).find(kind => node.config[keys[kind]] !== undefined && node.config[keys[kind]] !== null) || 'percent'
+    },
+    positionSizingValue (node) {
+      const mode = node && node.config ? node.config.mode : ''
+      const keys = POSITION_VALUE_KEYS[mode]
+      return keys ? node.config[keys[this.positionSizingKind(node)]] : undefined
+    },
     normalizeLocalNodes () {
       if (!Array.isArray(this.local.nodes)) this.$set(this.local, 'nodes', [])
       this.local.nodes.forEach(node => {
@@ -388,8 +439,9 @@ export default {
       const configuredSymbols = config.symbols || config.instruments || config.symbol
       const firstSymbol = Array.isArray(configuredSymbols) ? configuredSymbols[0] : configuredSymbols
       const symbol = firstSymbol && typeof firstSymbol === 'object' ? firstSymbol.symbol : firstSymbol
-      if (!this.previewMarket) this.previewMarket = config.market || ''
-      if (!this.previewSymbol) this.previewSymbol = symbol || ''
+      const runtimeSymbol = config.runtime_symbol ? (config.default_symbol || '') : ''
+      if (!this.previewMarket) this.previewMarket = config.market || config.runtime_market || ''
+      if (!this.previewSymbol) this.previewSymbol = symbol || runtimeSymbol || ''
       if (!this.previewTimeframe || this.previewTimeframe === '1d') {
         this.previewTimeframe = config.frequency || config.timeframe || this.previewTimeframe
       }
@@ -417,6 +469,44 @@ export default {
         config = { kind: 'target_percent', value: 1 }
       }
       this.local.nodes = [...(this.local.nodes || []), { id, type, config, position: {} }]
+      this.emitChange()
+    },
+    handleActionKindChange (node) {
+      const kind = String(node.config.kind || '')
+      if (['open', 'close', 'emit_signal'].includes(kind)) {
+        delete node.config.value
+      } else if (node.config.value === undefined || node.config.value === null) {
+        this.$set(node.config, 'value', kind === 'target_percent' ? 1 : 0)
+      }
+      this.emitChange()
+    },
+    handlePositionModeChange (node) {
+      const mode = String(node.config.mode || 'target')
+      delete node.config.multiplier
+      Object.values(POSITION_VALUE_KEYS).forEach(keys => {
+        Object.values(keys).forEach(key => { delete node.config[key] })
+      })
+      if (mode === 'scale') this.$set(node.config, 'multiplier', 1)
+      else if (POSITION_VALUE_KEYS[mode]) {
+        const key = POSITION_VALUE_KEYS[mode].percent
+        this.$set(node.config, key, mode === 'max_position' ? 1 : (mode === 'delta' ? 0.1 : 1))
+      }
+      this.emitChange()
+    },
+    setPositionSizingKind (node, kind) {
+      const mode = node && node.config ? node.config.mode : ''
+      const keys = POSITION_VALUE_KEYS[mode]
+      if (!keys || !keys[kind]) return
+      delete node.config.multiplier
+      Object.values(keys).forEach(key => { delete node.config[key] })
+      this.$set(node.config, keys[kind], mode === 'max_position' ? 1 : (mode === 'delta' ? 0.1 : 1))
+      this.emitChange()
+    },
+    setPositionSizingValue (node, value) {
+      const mode = node && node.config ? node.config.mode : ''
+      const keys = POSITION_VALUE_KEYS[mode]
+      if (!keys) return
+      this.$set(node.config, keys[this.positionSizingKind(node)], value)
       this.emitChange()
     },
     removeNode (id) {

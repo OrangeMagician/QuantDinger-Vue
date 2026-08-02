@@ -13,7 +13,7 @@ const portfolioResultPath = fileURLToPath(
 const portfolioResultSource = fs.readFileSync(portfolioResultPath, 'utf8')
 
 test('backtest center compiles a source manifest before accepting runtime controls', () => {
-  assert.match(source, /compileScriptSource\(\{ sourceId \}\)/)
+  assert.match(source, /compileScriptSource\(\{ sourceId(?:,|\s*\})/)
   assert.match(source, /this\.manifest = compiled\.data && compiled\.data\.manifest/)
   assert.match(source, /return Boolean\(this\.manifest && this\.manifest\.leverageAllowed\)/)
 })

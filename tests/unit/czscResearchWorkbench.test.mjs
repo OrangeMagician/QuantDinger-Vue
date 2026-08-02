@@ -155,3 +155,16 @@ test('deleted CZSC workbench product surfaces stay removed', async () => {
     fileDoesNotExist('locales/lang/czsc-workbench.js')
   ])
 })
+
+test('graph strategy editor exposes the complete declarative action and risk contract', async () => {
+  const editor = await source('views/strategy-ide/components/GraphStrategyEditor.vue')
+
+  for (const kind of ['value="open"', 'value="close"', 'value="target_percent"', 'value="target_value"', 'value="target_quantity"']) {
+    assert.match(editor, new RegExp(kind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+  assert.match(editor, /value="cooldown"/)
+  assert.match(editor, /node\.config\.activation_pct/)
+  assert.match(editor, /positionSizingKind\(node\)/)
+  assert.match(editor, /setPositionSizingValue\(node, \$event\)/)
+  assert.match(editor, /handleActionKindChange\(node\)/)
+})
