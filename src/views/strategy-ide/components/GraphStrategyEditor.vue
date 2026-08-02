@@ -260,7 +260,11 @@ export default {
         ? this.previewResult.decisions.length
         : 0
       const providers = this.previewResult && this.previewResult.diagnostics && this.previewResult.diagnostics.provider_versions
-      const providerText = providers && providers.length ? ` · ${providers.join(', ')}` : ''
+      const providerText = Array.isArray(providers)
+        ? (providers.length ? ` · ${providers.join(', ')}` : '')
+        : (providers && typeof providers === 'object'
+            ? ` · ${Object.entries(providers).map(([name, version]) => `${name}@${version}`).join(', ')}`
+            : '')
       const snapshot = this.previewProvenance && this.previewProvenance.snapshot_id
         ? ` · ${this.previewProvenance.snapshot_id.slice(0, 18)}...`
         : ''
