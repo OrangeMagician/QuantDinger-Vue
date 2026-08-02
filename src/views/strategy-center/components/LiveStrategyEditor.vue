@@ -51,7 +51,8 @@
             v-if="model.scriptSourceId && sourceContractError"
             show-icon
             type="error"
-            :message="$t('strategyV2.compileFailed')" />
+            :message="$t('strategyV2.compileFailed')"
+            :description="sourceContractErrorMessage || $t('strategyV2.compileFailedHint')" />
           <div v-if="hasCurrentContract" class="strategy-v2-summary">
             <div class="strategy-v2-summary__head"><a-tag color="green">{{ $t('strategyV2.apiBadge') }}</a-tag><strong>{{ $t('strategyV2.manifestTitle') }}</strong></div>
             <p>{{ $t('strategyV2.manifestHint') }}</p>
@@ -302,6 +303,7 @@ export default {
       compiledManifest: {},
       sourceContractLoading: false,
       sourceContractError: false,
+      sourceContractErrorMessage: '',
       originalStrategy: null,
       notificationSettings: {},
       notificationChannels: ['browser', 'email', 'telegram', 'discord', 'webhook', 'phone'],
@@ -481,6 +483,7 @@ export default {
       this.sourceDetail = {}
       this.compiledManifest = {}
       this.sourceContractError = false
+      this.sourceContractErrorMessage = ''
       this.originalStrategy = null
       this.loading = true
       try {
@@ -531,6 +534,7 @@ export default {
       if (applyDefaults && !this.isEdit) this.model.directionMode = ''
       this.compiledManifest = {}
       this.sourceContractError = false
+      this.sourceContractErrorMessage = ''
       this.sourceContractLoading = true
       const contractRequest = compileScriptSource({ sourceId: Number(sourceId) })
         .then(response => ({ response }))
@@ -543,6 +547,9 @@ export default {
         const manifest = this.parseObject(contractResult.response && contractResult.response.data && contractResult.response.data.manifest)
         this.compiledManifest = manifest
         this.sourceContractError = Boolean(contractResult.error) || !Object.keys(manifest).length
+        this.sourceContractErrorMessage = contractResult.error
+          ? (contractResult.error.backendMessage || contractResult.error.message || this.$t('strategyV2.compileFailedHint'))
+          : (!Object.keys(manifest).length ? this.$t('strategyV2.compileFailedHint') : '')
         if (!this.model.name || (applyDefaults && !this.isEdit)) {
           this.model.name = this.sourceDetail.name || this.sourceDetail.title || ''
         }
@@ -554,7 +561,10 @@ export default {
           this.normalizeExecutionFields()
         }
       } catch (error) {
-        if (String(this.model.scriptSourceId) === sourceId) this.sourceContractError = true
+        if (String(this.model.scriptSourceId) === sourceId) {
+          this.sourceContractError = true
+          this.sourceContractErrorMessage = error.backendMessage || error.message || this.$t('strategyV2.compileFailedHint')
+        }
         throw error
       } finally {
         if (String(this.model.scriptSourceId) === sourceId) this.sourceContractLoading = false
@@ -683,17 +693,20 @@ export default {
       const sourceId = String(id)
       this.sourceContractLoading = true
       this.sourceContractError = false
+      this.sourceContractErrorMessage = ''
       try {
         const res = await compileScriptSource({ sourceId: Number(sourceId) })
         if (String(this.model.scriptSourceId) !== sourceId) return false
         const manifest = this.parseObject(res && res.data && res.data.manifest)
         this.compiledManifest = manifest
         this.sourceContractError = !Object.keys(manifest).length
+        this.sourceContractErrorMessage = this.sourceContractError ? this.$t('strategyV2.compileFailedHint') : ''
         return !this.sourceContractError
       } catch (error) {
         if (String(this.model.scriptSourceId) === sourceId) {
           this.compiledManifest = {}
           this.sourceContractError = true
+          this.sourceContractErrorMessage = error.backendMessage || error.message || this.$t('strategyV2.compileFailedHint')
         }
         return false
       } finally {
