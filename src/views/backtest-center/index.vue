@@ -802,8 +802,11 @@ export default {
         .filter(item => String(item.engine || '').toLowerCase() !== 'czsc' || item.source_kind === 'graph' || item.asset_type === 'graph_strategy')
         .map(item => ({
         ...item,
-        engine_origin: item.engine || 'native',
-        engine: item.source_kind === 'graph' || item.asset_type === 'graph_strategy' ? 'native' : 'native'
+        engine: String(item.engine || 'native').toLowerCase(),
+        engine_origin: String(item.engine || 'native').toLowerCase(),
+        // GraphSpec strategies execute through the product-owned Strategy V2
+        // adapter while retaining the provider that supplied their signals.
+        execution_engine: (item.source_kind === 'graph' || item.asset_type === 'graph_strategy') ? 'native' : String(item.engine || 'native').toLowerCase()
       }))
       const czscSources = (Array.isArray(czscResponse.data) ? czscResponse.data : [])
         .filter(item => item.source_kind !== 'graph' && item.asset_type !== 'graph_strategy')
@@ -812,6 +815,8 @@ export default {
         id: `czsc:${item.strategy_version_id}`,
         source_id: item.id,
         engine: 'czsc',
+        engine_origin: 'czsc',
+        execution_engine: 'czsc',
         asset_type: item.kind === 'portfolio' ? 'portfolio_strategy' : 'script',
         param_schema: item.parameters || {},
         manifest: {
@@ -827,6 +832,8 @@ export default {
         id: 'research:cnstock-factors',
         name: this.$t('unifiedFactor.assetName'),
         engine: 'czsc',
+        engine_origin: 'czsc',
+        execution_engine: 'czsc',
         research_asset: true,
         asset_type: 'portfolio_strategy',
         param_schema: {},
@@ -894,7 +901,7 @@ export default {
       this.backtestRangePolicy = null
       this.params = {}
       const selected = this.sources.find(item => String(item.id) === String(sourceId))
-      if (selected && selected.engine === 'czsc') {
+      if (selected && selected.engine === 'czsc' && selected.source_kind !== 'graph' && selected.asset_type !== 'graph_strategy') {
         this.source = selected
         this.manifest = selected.manifest
         this.backtestRangePolicy = null
@@ -906,7 +913,14 @@ export default {
       }
       const response = await getScriptSourceDetail(sourceId)
       const compiled = await compileScriptSource({ sourceId, symbol: this.form.symbol, timeframe: this.form.timeframe })
-      this.source = { ...response.data, engine_origin: response.data && response.data.engine, engine: 'native' }
+      const sourceEngine = String((response.data && response.data.engine) || selected && selected.engine || 'native').toLowerCase()
+      const isGraph = response.data && (response.data.source_kind === 'graph' || response.data.asset_type === 'graph_strategy')
+      this.source = {
+        ...response.data,
+        engine: sourceEngine,
+        engine_origin: sourceEngine,
+        execution_engine: isGraph ? 'native' : sourceEngine
+      }
       this.manifest = compiled.data && compiled.data.manifest
       this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
       await this.hydrateManifestSymbolNames()
