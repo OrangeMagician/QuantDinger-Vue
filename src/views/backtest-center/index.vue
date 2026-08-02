@@ -1063,6 +1063,8 @@ export default {
       try {
         const response = this.isCzscSource
           ? await this.runCzscBacktest()
+          : this.isGraphSource
+            ? await this.runGraphBacktest()
           : await runStrategyBacktest({
             sourceId: this.form.sourceId,
             symbol: this.form.symbol,
@@ -1124,6 +1126,41 @@ export default {
       return {
         data: {
           ...this.normalizeCzscResult(envelope.payload || {}, envelope),
+          run_id: envelope.backtest_run_id,
+          task_id: task.task_id,
+          billing: response.data.billing || (task.request && task.request._billing) || {}
+        }
+      }
+    },
+    async runGraphBacktest () {
+      const response = await createCzscBacktest({
+        strategy_id: this.source.source_id || this.source.id,
+        strategy_version_id: this.source.strategy_version_id,
+        strategy_name: this.source.name,
+        symbol: this.form.symbol.trim().toUpperCase(),
+        timeframe: this.form.timeframe,
+        start: this.form.startDate.format('YYYY-MM-DD'),
+        end: this.form.endDate.format('YYYY-MM-DD'),
+        initial_cash: this.form.initialCapital,
+        commission_rate: this.form.commission,
+        slippage: this.form.slippage,
+        leverage_enabled: this.form.leverageEnabled,
+        leverage: this.form.leverage,
+        parameters: this.params,
+        execution_assumptions: {
+          execution_price: 'next_bar_open',
+          commission_rate: this.form.commission,
+          slippage: this.form.slippage,
+          leverage: this.form.leverage
+        }
+      }, `backtest-graph-${this.source.strategy_version_id}-${this.form.symbol}-${Date.now()}`)
+      if (!response || response.code !== 1) throw new Error(response && response.msg)
+      const task = await this.waitResearchTask(response.data.task_id)
+      const envelope = task.result || {}
+      const payload = envelope.payload || {}
+      return {
+        data: {
+          ...payload,
           run_id: envelope.backtest_run_id,
           task_id: task.task_id,
           billing: response.data.billing || (task.request && task.request._billing) || {}
