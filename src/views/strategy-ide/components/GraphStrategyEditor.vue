@@ -72,6 +72,12 @@
                   :step="parameterSchema(node, key).type === 'integer' ? 1 : 0.05"
                   @change="emitChange"
                 />
+                <a-input
+                  v-else-if="['array', 'object'].includes(parameterSchema(node, key).type)"
+                  :value="structuredParameterValue(node, key)"
+                  size="small"
+                  @change="setStructuredParameter(node, key, $event)"
+                />
                 <a-switch
                   v-else-if="parameterSchema(node, key).type === 'boolean'"
                   v-model="node.config.params[key]"
@@ -321,7 +327,11 @@ export default {
           const parameterMinimum = Object.keys(schema)
             .filter(key => ['integer', 'number'].includes(schema[key] && schema[key].type))
             .map(key => Number(params[key] || (schema[key] && schema[key].default) || 0))
-          return Math.max(Number(definition.minimum_bars || 0), ...parameterMinimum)
+          const nestedSchema = schema.params && schema.params.properties ? schema.params.properties : {}
+          const nestedMinimum = Object.keys(nestedSchema)
+            .filter(key => ['integer', 'number'].includes(nestedSchema[key] && nestedSchema[key].type))
+            .map(key => Number((params.params && params.params[key]) || nestedSchema[key].default || 0))
+          return Math.max(Number(definition.minimum_bars || 0), ...parameterMinimum, ...nestedMinimum)
         })
         .filter(value => value > 0)
       return minimums.length ? Math.max(...minimums) : 20
@@ -418,6 +428,25 @@ export default {
         ? definition.parameter_schema[key]
         : {}
     },
+    structuredParameterValue (node, key) {
+      const value = node && node.config && node.config.params ? node.config.params[key] : undefined
+      if (value === undefined || value === null || value === '') return ''
+      try {
+        return JSON.stringify(value)
+      } catch (_) {
+        return String(value)
+      }
+    },
+    setStructuredParameter (node, key, event) {
+      const raw = event && event.target ? event.target.value : event
+      try {
+        const value = JSON.parse(String(raw || ''))
+        this.$set(node.config.params, key, value)
+        this.emitChange()
+      } catch (_) {
+        this.validationError = this.isZh ? '结构化参数必须是有效 JSON。' : 'Structured parameters must be valid JSON.'
+      }
+    },
     parameterLabel (node, key) {
       const schema = this.parameterSchema(node, key)
       if (key === 'operator') return this.isZh ? '运算符' : 'Operator'
@@ -430,7 +459,7 @@ export default {
       const schema = definition && definition.parameter_schema ? definition.parameter_schema : {}
       const params = { ...(node.config.params || {}) }
       Object.entries(schema).forEach(([key, item]) => {
-        if (typeof params[key] === 'undefined' && item && Object.prototype.hasOwnProperty.call(item, 'default')) params[key] = item.default
+        if (typeof params[key] === 'undefined' && item && Object.prototype.hasOwnProperty.call(item, 'default')) params[key] = clone(item.default)
       })
       this.$set(node.config, 'params', params)
       this.emitChange()
