@@ -10,7 +10,9 @@
         <a-button icon="eye" :loading="previewing" @click="preview">{{ isZh ? '信号预览' : 'Preview signal' }}</a-button>
         <a-button icon="code" :loading="compiling" @click="compile">{{ isZh ? '编译计划' : 'Compile plan' }}</a-button>
         <a-button icon="bar-chart" @click="$emit('backtest')">{{ isZh ? '回测' : 'Backtest' }}</a-button>
-        <a-button icon="thunderbolt" @click="$emit('live')">{{ isZh ? '创建运行' : 'Create run' }}</a-button>
+        <a-tooltip :title="liveUnavailableReason">
+          <a-button icon="thunderbolt" :disabled="!liveAllowed" @click="$emit('live')">{{ isZh ? '创建运行' : 'Create run' }}</a-button>
+        </a-tooltip>
         <a-button type="primary" icon="save" :loading="saving" @click="$emit('save')">{{ isZh ? '保存策略' : 'Save strategy' }}</a-button>
       </div>
     </header>
@@ -232,7 +234,7 @@
 <script>
 import { compileSignalGraph, evaluateSignalGraph, getMarketBars, getSignalCatalog, validateSignalGraph } from '@/api/domain'
 
-const ACTIONS = ['open_long', 'close_long', 'open_short', 'close_short', 'reverse', 'emit_signal']
+const ACTIONS = ['open_long', 'close_long', 'open_short', 'close_short', 'reverse', 'hold', 'emit_signal']
 const POSITION_VALUE_KEYS = Object.freeze({
   target: { percent: 'target_percent', value: 'target_value', quantity: 'target_quantity' },
   delta: { percent: 'delta_percent', value: 'delta_value', quantity: 'delta_quantity' },
@@ -254,6 +256,7 @@ export default {
     return {
       local: clone(this.value),
       signals: [],
+      providers: [],
       catalogError: '',
       catalogLoading: false,
       validation: null,
@@ -343,6 +346,22 @@ export default {
       if (this.validation && this.validation.valid) return this.isZh ? '校验通过' : 'Valid'
       if (this.validationError) return this.isZh ? '需要修正' : 'Needs fixes'
       return this.isZh ? '未校验' : 'Not validated'
+    },
+    liveAllowed () {
+      const providerNames = new Set((this.local.nodes || [])
+        .filter(node => node && node.type === 'signal')
+        .map(node => (this.signalDefinition(node) || {}).provider)
+        .filter(Boolean))
+      return providerNames.size > 0 && [...providerNames].every(name => {
+        const provider = this.providers.find(item => item && item.provider === name)
+        return provider ? provider.supports_live === true : false
+      })
+    },
+    liveUnavailableReason () {
+      if (this.liveAllowed) return ''
+      return this.isZh
+        ? '当前策略包含不支持实盘的信号源；可用于图表、研究或人工审核。'
+        : 'This graph contains a provider that does not support live execution; use chart, research, or manual review.'
     }
   },
   watch: {
@@ -368,6 +387,7 @@ export default {
         const response = await getSignalCatalog()
         const payload = (response && response.data) || response || {}
         this.signals = Array.isArray(payload.signals) ? payload.signals : []
+        this.providers = Array.isArray(payload.providers) ? payload.providers : []
         if (!this.signals.length) throw new Error(this.isZh ? '信号目录为空' : 'Signal catalog is empty')
       } catch (_) {
         this.catalogError = this.isZh ? '信号目录暂时不可用，已保留当前策略中的信号。' : 'Signal catalog is temporarily unavailable; existing strategy signals are preserved.'

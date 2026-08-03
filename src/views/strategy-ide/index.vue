@@ -93,7 +93,7 @@
                   <a-button
                     class="ide-icon-btn"
                     :loading="savingScriptMode === 'publish' || publishingScript"
-                    :disabled="scriptCodeHidden || savingScript || deletingScript"
+                    :disabled="scriptCodeHidden || currentAssetType === 'graph_strategy' || savingScript || deletingScript"
                     @click="openPublishModal"
                   >
                     <a-icon type="shop" />
