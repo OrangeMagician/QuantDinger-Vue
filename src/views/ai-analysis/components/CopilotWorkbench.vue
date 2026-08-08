@@ -16,7 +16,7 @@
           >
             <button type="button" class="session-card" @click="loadHistory(session.id)">
               <strong>{{ session.title || text.untitled }}</strong>
-              <span>{{ session.context_symbol || session.context_market || text.chatSession }}</span>
+              <span>{{ sessionContextLabel(session) }}</span>
             </button>
             <a-popconfirm
               :title="text.deleteSessionConfirm"
@@ -172,7 +172,7 @@
               >
                 <div class="symbol-option">
                   <strong>{{ item.symbol }}</strong>
-                  <span>{{ item.name || item.market }}</span>
+                  <span v-if="item.name">{{ item.name }}</span>
                   <em :class="['symbol-market-pill', marketPillClass(item.market)]">{{ marketLabel(item.market) }}</em>
                 </div>
               </a-select-option>
@@ -560,7 +560,7 @@ export default {
   data () {
     return {
       markets: [],
-      context: { market: '', symbol: '' },
+      context: { market: '', symbol: '', name: '' },
       selectedSymbolValue: '',
       watchAddValue: undefined,
       symbolOptions: [],
@@ -965,22 +965,27 @@ export default {
       return !this.sending && (this.draft.trim().length > 0 || this.attachments.length > 0)
     },
     currentContextLabel () {
-      const target = this.normalizeSymbolOption(this.context)
+      const target = this.resolveSymbolOption(this.context)
       if (!target || !target.symbol) return this.text.contextAutoInfer
-      return `${target.market}:${target.symbol}`
+      return [target.symbol, target.name].filter(Boolean).join(' ')
     },
     selectableSymbols () {
       const map = new Map()
-      ;(this.watchlist || []).forEach(item => {
+      const merge = item => {
         const normalized = this.normalizeSymbolOption(item)
-        if (normalized) map.set(this.symbolOptionValue(normalized), normalized)
+        if (!normalized) return
+        const key = this.watchAssetKey(normalized)
+        map.set(key, this.mergeSymbolOptions(map.get(key), normalized))
+      }
+      const watchItems = this.watchlist || []
+      const searchItems = this.symbolOptions || []
+      watchItems.forEach(item => {
+        merge(item)
       })
-      ;(this.symbolOptions || []).forEach(item => {
-        const normalized = this.normalizeSymbolOption(item)
-        if (normalized) map.set(this.symbolOptionValue(normalized), normalized)
+      searchItems.forEach(item => {
+        merge(item)
       })
-      const current = this.normalizeSymbolOption(this.context)
-      if (current) map.set(this.symbolOptionValue(current), current)
+      merge(this.context)
       return Array.from(map.values())
     },
     displayCalendarEvents () {
@@ -1228,7 +1233,7 @@ export default {
         this.addWatchMarket = firstMarketValue(this.markets)
       }
       if (this.context.market && !values.includes(this.context.market)) {
-        this.context = { market: '', symbol: '' }
+        this.context = { market: '', symbol: '', name: '' }
       }
     },
     openAiInterfaceSettings () {
@@ -1272,6 +1277,13 @@ export default {
         const res = await getWatchlist()
         const list = Array.isArray(res.data) ? res.data : ((res.data && res.data.watchlist) || [])
         this.watchlist = list.map(x => this.normalizeSymbolOption(x)).filter(Boolean)
+        if (this.context.symbol) {
+          const active = this.resolveSymbolOption(this.context)
+          if (active) {
+            this.context = active
+            this.selectedSymbolValue = this.symbolOptionValue(active)
+          }
+        }
         this.seedSymbolOptions()
         this.applyDefaultWatchSymbol()
         if (this.watchlist.length) {
@@ -1393,9 +1405,9 @@ export default {
       if (this.selectedSymbolValue || this.context.symbol || this.draftContextLock) return
       const first = (this.watchlist || [])[0]
       if (!first) return
-      this.context.market = first.market || this.context.market || firstMarketValue(this.markets)
-      this.context.symbol = first.symbol || ''
-      this.selectedSymbolValue = this.symbolOptionValue(first)
+      const target = this.resolveSymbolOption(first)
+      this.context = target || { market: firstMarketValue(this.markets), symbol: '', name: '' }
+      this.selectedSymbolValue = target ? this.symbolOptionValue(target) : ''
       this.seedSymbolOptions()
     },
     handleSymbolSearch (keyword) {
@@ -1433,14 +1445,13 @@ export default {
     },
     handleSymbolChange (value) {
       if (!value) {
-        this.context.market = ''
-        this.context.symbol = ''
+        this.context = { market: '', symbol: '', name: '' }
         return
       }
       const item = this.selectableSymbols.find(x => this.symbolOptionValue(x) === value) || this.parseSymbolValue(value)
-      this.context.market = item.market || this.context.market
-      this.context.symbol = item.symbol || ''
-      this.selectedSymbolValue = this.symbolOptionValue(item)
+      const target = this.resolveSymbolOption(item)
+      this.context = target || { market: '', symbol: '', name: '' }
+      this.selectedSymbolValue = target ? this.symbolOptionValue(target) : ''
       this.seedSymbolOptions()
     },
     addWatchSymbol () {
@@ -1592,9 +1603,8 @@ export default {
       }
     },
     selectWatch (item) {
-      const normalized = this.normalizeSymbolOption(item)
-      this.context.market = normalized.market
-      this.context.symbol = normalized.symbol
+      const normalized = this.resolveSymbolOption(item)
+      this.context = normalized
       this.selectedSymbolValue = this.symbolOptionValue(normalized)
       this.seedSymbolOptions()
     },
@@ -2408,7 +2418,7 @@ export default {
           content: String(msg.content || '').slice(0, 8000)
         }))
       const locked = resolvedSymbol && resolvedSymbol.locked ? this.normalizeSymbolOption(resolvedSymbol) : null
-      const selected = this.normalizeSymbolOption(this.context)
+      const selected = this.resolveSymbolOption(this.context)
       const mentioned = this.inferSymbolFromText(message)
       const resolved = locked || this.normalizeSymbolOption(resolvedSymbol)
       const active = locked || mentioned || resolved || selected
@@ -3434,6 +3444,39 @@ export default {
         settle_currency: item.settle_currency || item.settleCurrency || ''
       }
     },
+    mergeSymbolOptions (previous, incoming) {
+      if (!previous) return incoming
+      if (!incoming) return previous
+      const merged = { ...previous }
+      Object.keys(incoming).forEach(key => {
+        if (incoming[key] !== '' && incoming[key] !== null && incoming[key] !== undefined) {
+          merged[key] = incoming[key]
+        }
+      })
+      if (previous.name && !incoming.name) merged.name = previous.name
+      return merged
+    },
+    resolveSymbolOption (item) {
+      let target = this.normalizeSymbolOption(item)
+      if (!target) return null
+      const candidates = [...(this.watchlist || []), ...(this.symbolOptions || [])]
+      candidates.forEach(candidate => {
+        const normalized = this.normalizeSymbolOption(candidate)
+        if (normalized && this.watchAssetKey(normalized) === this.watchAssetKey(target)) {
+          target = this.mergeSymbolOptions(target, normalized)
+        }
+      })
+      return target
+    },
+    sessionContextLabel (session) {
+      const target = this.resolveSymbolOption({
+        market: session && session.context_market,
+        symbol: session && session.context_symbol,
+        name: session && session.context_name
+      })
+      if (target && target.symbol) return [target.symbol, target.name].filter(Boolean).join(' ')
+      return (session && session.context_market) || this.text.chatSession
+    },
     parseSymbolValue (value) {
       if (String(value || '').includes('|')) {
         const [market, exchangeId, marketType, instrumentId, symbol] = String(value || '').split('|')
@@ -3859,6 +3902,7 @@ export default {
       if (includesAny([
         /local-only|not implemented/i,
         /llm|large language model|provider|model provider|api key|apikey|base url|openrouter|openai|anthropic|deepseek|atlascloud/i,
+        /expecting value.*line 1 column 1|json decode|non-json|empty response|empty content|missing ['"]choices['"]/i,
         '大模型',
         '模型供应商',
         '模型提供商',

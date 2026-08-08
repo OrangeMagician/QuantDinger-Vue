@@ -89,8 +89,23 @@ test('desktop breakpoint keeps history, chat, and watchlist in one row', () => {
   )
 })
 
+test('copilot symbol labels preserve stock names instead of exposing market ids', () => {
+  assert.match(copilot, /sessionContextLabel\(session\)/)
+  assert.match(copilot, /return \[target\.symbol, target\.name\]\.filter\(Boolean\)\.join\(' '\)/)
+  assert.match(copilot, /if \(previous\.name && !incoming\.name\) merged\.name = previous\.name/)
+  assert.doesNotMatch(copilot, /<span>\{\{ item\.name \|\| item\.market \}\}<\/span>/)
+})
+
+test('empty or non-json AI responses are classified as LLM failures', () => {
+  assert.match(copilot, /expecting value\.\*line 1 column 1\|json decode\|non-json\|empty response/)
+  for (const key of ['llm.meta', 'llm.title', 'llm.body']) {
+    assert.ok(zh.includes(`"aiCopilot.setup.${key}"`), `missing zh-CN setup key: ${key}`)
+    assert.ok(en.includes(`"aiCopilot.setup.${key}"`), `missing en-US setup key: ${key}`)
+  }
+})
+
 test('analysis quick action is localized for every selectable language', () => {
-  const localeCount = (copilotOverrides.match(/^  "[a-z]{2}-[A-Z]{2}": \{/gm) || []).length
+  const localeCount = (copilotOverrides.match(/^ {2}"[a-z]{2}-[A-Z]{2}": \{/gm) || []).length
   const promptCount = (copilotOverrides.match(/"aiAssetAnalysis\.copilot\.analysisPromptTemplate"/g) || []).length
 
   assert.equal(localeCount, 11)
