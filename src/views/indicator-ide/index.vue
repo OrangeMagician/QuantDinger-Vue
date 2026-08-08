@@ -289,19 +289,22 @@
                         size="small"
                         show-search
                         allow-clear
-                        :filter-option="filterWatchlistOption"
+                        :filter-option="false"
+                        :loading="watchlistSearching || watchlistSelecting"
                         :dropdown-class-name="isDarkTheme ? 'ide-watchlist-dropdown ide-watchlist-dropdown--dark' : 'ide-watchlist-dropdown'"
                         :get-popup-container="chartToolbarGetPopupContainer"
+                        @search="onWatchlistSearch"
                         @change="handleWatchlistChange"
                       >
                         <a-select-option
-                          v-for="w in watchlist"
+                          v-for="w in toolbarSymbolOptions"
                           :key="watchlistContextKey(w)"
                           :value="watchlistContextKey(w)"
                         >
                           <span class="wl-opt-tag" :class="'wl-mkt-' + (w.market || '').toLowerCase()">{{ marketLabel(w.market) }}</span>
                           <strong class="wl-opt-symbol">{{ w.symbol }}</strong>
                           <span v-if="w.name" class="wl-opt-name">{{ w.name }}</span>
+                          <a-icon v-if="!w.watchlisted" type="plus-circle" class="wl-opt-add" />
                         </a-select-option>
                         <a-select-option key="__add__" value="__add__" class="add-option">
                           <div class="ide-watchlist-add-row">
@@ -491,9 +494,9 @@
       @ok="handleAddStock"
       @cancel="showAddModal = false"
       :confirmLoading="addingStock"
-      width="560px"
+      width="820px"
       :get-container="ideModalGetContainer"
-      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-modal-wrap--dark' : 'ide-modal-wrap'"
+      :wrap-class-name="isDarkTheme ? 'ide-modal-wrap ide-add-symbol-modal-wrap ide-modal-wrap--dark' : 'ide-modal-wrap ide-add-symbol-modal-wrap'"
     >
       <a-tabs v-model="addMarketTab" size="small" class="ide-add-market-tabs" @change="onAddMarketTabChange">
         <a-tab-pane
@@ -1050,6 +1053,12 @@ export default {
       cryptoExchangeIds: CRYPTO_EXCHANGE_IDS,
       watchlist: [],
       selectedWatchlistKey: 'Crypto:BTC/USDT',
+      watchlistSearchKeyword: '',
+      watchlistSearchResults: [],
+      watchlistSearching: false,
+      watchlistSelecting: false,
+      watchlistSearchTimer: null,
+      watchlistSearchRequestId: 0,
 
       activeIndicators: [],
       chartIndicatorRunning: true,
@@ -1171,6 +1180,15 @@ export default {
     chartTheme () {
       return this.isDarkTheme ? 'dark' : 'light'
     },
+    toolbarSymbolOptions () {
+      const searching = !!String(this.watchlistSearchKeyword || '').trim()
+      const source = searching ? this.watchlistSearchResults : this.watchlist
+      const watchlistKeys = new Set((this.watchlist || []).map(item => this.watchlistContextKey(item)))
+      return (source || []).map(item => ({
+        ...item,
+        watchlisted: watchlistKeys.has(this.watchlistContextKey(item))
+      }))
+    },
     ideQtOverlayGetContainer () {
       return (trigger) => this.chartToolbarGetPopupContainer(trigger)
     },
@@ -1280,6 +1298,7 @@ export default {
       this.cmInstance = null
     }
     clearTimeout(this.addSearchTimer)
+    clearTimeout(this.watchlistSearchTimer)
     if (this.ideAiTipTimer) clearInterval(this.ideAiTipTimer)
     if (this._fullscreenListener) {
       document.removeEventListener('fullscreenchange', this._fullscreenListener)
@@ -3275,34 +3294,103 @@ export default {
       return marketContextKey(item)
     },
     filterWatchlistOption (input, option) {
-      const val = (option.componentOptions.propsData.value || '').toLowerCase()
-      if (val === '__add__') return true
-      return val.includes(input.toLowerCase())
+      const value = String(option.componentOptions.propsData.value || '').toLowerCase()
+      return value.includes(String(input || '').toLowerCase())
     },
-    handleWatchlistChange (val) {
+    onWatchlistSearch (keyword) {
+      this.watchlistSearchKeyword = String(keyword || '').trim()
+      clearTimeout(this.watchlistSearchTimer)
+      if (!this.watchlistSearchKeyword) {
+        this.watchlistSearchResults = []
+        this.watchlistSearching = false
+        return
+      }
+      this.watchlistSearchTimer = setTimeout(() => this.searchAllSymbols(), 300)
+    },
+    async searchAllSymbols () {
+      const keyword = String(this.watchlistSearchKeyword || '').trim()
+      if (!keyword) return
+      const requestId = ++this.watchlistSearchRequestId
+      this.watchlistSearching = true
+      try {
+        const res = await searchSymbols({ keyword, limit: 40 })
+        if (requestId !== this.watchlistSearchRequestId) return
+        this.watchlistSearchResults = res && Array.isArray(res.data) ? res.data : []
+      } catch (_) {
+        if (requestId === this.watchlistSearchRequestId) this.watchlistSearchResults = []
+      } finally {
+        if (requestId === this.watchlistSearchRequestId) this.watchlistSearching = false
+      }
+    },
+    applySymbolSelection (item) {
+      const market = String(item.market || '')
+      const symbol = String(item.symbol || '')
+      this.market = market
+      this.symbol = symbol
+      this.qtSymbol = symbol
+      this.currentInstrumentId = market === 'Crypto' ? '' : String(item.instrument_id || item.instrumentId || '')
+      if (market === 'Crypto') {
+        this.cryptoExchangeId = this.normalizeCryptoExchange(item.exchange_id || this.cryptoExchangeId)
+        this.cryptoMarketType = normalizeMarketType(item.market_type || this.cryptoMarketType, 'Crypto')
+        this.persistCryptoMarketSource()
+      }
+      this.selectedWatchlistKey = this.watchlistContextKey(item)
+      this.watchlistSearchKeyword = ''
+      this.watchlistSearchResults = []
+      this.persistIdeSelectionPreference()
+    },
+    async addSymbolToWatchlist (item) {
+      const market = String(item.market || this.addMarketTab || '')
+      await addWatchlist({
+        userid: this.userId,
+        market,
+        symbol: item.symbol,
+        name: item.name || '',
+        exchange_id: item.exchange_id || (market === 'Crypto' ? this.cryptoExchangeId : ''),
+        market_type: item.market_type || (market === 'Crypto' ? this.cryptoMarketType : 'spot'),
+        instrument_id: item.instrument_id || '',
+        settle_currency: item.settle_currency || ''
+      })
+      await this.loadWatchlist()
+      const key = this.watchlistContextKey(item)
+      if (!(this.watchlist || []).some(row => this.watchlistContextKey(row) === key)) {
+        this.watchlist = [{ ...item, market }, ...(this.watchlist || [])]
+      }
+    },
+    async handleWatchlistChange (val) {
       if (val === '__add__') {
         this.showAddModal = true
         this.$nextTick(() => { this.selectedWatchlistKey = undefined })
         return
       }
       if (val) {
-        const row = (this.watchlist || []).find(
+        let row = (this.watchlist || []).find(
           w => w && w.market && w.symbol && this.watchlistContextKey(w) === val
         )
-        if (row) {
-          this.market = String(row.market)
-          this.symbol = String(row.symbol)
-        } else {
-          const i = val.indexOf(':')
-          if (i > 0) {
-            this.market = val.slice(0, i)
-            this.symbol = val.slice(i + 1)
+        if (!row) {
+          row = (this.watchlistSearchResults || []).find(
+            item => item && this.watchlistContextKey(item) === val
+          )
+          if (row) {
+            this.watchlistSelecting = true
+            try {
+              await this.addSymbolToWatchlist(row)
+              this.$message.success(this.$t('backtest-center.config.addSuccess'))
+            } catch (error) {
+              this.$message.error(error.message || this.$t('aiAssetAnalysis.copilot.addWatchFailed'))
+              this.selectedWatchlistKey = marketContextKey({ market: this.market, symbol: this.symbol })
+              return
+            } finally {
+              this.watchlistSelecting = false
+            }
           }
         }
-        this.qtSymbol = this.symbol
+        if (row) this.applySymbolSelection(row)
       } else {
         this.market = ''
         this.symbol = ''
+        this.watchlistSearchKeyword = ''
+        this.watchlistSearchResults = []
       }
       this.persistIdeSelectionPreference()
     },
@@ -3423,24 +3511,10 @@ export default {
       this.addingStock = true
       try {
         const mkt = item.market || this.addMarketTab
-        await addWatchlist({
-          userid: this.userId,
-          market: mkt,
-          symbol: item.symbol,
-          name: item.name || '',
-          exchange_id: item.exchange_id || (mkt === 'Crypto' ? this.cryptoExchangeId : ''),
-          market_type: item.market_type || (mkt === 'Crypto' ? this.cryptoMarketType : 'spot'),
-          instrument_id: item.instrument_id || '',
-          settle_currency: item.settle_currency || ''
-        })
+        const selectedItem = { ...item, market: mkt }
+        await this.addSymbolToWatchlist(selectedItem)
         this.$message.success(this.$t('backtest-center.config.addSuccess'))
-        await this.loadWatchlist()
-        this.selectedWatchlistKey = marketContextKey({
-          market: mkt,
-          symbol: item.symbol
-        })
-        this.market = mkt
-        this.symbol = item.symbol
+        this.applySymbolSelection(selectedItem)
         this.showAddModal = false
       } catch (e) {
         this.$message.error(e.message || 'Failed')
@@ -6473,6 +6547,11 @@ body.dark .ide-param-modal-wrap {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .wl-opt-add {
+    margin-left: auto;
+    color: var(--primary-color, #1890ff);
+    flex-shrink: 0;
+  }
   .ant-select-dropdown-menu-item-selected {
     background: #e6f7ff;
     .wl-opt-symbol { color: var(--primary-color, #1890ff); }
@@ -6675,6 +6754,33 @@ body.dark .ide-param-modal-wrap {
 </style>
 
 <style lang="less">
+.ide-add-symbol-modal-wrap {
+  .ant-modal {
+    width: 820px !important;
+    max-width: calc(100vw - 32px);
+  }
+  .ide-add-market-tabs {
+    .ant-tabs-nav {
+      display: block;
+      width: 100%;
+      min-width: 100%;
+    }
+    .ant-tabs-nav > div:first-child {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(72px, 1fr);
+      width: 100%;
+      min-width: 100%;
+    }
+    .ant-tabs-tab {
+      margin: 0 !important;
+      padding-left: 12px;
+      padding-right: 12px;
+      text-align: center;
+    }
+  }
+}
+
 .ide-add-source-row {
   display: flex;
   gap: 8px;
