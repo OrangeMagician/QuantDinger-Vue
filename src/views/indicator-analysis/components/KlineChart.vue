@@ -85,16 +85,16 @@
         ></canvas>
       </div>
 
-      <div v-if="loading && !klineData.length" class="chart-overlay">
+      <div v-if="(loading || loadFailurePending) && !klineData.length" class="chart-overlay">
         <a-spin size="large">
           <a-icon slot="indicator" type="loading" style="font-size: 24px; color: #13c2c2" spin />
         </a-spin>
       </div>
-      <div v-else-if="loading" class="chart-refresh-indicator" aria-live="polite">
+      <div v-else-if="loading || loadFailurePending" class="chart-refresh-indicator" aria-live="polite">
         <a-spin size="small" />
       </div>
 
-      <div v-if="error" class="chart-overlay">
+      <div v-if="error && !loading && !loadFailurePending" class="chart-overlay">
         <div class="error-box">
           <a-icon type="warning" style="font-size: 24px; color: #ef5350; margin-bottom: 10px" />
           <span>{{ error }}</span>
@@ -266,11 +266,16 @@ export default {
     const klineData = shallowRef([])
     const loading = ref(false)
     const error = ref(null)
+    const loadFailurePending = ref(false)
     const loadingHistory = ref(false)
     const hasMoreHistory = ref(true)
     let loadingHistoryPromise = null
     let loadGeneration = 0
     let activeLoadContextKey = ''
+    let loadErrorRevealTimer = null
+    const LOAD_ERROR_REVEAL_DELAY_MS = 1000
+    const KLINE_LOAD_MAX_ATTEMPTS = 2
+    const KLINE_LOAD_RETRY_DELAY_MS = 350
     let lastHistoryBeforeTimestamp = null
     let lastHistoryLoadAt = 0
     let suppressHistoryRangeUntil = 0
@@ -2443,6 +2448,11 @@ registerOverlay({
       }
     }
 
+    const isRetryableEmptyKlineError = (err) => {
+      const message = String(err && err.message ? err.message : err || '')
+      return /no data|no k-line data|暂无数据|没有.*数据/i.test(message)
+    }
+
     const loadKlineData = async () => {
       if (!props.symbol) return
       const contextKey = JSON.stringify([
@@ -2458,6 +2468,12 @@ registerOverlay({
       if (loading.value && contextKey === activeLoadContextKey) return
       const generation = ++loadGeneration
       activeLoadContextKey = contextKey
+
+      if (loadErrorRevealTimer) {
+        clearTimeout(loadErrorRevealTimer)
+        loadErrorRevealTimer = null
+      }
+      loadFailurePending.value = false
 
       stopRealtime()
       clearBacktestOverlays()
@@ -2478,27 +2494,35 @@ registerOverlay({
       try {
         let formattedData = []
         const initialLimit = getInitialKlineLimit()
-        try {
-          const response = await request({
-            url: '/api/indicator/kline',
-            method: 'get',
-            params: marketRequestParams({ limit: initialLimit, before_time: getInitialBeforeTime() }),
-            timeout: 45000
-          })
+        for (let attempt = 1; attempt <= KLINE_LOAD_MAX_ATTEMPTS; attempt += 1) {
+          try {
+            const response = await request({
+              url: '/api/indicator/kline',
+              method: 'get',
+              params: marketRequestParams({ limit: initialLimit, before_time: getInitialBeforeTime() }),
+              timeout: 45000
+            })
 
-          if (generation !== loadGeneration) return
+            if (generation !== loadGeneration) return
 
-          if (response.code === 1 && response.data && Array.isArray(response.data)) {
-            formattedData = formatKlineData(response.data)
-          } else {
+            if (response.code === 1 && response.data && Array.isArray(response.data)) {
+              formattedData = formatKlineData(response.data)
+              if (formattedData.length > 0) break
+              throw new Error('No K-line data returned')
+            }
+
             let errMsg = response.msg || 'Failed to load K-line data'
             if (response.hint === 'tiingo_subscription') {
               errMsg = proxy.$t('dashboard.indicator.error.tiingoSubscription') || 'Forex 1-minute data requires Tiingo paid subscription'
             }
             throw new Error(errMsg)
+          } catch (apiErr) {
+            const loadError = new Error(apiErr && apiErr.message ? apiErr.message : String(apiErr))
+            const shouldRetry = attempt < KLINE_LOAD_MAX_ATTEMPTS && isRetryableEmptyKlineError(loadError)
+            if (!shouldRetry) throw loadError
+            await new Promise(resolve => setTimeout(resolve, KLINE_LOAD_RETRY_DELAY_MS))
+            if (generation !== loadGeneration) return
           }
-        } catch (apiErr) {
-          throw new Error(apiErr && apiErr.message ? apiErr.message : String(apiErr))
         }
 
         if (!formattedData || formattedData.length === 0) {
@@ -2549,7 +2573,14 @@ registerOverlay({
         })
       } catch (err) {
         if (generation !== loadGeneration) return
-        error.value = proxy.$t('dashboard.indicator.error.loadDataFailed') + ': ' + (err.message || proxy.$t('dashboard.indicator.error.loadDataFailedDesc'))
+        const terminalError = proxy.$t('dashboard.indicator.error.loadDataFailed') + ': ' + (err.message || proxy.$t('dashboard.indicator.error.loadDataFailedDesc'))
+        loadFailurePending.value = true
+        loadErrorRevealTimer = setTimeout(() => {
+          loadErrorRevealTimer = null
+          if (generation !== loadGeneration) return
+          error.value = terminalError
+          loadFailurePending.value = false
+        }, LOAD_ERROR_REVEAL_DELAY_MS)
         klineData.value = []
         if (chartRef.value) {
           try {
@@ -5323,7 +5354,12 @@ registerOverlay({
     }
 
     onBeforeUnmount(() => {
+      loadGeneration += 1
       czscLoadGeneration += 1
+      if (loadErrorRevealTimer) {
+        clearTimeout(loadErrorRevealTimer)
+        loadErrorRevealTimer = null
+      }
       clearCzscLayerOverlays()
       stopRealtime()
       wsClient = null
@@ -5361,6 +5397,7 @@ registerOverlay({
     return {
       klineData,
       loading,
+      loadFailurePending,
       error,
       loadingHistory,
       chartRef,

@@ -55,6 +55,26 @@ test('initial left-edge layout events do not trigger history loading', () => {
   )
 })
 
+test('transient kline failures stay in loading state until failure is confirmed', () => {
+  assert.match(
+    klineChartSource,
+    /v-if="\(loading \|\| loadFailurePending\) && !klineData\.length"/
+  )
+  assert.match(
+    klineChartSource,
+    /const LOAD_ERROR_REVEAL_DELAY_MS = 1000[\s\S]*?loadFailurePending\.value = false[\s\S]*?loading\.value = true/
+  )
+  assert.match(
+    klineChartSource,
+    /const terminalError = [\s\S]*?loadFailurePending\.value = true[\s\S]*?if \(generation !== loadGeneration\) return[\s\S]*?error\.value = terminalError[\s\S]*?loadFailurePending\.value = false/
+  )
+  assert.match(
+    klineChartSource,
+    /const KLINE_LOAD_MAX_ATTEMPTS = 2[\s\S]*?for \(let attempt = 1; attempt <= KLINE_LOAD_MAX_ATTEMPTS; attempt \+= 1\)[\s\S]*?isRetryableEmptyKlineError\(loadError\)[\s\S]*?KLINE_LOAD_RETRY_DELAY_MS/
+  )
+  assert.match(klineChartSource, /v-if="error && !loading && !loadFailurePending"/)
+})
+
 test('chart annotations share collision lanes and keep labels away from candle bodies', () => {
   assert.match(klineChartSource, /reserveCzscAnnotationLanes\(\{[\s\S]*?allocateLane: allocateAnnotationLane/)
   assert.match(klineChartSource, /labelLane: text \? allocateLane\(\{ timestamp: end, side: labelSide, text/)
