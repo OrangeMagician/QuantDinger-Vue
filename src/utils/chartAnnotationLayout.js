@@ -18,7 +18,7 @@ export const normalizeAnnotationSide = (side) => {
 
 export function createChartAnnotationLaneAllocator (bars = [], options = {}) {
   const baseLane = Math.max(0, Number(options.baseLane) || 0)
-  const assumedBarWidth = Math.max(12, Number(options.assumedBarWidth) || 30)
+  const assumedBarWidth = Math.max(12, Number(options.assumedBarWidth) || 16)
   const timestampIndex = new Map()
 
   bars.forEach((bar, index) => {

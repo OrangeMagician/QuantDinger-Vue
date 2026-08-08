@@ -55,6 +55,13 @@ test('initial left-edge layout events do not trigger history loading', () => {
   )
 })
 
+test('chart annotations share collision lanes and keep labels away from candle bodies', () => {
+  assert.match(klineChartSource, /reserveCzscAnnotationLanes\(\{[\s\S]*?allocateLane: allocateAnnotationLane/)
+  assert.match(klineChartSource, /labelLane: text \? allocateLane\(\{ timestamp: end, side: labelSide, text/)
+  assert.match(klineChartSource, /const markerGap = 8[\s\S]*?signalY \+ markerGap \+ laneShift/)
+  assert.doesNotMatch(klineChartSource, /baseLane: czscLaneCount/)
+})
+
 test('indicator conversion route opens before strategy route initialization can replace it', () => {
   assert.match(
     strategyIdeSource,

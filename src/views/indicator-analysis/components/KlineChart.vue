@@ -179,7 +179,7 @@ import { klineChartMarketStyles, marketPalette } from '@/utils/marketColors'
 import { usePyodide } from '@/services/pyodide/usePyodide'
 import { computeChartLayers } from '@/api/domain'
 import { createChartAnnotationLaneAllocator } from '@/utils/chartAnnotationLayout'
-import { clearCzscOverlays, getCzscAnnotationLaneCount, registerCzscOverlays, renderCzscOverlays } from '@/utils/czscChartLayers'
+import { clearCzscOverlays, registerCzscOverlays, renderCzscOverlays, reserveCzscAnnotationLanes } from '@/utils/czscChartLayers'
 import {
   calculateSMA,
   calculateEMA,
@@ -1690,7 +1690,8 @@ registerOverlay({
           const compactHeight = isDashed ? 13 : 15
           const compactWidth = Math.max(18, Math.min(38, shortText.length * 7 + 10))
           const laneShift = lane * 16
-          const compactY = isBuy ? signalY + laneShift : signalY - compactHeight - laneShift
+          const markerGap = 8
+          const compactY = isBuy ? signalY + markerGap + laneShift : signalY - compactHeight - markerGap - laneShift
           const dotY = anchorY
           const edgeLineEndY = isBuy ? compactY : (compactY + compactHeight)
           const labelFill = isDashed ? 'rgba(0,0,0,0)' : color
@@ -1749,7 +1750,8 @@ registerOverlay({
 
         const lane = Math.max(0, Number(overlay.extendData?.lane) || 0)
         const laneShift = lane * (boxHeight + 4)
-        const boxY = isBuy ? signalY + laneShift : (signalY - boxHeight - laneShift)
+        const markerGap = 8
+        const boxY = isBuy ? signalY + markerGap + laneShift : (signalY - boxHeight - markerGap - laneShift)
 
         const circleY = anchorY
         const lineStartY = circleY
@@ -1957,9 +1959,18 @@ registerOverlay({
           }
         ]
         if (data.text) {
+          const labelSide = data.labelSide === 'below' ? 'below' : 'above'
+          const labelLane = Math.max(0, Number(data.labelLane) || 0)
+          const labelOffset = 12 + labelLane * 16
           figures.push({
             type: 'text',
-            attrs: { x: coordinates[1].x + 6, y: coordinates[1].y, text: String(data.text), align: 'left', baseline: 'middle' },
+            attrs: {
+              x: coordinates[1].x + 6,
+              y: coordinates[1].y + (labelSide === 'above' ? -labelOffset : labelOffset),
+              text: String(data.text),
+              align: 'left',
+              baseline: 'middle'
+            },
             styles: {
               color: data.textColor || color,
               size: Number(data.fontSize || 10),
@@ -4264,6 +4275,8 @@ registerOverlay({
           const y1 = normalizeLayerPrice(layer.y1, layer.price1, layer.price, layer.level)
           const y2 = normalizeLayerPrice(layer.y2, layer.price2, layer.price, layer.level)
           if (start == null || end == null || y1 == null || y2 == null) return
+          const text = layer.text || layer.name || ''
+          const labelSide = layer.side || 'above'
           pushLayerOverlay({
             name: 'qdIndicatorLine',
             points: [
@@ -4271,12 +4284,14 @@ registerOverlay({
               { timestamp: end, value: y2 }
             ],
             extendData: {
-              text: layer.text || layer.name || '',
+              text,
               color: layer.color,
               lineWidth: layer.lineWidth,
               dashed: layer.dashed,
               fontSize: layer.fontSize,
-              textColor: layer.textColor
+              textColor: layer.textColor,
+              labelSide,
+              labelLane: text ? allocateLane({ timestamp: end, side: labelSide, text, fontSize: layer.fontSize }) : 0
             },
             lock: true
           })
@@ -4359,16 +4374,15 @@ registerOverlay({
       addedIndicatorIds.value = []
       try {
       const internalData = convertToInternalFormat(klineData.value)
-      const czscLaneCount = props.czscEnabled && czscResult.value
-        ? getCzscAnnotationLaneCount({
-            result: czscResult.value,
-            visibility: props.czscVisibility,
-            translate: key => proxy.$t(key)
-          })
-        : 0
-      const allocateAnnotationLane = createChartAnnotationLaneAllocator(internalData, {
-        baseLane: czscLaneCount
-      })
+      const allocateAnnotationLane = createChartAnnotationLaneAllocator(internalData)
+      if (props.czscEnabled && czscResult.value) {
+        reserveCzscAnnotationLanes({
+          result: czscResult.value,
+          visibility: props.czscVisibility,
+          translate: key => proxy.$t(key),
+          allocateLane: allocateAnnotationLane
+        })
+      }
       const mainPaneOverlayFigures = []
       const mainPaneOverlayCalcEntries = []
       const mainPaneOverlaySignatureParts = []

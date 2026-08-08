@@ -103,6 +103,9 @@ test('structure chart renders volume, MACD and aligned CZSC overlays', async () 
   assert.match(chart, /timestamp: normalizeEpochMilliseconds\(bar\.timestamp\)/)
   assert.match(layers, /normalizeEpochMilliseconds\(stroke\.start_timestamp\)/)
   assert.match(layers, /normalizeEpochMilliseconds\(fractal\.timestamp\)/)
+  assert.match(layers, /signal\?\.conditions\?\.fractal_datetime/)
+  assert.match(layers, /reserveCzscAnnotationLanes/)
+  assert.match(layers, /confirmedKeys\.has/)
 })
 
 test('research workflows use one task center and product task IDs', async () => {
