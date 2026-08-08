@@ -1,8 +1,47 @@
 import { registerOverlay } from 'klinecharts'
 import { marketPalette } from '@/utils/marketColors'
 import { normalizeEpochMilliseconds } from '@/utils/timestamps'
+import { createChartAnnotationLaneAllocator } from '@/utils/chartAnnotationLayout'
 
 let overlaysRegistered = false
+
+const buildCzscAnnotationLayout = ({ result, visibility, translate }) => {
+  const enabled = { fractals: true, unfinished: true, signals: true, ...(visibility || {}) }
+  const allocateLane = createChartAnnotationLaneAllocator(result?.bars || [])
+  const lanes = new WeakMap()
+  let laneCount = 0
+  const assign = (item, timestamp, side, text) => {
+    const lane = allocateLane({ timestamp, side, text })
+    lanes.set(item, lane)
+    laneCount = Math.max(laneCount, lane + 1)
+  }
+
+  if (enabled.fractals) {
+    ;(result?.fractals || []).forEach(fractal => {
+      const text = fractal.kind === 'top' ? translate('czsc.top') : translate('czsc.bottom')
+      assign(fractal, normalizeEpochMilliseconds(fractal.timestamp), fractal.kind, text)
+    })
+  }
+  if (enabled.unfinished) {
+    ;((result?.unfinished && result.unfinished.fractals) || []).forEach(fractal => {
+      assign(fractal, normalizeEpochMilliseconds(fractal.timestamp), fractal.kind, translate('czsc.unfinishedShort'))
+    })
+  }
+  if (enabled.signals) {
+    ;(result?.enhanced_signals || []).forEach(signal => {
+      const mark = signal.chart_mark || {}
+      if (!mark.timestamp || !mark.price) return
+      const text = mark.text || signal.signal_type_label || signal.signal_type
+      assign(signal, normalizeEpochMilliseconds(mark.timestamp), mark.position, text)
+    })
+  }
+  return { lanes, laneCount }
+}
+
+export function getCzscAnnotationLaneCount ({ result, visibility, translate }) {
+  if (!result) return 0
+  return buildCzscAnnotationLayout({ result, visibility, translate }).laneCount
+}
 
 export function registerCzscOverlays () {
   if (overlaysRegistered) return
@@ -46,7 +85,9 @@ export function registerCzscOverlays () {
         const top = data.kind === 'top'
         const color = data.color || (top ? '#52c41a' : '#f5222d')
         const confirmed = data.confirmed !== false
-        const textY = point.y + (top ? -13 : 13)
+        const lane = Math.max(0, Number(data.lane) || 0)
+        const textOffset = 15 + lane * 17
+        const textY = point.y + (top ? -textOffset : textOffset)
         return [
           {
             type: 'circle',
@@ -75,9 +116,11 @@ export function registerCzscOverlays () {
         if (!coordinates[0]) return []
         const point = coordinates[0]
         const data = overlay.extendData || {}
-        const above = data.position === 'above'
+        const above = ['above', 'top', 'sell', 'short', 'exit'].some(token => String(data.position || '').toLowerCase().includes(token))
         const color = data.color || '#1677ff'
-        const y = point.y + (above ? -22 : 22)
+        const lane = Math.max(0, Number(data.lane) || 0)
+        const textOffset = 18 + lane * 18
+        const y = point.y + (above ? -textOffset : textOffset)
         return [
           {
             type: 'circle',
@@ -115,6 +158,7 @@ export function renderCzscOverlays ({ chart, result, visibility, dark, marketCol
   const overlayIds = []
   const market = marketPalette(dark, marketColorConvention)
   const enabled = { fractals: true, strokes: true, unfinished: true, signals: true, ...(visibility || {}) }
+  const annotationLayout = buildCzscAnnotationLayout({ result, visibility: enabled, translate })
   const add = config => {
     try {
       const id = chart.createOverlay(config, 'candle_pane')
@@ -135,27 +179,42 @@ export function renderCzscOverlays ({ chart, result, visibility, dark, marketCol
   }
 
   if (enabled.fractals) {
-    ;(result.fractals || []).forEach(fractal => add({
-      name: 'czscFractal',
-      points: [{ timestamp: normalizeEpochMilliseconds(fractal.timestamp), value: Number(fractal.price) }],
-      extendData: {
-        kind: fractal.kind,
-        text: fractal.kind === 'top' ? translate('czsc.top') : translate('czsc.bottom'),
-        confirmed: true,
-        color: fractal.kind === 'top' ? market.fall : market.rise
-      },
-      lock: true
-    }))
+    ;(result.fractals || []).forEach(fractal => {
+      const text = fractal.kind === 'top' ? translate('czsc.top') : translate('czsc.bottom')
+      const timestamp = normalizeEpochMilliseconds(fractal.timestamp)
+      add({
+        name: 'czscFractal',
+        points: [{ timestamp, value: Number(fractal.price) }],
+        extendData: {
+          kind: fractal.kind,
+          text,
+          lane: annotationLayout.lanes.get(fractal) || 0,
+          confirmed: true,
+          color: fractal.kind === 'top' ? market.fall : market.rise
+        },
+        lock: true
+      })
+    })
   }
 
   const unfinished = (result.unfinished && result.unfinished.fractals) || []
   if (enabled.unfinished) {
-    unfinished.forEach(fractal => add({
-      name: 'czscFractal',
-      points: [{ timestamp: normalizeEpochMilliseconds(fractal.timestamp), value: Number(fractal.price) }],
-      extendData: { kind: fractal.kind, text: translate('czsc.unfinishedShort'), confirmed: false, color: '#d4a017' },
-      lock: true
-    }))
+    unfinished.forEach(fractal => {
+      const text = translate('czsc.unfinishedShort')
+      const timestamp = normalizeEpochMilliseconds(fractal.timestamp)
+      add({
+        name: 'czscFractal',
+        points: [{ timestamp, value: Number(fractal.price) }],
+        extendData: {
+          kind: fractal.kind,
+          text,
+          lane: annotationLayout.lanes.get(fractal) || 0,
+          confirmed: false,
+          color: '#d4a017'
+        },
+        lock: true
+      })
+    })
     const lastStroke = (result.strokes || [])[result.strokes.length - 1]
     const candidate = unfinished[unfinished.length - 1]
     if (lastStroke && candidate) {
@@ -175,13 +234,16 @@ export function renderCzscOverlays ({ chart, result, visibility, dark, marketCol
     ;(result.enhanced_signals || []).forEach(signal => {
       const mark = signal.chart_mark || {}
       if (!mark.timestamp || !mark.price) return
+      const text = mark.text || signal.signal_type_label || signal.signal_type
+      const timestamp = normalizeEpochMilliseconds(mark.timestamp)
       add({
         name: 'czscSignalMarker',
-        points: [{ timestamp: normalizeEpochMilliseconds(mark.timestamp), value: Number(mark.price) }],
+        points: [{ timestamp, value: Number(mark.price) }],
         extendData: {
-          text: mark.text || signal.signal_type_label || signal.signal_type,
+          text,
           color: mark.color,
-          position: mark.position
+          position: mark.position,
+          lane: annotationLayout.lanes.get(signal) || 0
         },
         lock: true
       })

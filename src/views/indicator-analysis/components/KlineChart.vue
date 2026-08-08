@@ -178,7 +178,8 @@ import { splitIndicatorPlotsByPane } from '@/utils/indicatorPlotGrouping'
 import { klineChartMarketStyles, marketPalette } from '@/utils/marketColors'
 import { usePyodide } from '@/services/pyodide/usePyodide'
 import { computeChartLayers } from '@/api/domain'
-import { clearCzscOverlays, registerCzscOverlays, renderCzscOverlays } from '@/utils/czscChartLayers'
+import { createChartAnnotationLaneAllocator } from '@/utils/chartAnnotationLayout'
+import { clearCzscOverlays, getCzscAnnotationLaneCount, registerCzscOverlays, renderCzscOverlays } from '@/utils/czscChartLayers'
 import {
   calculateSMA,
   calculateEMA,
@@ -668,6 +669,7 @@ export default {
         czscResult.value = response.data
         renderCurrentCzscLayers()
         setCzscState('ready')
+        nextTick(() => updateIndicators())
       } catch (error) {
         if (generation !== czscLoadGeneration) return
         czscResult.value = null
@@ -1745,7 +1747,9 @@ registerOverlay({
           ]
         }
 
-        const boxY = isBuy ? signalY : (signalY - boxHeight)
+        const lane = Math.max(0, Number(overlay.extendData?.lane) || 0)
+        const laneShift = lane * (boxHeight + 4)
+        const boxY = isBuy ? signalY + laneShift : (signalY - boxHeight - laneShift)
 
         const circleY = anchorY
         const lineStartY = circleY
@@ -1992,7 +1996,9 @@ registerOverlay({
         const x = coordinates[0].x
         const anchorRight = data.side === 'right' || lowerText.startsWith('regime')
         const rectX = anchorRight ? x + 8 : x - width / 2
-        const y = coordinates[0].y + (isAbove ? -height - 7 : 7)
+        const lane = Math.max(0, Number(data.lane) || 0)
+        const laneShift = lane * (height + 4)
+        const y = coordinates[0].y + (isAbove ? -height - 7 - laneShift : 7 + laneShift)
         return [
           {
             type: 'rect',
@@ -4213,7 +4219,7 @@ registerOverlay({
       }
     }
 
-    const renderIndicatorLayers = (layers, internalData) => {
+    const renderIndicatorLayers = (layers, internalData, allocateLane) => {
       if (!Array.isArray(layers) || !layers.length || !internalData.length) return
       const lastIndex = internalData.length - 1
 
@@ -4281,15 +4287,18 @@ registerOverlay({
           const timestamp = normalizeLayerTimestamp(layer.timestamp ?? layer.time ?? layer.index, internalData, layer.index ?? lastIndex)
           const price = normalizeLayerPrice(layer.price, layer.value, layer.y)
           if (timestamp == null || price == null) return
+          const text = layer.text || layer.name || ''
+          const side = layer.side || 'below'
           pushLayerOverlay({
             name: 'qdIndicatorLabel',
             points: [{ timestamp, value: price }],
             extendData: {
-              text: layer.text || layer.name || '',
+              text,
               color: layer.color,
               fillColor: layer.fillColor,
               borderColor: layer.borderColor,
-              side: layer.side,
+              side,
+              lane: allocateLane({ timestamp, side, text, fontSize: layer.fontSize }),
               fontSize: layer.fontSize,
               textColor: layer.textColor
             },
@@ -4299,7 +4308,7 @@ registerOverlay({
       })
     }
 
-    const renderIndicatorSignals = (signalPoints) => {
+    const renderIndicatorSignals = (signalPoints, allocateLane) => {
       if (!Array.isArray(signalPoints) || !signalPoints.length) return
       if (!chartRef.value || typeof chartRef.value.createOverlay !== 'function') return
 
@@ -4317,7 +4326,8 @@ registerOverlay({
               side: point.side,
               action: point.action,
               price: point.price,
-              rawPrice: point.rawPrice
+              rawPrice: point.rawPrice,
+              lane: allocateLane({ timestamp: point.timestamp, side: point.side, text: point.text })
             },
             lock: true
           }, 'candle_pane')
@@ -4349,6 +4359,16 @@ registerOverlay({
       addedIndicatorIds.value = []
       try {
       const internalData = convertToInternalFormat(klineData.value)
+      const czscLaneCount = props.czscEnabled && czscResult.value
+        ? getCzscAnnotationLaneCount({
+            result: czscResult.value,
+            visibility: props.czscVisibility,
+            translate: key => proxy.$t(key)
+          })
+        : 0
+      const allocateAnnotationLane = createChartAnnotationLaneAllocator(internalData, {
+        baseLane: czscLaneCount
+      })
       const mainPaneOverlayFigures = []
       const mainPaneOverlayCalcEntries = []
       const mainPaneOverlaySignatureParts = []
@@ -4424,8 +4444,8 @@ registerOverlay({
 
                 const renderResult = normalizeIndicatorRenderResult(result, internalData)
                 const allPlots = [...renderResult.plots]
-                renderIndicatorLayers(renderResult.layers, internalData)
-                renderIndicatorSignals(renderResult.signalPoints)
+                renderIndicatorLayers(renderResult.layers, internalData, allocateAnnotationLane)
+                renderIndicatorSignals(renderResult.signalPoints, allocateAnnotationLane)
 
                 if (allPlots.length > 0) {
                   const validPlots = allPlots.filter(plot => plot.data && Array.isArray(plot.data) && plot.data.length > 0)
@@ -4512,8 +4532,8 @@ registerOverlay({
 
                 const renderResult = normalizeIndicatorRenderResult(pythonResult, internalData)
                 const allPlots = [...renderResult.plots]
-                renderIndicatorLayers(renderResult.layers, internalData)
-                renderIndicatorSignals(renderResult.signalPoints)
+                renderIndicatorLayers(renderResult.layers, internalData, allocateAnnotationLane)
+                renderIndicatorSignals(renderResult.signalPoints, allocateAnnotationLane)
 
                 if (allPlots.length > 0) {
                   const validPlots = allPlots.filter(plot => plot.data && Array.isArray(plot.data) && plot.data.length > 0)
@@ -5154,11 +5174,13 @@ registerOverlay({
         czscContextKey = ''
         clearCzscLayerOverlays()
         setCzscState('idle')
+        nextTick(() => updateIndicators())
       }
     })
 
     watch(() => props.czscVisibility, () => {
       renderCurrentCzscLayers()
+      nextTick(() => updateIndicators())
     }, { deep: true })
 
     watch(() => props.realtimeEnabled, (newVal) => {
