@@ -33,6 +33,16 @@ test('indicator IDE no longer carries the retired execution-column conversion pr
   assert.doesNotMatch(indicatorIdeSource, /open_long\/open_short/)
 })
 
+test('hidden marketplace indicators never use browser-delivered source code', () => {
+  const start = indicatorIdeSource.indexOf('getIndicatorExecutableCode (indicator, codeOverride)')
+  const end = indicatorIdeSource.indexOf('extractIndicatorNameFromCode (code)', start)
+  const executableCodeSource = indicatorIdeSource.slice(start, end)
+
+  assert.ok(start >= 0 && end > start)
+  assert.match(executableCodeSource, /if \(this\.isIndicatorCodeHidden\(ind\)\) \{\s*return ''\s*\}/)
+  assert.doesNotMatch(executableCodeSource, /runtime_code|runtimeCode|run_code/)
+})
+
 test('initial left-edge layout events do not trigger history loading', () => {
   assert.match(
     klineChartSource,

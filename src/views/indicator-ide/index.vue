@@ -2179,7 +2179,7 @@ export default {
     getIndicatorExecutableCode (indicator, codeOverride) {
       const ind = indicator || {}
       if (this.isIndicatorCodeHidden(ind)) {
-        return String(ind.runtime_code || ind.runtimeCode || ind.run_code || '')
+        return ''
       }
       if (typeof codeOverride === 'string') return codeOverride
       if (Number(this.selectedIndicatorId) === Number(ind.id)) {
