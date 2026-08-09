@@ -5840,7 +5840,7 @@ const locale = {
   "indicatorIde.toolbar.watchlist": "Watchlist",
   "indicatorIde.toolbar.timeframe": "Timeframe",
   "indicatorIde.toolbar.indicator": "Indicator",
-  "indicatorIde.czsc.name": "CZSC Structure",
+  "indicatorIde.czsc.name": "Chan Structure (CZSC)",
   "indicatorIde.czsc.builtin": "Built-in",
   "indicatorIde.czsc.builtinIndicators": "Built-in indicators",
   "indicatorIde.czsc.customIndicators": "Custom indicators",

@@ -359,75 +359,85 @@
                     </div>
                     <div class="ide-toolbar-group ide-toolbar-group--indicator">
                       <span class="ide-toolbar-label">{{ $t('indicatorIde.toolbar.indicator') }}</span>
-                      <a-dropdown
-                        :trigger="['click']"
-                        placement="bottomLeft"
-                        :visible="indicatorDropdownVisible"
-                        :get-popup-container="chartToolbarGetPopupContainer"
-                        @visibleChange="onIndicatorDropdownVisibleChange"
-                        :overlay-class-name="isDarkTheme ? 'ide-indicator-multiselect-dropdown ide-indicator-multiselect-dropdown--dark' : 'ide-indicator-multiselect-dropdown'"
-                      >
-                        <a-button
-                          size="small"
-                          class="ide-toolbar-select ide-toolbar-select--indicator ide-indicator-multiselect-trigger"
-                          :loading="loadingIndicators"
+                      <div class="ide-indicator-toolbar-controls">
+                        <a-checkbox
+                          class="ide-czsc-toolbar-toggle"
+                          :checked="czscIndicatorEnabled"
+                          @change="e => setCzscIndicatorEnabled(e.target.checked)"
                         >
-                          <span class="ide-indicator-trigger-text">{{ indicatorToolbarSummary }}</span>
-                          <a-icon type="down" />
-                        </a-button>
-                        <div slot="overlay" class="ide-indicator-overlay" @mousedown.stop @click.stop>
-                          <div class="ide-indicator-overlay-hint">{{ $t('indicatorIde.chartPickHint') }}</div>
-                          <a-spin v-if="loadingIndicators" size="small" style="padding: 12px;" />
-                          <div v-else class="ide-indicator-overlay-list">
-                            <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.builtinIndicators') }}</div>
-                            <div class="ide-indicator-row ide-indicator-row--builtin">
-                              <a-checkbox
-                                :checked="czscIndicatorEnabled"
-                                @change="e => setCzscIndicatorEnabled(e.target.checked)"
-                              />
-                              <span class="ide-indicator-name" @click="setCzscIndicatorEnabled(!czscIndicatorEnabled)">
-                                {{ $t('indicatorIde.czsc.name') }}
-                              </span>
-                              <a-tag color="blue" class="ide-indicator-purchased-tag">{{ $t('indicatorIde.czsc.builtin') }}</a-tag>
-                              <a-spin v-if="czscLayerState.state === 'loading'" size="small" />
-                              <a-tooltip v-else-if="czscLayerState.state === 'error'" :title="czscLayerState.message">
-                                <a-icon type="warning" class="ide-czsc-warning" />
-                              </a-tooltip>
-                            </div>
-                            <div v-if="czscIndicatorEnabled" class="ide-czsc-layer-options">
-                              <a-checkbox v-model="czscLayerVisibility.fractals">{{ $t('trendChart.fractals') }}</a-checkbox>
-                              <a-checkbox v-model="czscLayerVisibility.strokes">{{ $t('trendChart.strokes') }}</a-checkbox>
-                              <a-checkbox v-model="czscLayerVisibility.unfinished">{{ $t('trendChart.unfinished') }}</a-checkbox>
-                              <a-checkbox v-model="czscLayerVisibility.signals">{{ $t('trendChart.signals') }}</a-checkbox>
-                              <a-button type="link" size="small" icon="branches" @click="openCzscMultiPeriod">
-                                {{ $t('indicatorIde.czsc.multiPeriod') }}
-                              </a-button>
-                            </div>
-                            <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.customIndicators') }}</div>
-                            <div v-if="!indicators.length" class="ide-indicator-overlay-empty">{{ $t('indicatorIde.noIndicatorsYet') }}</div>
-                            <div
-                              v-for="ind in indicators"
-                              :key="'ind-row-' + ind.id"
-                              class="ide-indicator-row"
-                            >
-                              <a-checkbox
-                                :checked="(chartVisibleIndicatorIds || []).some(x => Number(x) === Number(ind.id))"
-                                @change="e => onChartIndicatorCheckChange(ind.id, e.target.checked)"
-                              />
-                              <span
-                                class="ide-indicator-name"
-                                :class="{ active: Number(selectedIndicatorId) === Number(ind.id) }"
-                                @click="selectEditorIndicator(ind.id)"
-                              >{{ indicatorDisplayName(ind) }}</span>
-                              <a-tag
-                                v-if="Number(ind.is_buy) === 1"
-                                color="purple"
-                                class="ide-indicator-purchased-tag"
-                              >{{ $t('indicatorIde.purchasedBadge') }}</a-tag>
+                          <a-icon type="branches" />
+                          <span>{{ $t('indicatorIde.czsc.name') }}</span>
+                          <a-spin v-if="czscLayerState.state === 'loading'" size="small" />
+                          <a-tooltip v-else-if="czscLayerState.state === 'error'" :title="czscLayerState.message">
+                            <a-icon type="warning" class="ide-czsc-warning" />
+                          </a-tooltip>
+                        </a-checkbox>
+                        <a-dropdown
+                          :trigger="['click']"
+                          placement="bottomLeft"
+                          :visible="indicatorDropdownVisible"
+                          :get-popup-container="chartToolbarGetPopupContainer"
+                          @visibleChange="onIndicatorDropdownVisibleChange"
+                          :overlay-class-name="isDarkTheme ? 'ide-indicator-multiselect-dropdown ide-indicator-multiselect-dropdown--dark' : 'ide-indicator-multiselect-dropdown'"
+                        >
+                          <a-button
+                            size="small"
+                            class="ide-toolbar-select ide-toolbar-select--indicator ide-indicator-multiselect-trigger"
+                            :loading="loadingIndicators"
+                          >
+                            <span class="ide-indicator-trigger-text">{{ indicatorToolbarSummary }}</span>
+                            <a-icon type="down" />
+                          </a-button>
+                          <div slot="overlay" class="ide-indicator-overlay" @mousedown.stop @click.stop>
+                            <div class="ide-indicator-overlay-hint">{{ $t('indicatorIde.chartPickHint') }}</div>
+                            <a-spin v-if="loadingIndicators" size="small" style="padding: 12px;" />
+                            <div v-else class="ide-indicator-overlay-list">
+                              <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.builtinIndicators') }}</div>
+                              <div class="ide-indicator-row ide-indicator-row--builtin">
+                                <a-checkbox
+                                  :checked="czscIndicatorEnabled"
+                                  @change="e => setCzscIndicatorEnabled(e.target.checked)"
+                                />
+                                <span class="ide-indicator-name" @click="setCzscIndicatorEnabled(!czscIndicatorEnabled)">
+                                  {{ $t('indicatorIde.czsc.name') }}
+                                </span>
+                                <a-tag color="blue" class="ide-indicator-purchased-tag">{{ $t('indicatorIde.czsc.builtin') }}</a-tag>
+                              </div>
+                              <div v-if="czscIndicatorEnabled" class="ide-czsc-layer-options">
+                                <a-checkbox v-model="czscLayerVisibility.fractals">{{ $t('trendChart.fractals') }}</a-checkbox>
+                                <a-checkbox v-model="czscLayerVisibility.strokes">{{ $t('trendChart.strokes') }}</a-checkbox>
+                                <a-checkbox v-model="czscLayerVisibility.unfinished">{{ $t('trendChart.unfinished') }}</a-checkbox>
+                                <a-checkbox v-model="czscLayerVisibility.signals">{{ $t('trendChart.signals') }}</a-checkbox>
+                                <a-button type="link" size="small" icon="branches" @click="openCzscMultiPeriod">
+                                  {{ $t('indicatorIde.czsc.multiPeriod') }}
+                                </a-button>
+                              </div>
+                              <div class="ide-indicator-section-label">{{ $t('indicatorIde.czsc.customIndicators') }}</div>
+                              <div v-if="!indicators.length" class="ide-indicator-overlay-empty">{{ $t('indicatorIde.noIndicatorsYet') }}</div>
+                              <div
+                                v-for="ind in indicators"
+                                :key="'ind-row-' + ind.id"
+                                class="ide-indicator-row"
+                              >
+                                <a-checkbox
+                                  :checked="(chartVisibleIndicatorIds || []).some(x => Number(x) === Number(ind.id))"
+                                  @change="e => onChartIndicatorCheckChange(ind.id, e.target.checked)"
+                                />
+                                <span
+                                  class="ide-indicator-name"
+                                  :class="{ active: Number(selectedIndicatorId) === Number(ind.id) }"
+                                  @click="selectEditorIndicator(ind.id)"
+                                >{{ indicatorDisplayName(ind) }}</span>
+                                <a-tag
+                                  v-if="Number(ind.is_buy) === 1"
+                                  color="purple"
+                                  class="ide-indicator-purchased-tag"
+                                >{{ $t('indicatorIde.purchasedBadge') }}</a-tag>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </a-dropdown>
+                        </a-dropdown>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3802,6 +3812,34 @@ export default {
   align-items: center;
   row-gap: 6px;
 }
+.ide-indicator-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+.ide-czsc-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  height: 30px;
+  margin: 0;
+  padding: 0 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  white-space: nowrap;
+  ::v-deep .ant-checkbox + span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding-right: 0;
+  }
+}
 .ide-toolbar-group--params {
   min-width: 96px;
 }
@@ -5291,6 +5329,10 @@ body.dark .ide-signal-alert-modal-wrap {
         width: 100%;
         max-width: none;
       }
+      .ide-indicator-toolbar-controls .ant-dropdown-trigger {
+        flex: 1 1 auto;
+        min-width: 120px;
+      }
     }
   }
   .chart-panel-watchlist-select {
@@ -5892,6 +5934,11 @@ body.dark .ide-signal-alert-modal-wrap {
   }
   ::v-deep .ant-checkbox-wrapper { color: rgba(255,255,255,0.85); }
   ::v-deep .ant-checkbox-inner { background: #1f1f1f; border-color: #434343; }
+  .ide-czsc-toolbar-toggle {
+    background: #262626;
+    border-color: #434343;
+    color: rgba(255,255,255,0.85);
+  }
   ::v-deep .ant-btn-default { background: #1f1f1f; border-color: #434343; color: rgba(255,255,255,0.65); &:hover { border-color: var(--primary-color-active, #177ddc); color: var(--primary-color-active, #177ddc); } }
   ::v-deep .ant-table {
     background: transparent; color: rgba(255,255,255,0.85);

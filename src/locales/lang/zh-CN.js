@@ -5823,7 +5823,7 @@ const locale = {
   "indicatorIde.toolbar.watchlist": "自选标的",
   "indicatorIde.toolbar.timeframe": "K 线周期",
   "indicatorIde.toolbar.indicator": "指标",
-  "indicatorIde.czsc.name": "CZSC 走势",
+  "indicatorIde.czsc.name": "缠论走势（CZSC）",
   "indicatorIde.czsc.builtin": "内置",
   "indicatorIde.czsc.builtinIndicators": "内置指标",
   "indicatorIde.czsc.customIndicators": "自定义指标",
