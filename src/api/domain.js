@@ -276,3 +276,27 @@ export function createScreenPortfolioAccount (data) {
 export function rebalanceScreenPortfolioAccount (accountId, data) {
   return request({ url: `/api/v2/screens/portfolio-accounts/${encodeURIComponent(accountId)}/rebalance`, method: 'post', data, timeout: 30000 })
 }
+
+export function getAdvancedScreeningDashboard () {
+  return request({ url: '/api/v2/screens/advanced', method: 'get', timeout: 20000 })
+}
+
+export function bootstrapAdvancedScreening () {
+  return request({ url: '/api/v2/screens/advanced/bootstrap', method: 'post', timeout: 20000 })
+}
+
+export function runAdvancedScreenResearch (data) {
+  return request({ url: '/api/v2/screens/advanced/research', method: 'post', data, timeout: 60000 })
+}
+
+export function optimizeAdvancedScreenPortfolio (data) {
+  return request({ url: '/api/v2/screens/advanced/portfolio', method: 'post', data, timeout: 60000 })
+}
+
+export function explainAdvancedScreenCandidate (data) {
+  return request({ url: '/api/v2/screens/advanced/explain', method: 'post', data, timeout: 20000 })
+}
+
+export function queueAdvancedActiveLearning (data) {
+  return request({ url: '/api/v2/screens/advanced/active-learning', method: 'post', data, timeout: 20000 })
+}

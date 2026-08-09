@@ -62,6 +62,30 @@
           <h3>{{ $t('screenIntelligence.alerts') }}</h3>
           <a-list :data-source="center.alerts" size="small" bordered><a-list-item slot="renderItem" slot-scope="item"><a-tag :color="item.alert_type === 'removed' ? 'red' : 'green'">{{ item.alert_type }}</a-tag><b>{{ item.symbol || item.title }}</b><small>{{ formatDate(item.created_at) }}</small></a-list-item></a-list>
         </a-tab-pane>
+
+        <a-tab-pane key="production" :tab="$t('screenIntelligence.productionPlatform')">
+          <div class="production-head">
+            <a-alert
+              :type="advanced.readiness.ready ? 'success' : 'warning'"
+              show-icon
+              :message="$t(advanced.readiness.ready ? 'screenIntelligence.productionReady' : 'screenIntelligence.productionBlocked')"
+              :description="readinessDescription" />
+            <a-button icon="database" :loading="bootstrapping" @click="bootstrapPlatform">{{ $t('screenIntelligence.bootstrapData') }}</a-button>
+          </div>
+          <div class="coverage-grid">
+            <div v-for="(item, key) in advanced.readiness.coverage" :key="`advanced-${key}`">
+              <span>{{ coverageLabel(key) }}</span><b>{{ percent(item.ratio) }}</b><small>{{ Number(item.symbols || 0).toLocaleString() }} / {{ Number(item.expected || 0).toLocaleString() }}</small>
+            </div>
+          </div>
+          <h3>{{ $t('screenIntelligence.productionCapabilities') }}</h3>
+          <div class="capability-list"><a-tag v-for="item in advanced.capabilities" :key="item" color="blue">{{ capabilityLabel(item) }}</a-tag></div>
+          <h3>{{ $t('screenIntelligence.modelDrift') }}</h3>
+          <a-table row-key="id" :columns="driftColumns" :data-source="advanced.drift" :pagination="{ pageSize: 6 }" size="small" />
+          <h3>{{ $t('screenIntelligence.activeLearning') }}</h3>
+          <a-list :data-source="advanced.active_learning" size="small" bordered>
+            <a-list-item slot="renderItem" slot-scope="item"><b>{{ item.symbol }}</b><a-tag color="orange">{{ Number(item.priority || 0).toFixed(3) }}</a-tag><small>{{ String(item.task_id || '').slice(-8) }}</small></a-list-item>
+          </a-list>
+        </a-tab-pane>
       </a-tabs>
     </a-spin>
 
@@ -77,6 +101,7 @@
 
 <script>
 import {
+  bootstrapAdvancedScreening,
   compareScreens,
   createScreenDailySummary,
   createScreenExperiment,
@@ -85,6 +110,7 @@ import {
   getScreenExperiment,
   getScreenFeedbackAnalytics,
   getScreenPersonalization,
+  getAdvancedScreeningDashboard,
   listScreenPlanLibrary,
   listScreenPlanVersions,
   syncScreenFundamentals
@@ -99,10 +125,12 @@ export default {
 summarizing: false,
       creatingExperiment: false,
       syncingFundamentals: false,
+      bootstrapping: false,
 activeTab: 'overview',
       center: { plans: [], schedules: [], portfolios: [], accounts: [], experiments: [], alerts: [], runs: [] },
       governance: { coverage: {}, issues: [] },
 personalization: {},
+advanced: { readiness: { ready: false, blockers: [], coverage: {} }, capabilities: [], models: [], drift: [], attributions: [], active_learning: [] },
 feedback: {},
 library: [],
       leftTask: '',
@@ -129,33 +157,43 @@ experimentReport: null,
         { title: this.$t('screenIntelligence.issue'), dataIndex: 'issue_code' },
         { title: this.$t('screenIntelligence.severity'), dataIndex: 'severity' },
         { title: this.$t('screenIntelligence.count'), dataIndex: 'count' }
+      ],
+      driftColumns: [
+        { title: this.$t('screenIntelligence.model'), dataIndex: 'model_key' },
+        { title: this.$t('screenIntelligence.metric'), dataIndex: 'metric_key' },
+        { title: this.$t('screenIntelligence.value'), dataIndex: 'value', customRender: value => Number(value || 0).toFixed(3) },
+        { title: this.$t('screenIntelligence.status'), dataIndex: 'status' }
       ]
     }
   },
   watch: { visible (value) { if (value) this.loadAll() } },
-  computed: {
-    openIssues () { return (this.governance.issues || []).reduce((sum, item) => sum + Number(item.count || 0), 0) },
-    governanceTone () { return this.openIssues ? 'orange' : 'green' }
-  },
   methods: {
     async loadAll () {
       this.loading = true
       try {
-        const [center, governance, personalization, feedback, library] = await Promise.all([getScreenDecisionCenter(), getScreenDataGovernance(), getScreenPersonalization(), getScreenFeedbackAnalytics(), listScreenPlanLibrary()])
+        const [center, governance, personalization, feedback, library, advanced] = await Promise.all([getScreenDecisionCenter(), getScreenDataGovernance(), getScreenPersonalization(), getScreenFeedbackAnalytics(), listScreenPlanLibrary(), getAdvancedScreeningDashboard()])
         this.center = center.data || this.center; this.governance = governance.data || this.governance
         this.personalization = personalization.data || {}; this.feedback = feedback.data || {}; this.library = library.data || []
+        this.advanced = advanced.data || this.advanced
       } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.loading = false }
     },
     async compareRuns () { try { const response = await compareScreens({ left_task_id: this.leftTask, right_task_id: this.rightTask }); this.comparison = response.data } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     async loadVersions (plan) { try { const response = await listScreenPlanVersions(plan.plan_key); this.versions = response.data || []; this.versionsVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     async createSummary () { this.summarizing = true; try { const response = await createScreenDailySummary(this.taskId); this.$message.success(this.$t('screenIntelligence.summaryCreated', { added: response.data.added.length, removed: response.data.removed.length })); await this.loadAll() } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.summarizing = false } },
     async syncFundamentals () { this.syncingFundamentals = true; try { await syncScreenFundamentals({ chunk_size: 50 }); this.$message.success(this.$t('screenIntelligence.fundamentalSyncQueued')) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.syncingFundamentals = false } },
+    async bootstrapPlatform () { this.bootstrapping = true; try { await bootstrapAdvancedScreening(); this.$message.success(this.$t('screenIntelligence.bootstrapQueued')); await this.loadAll() } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.bootstrapping = false } },
     async createExperiment () { this.creatingExperiment = true; try { await createScreenExperiment(this.experiment); this.experimentVisible = false; await this.loadAll() } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.creatingExperiment = false } },
     async loadExperiment (item) { try { const response = await getScreenExperiment(item.id); this.experimentReport = response.data } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     runLabel (run) { return `${String(run.task_id).slice(-8)} · ${run.status}` },
     coverageLabel (key) { return this.$t(`screenIntelligence.coverage.${key}`) },
+    capabilityLabel (key) { const value = `screenIntelligence.capability.${key}`; return this.$te(value) ? this.$t(value) : key.replace(/_/g, ' ') },
     formatDate (value) { return value ? new Date(value).toLocaleString() : '-' },
     percent (value) { return `${(Number(value || 0) * 100).toFixed(2)}%` }
+  },
+  computed: {
+    openIssues () { return (this.governance.issues || []).reduce((sum, item) => sum + Number(item.count || 0), 0) },
+    governanceTone () { return this.openIssues ? 'orange' : 'green' },
+    readinessDescription () { const blockers = (this.advanced.readiness && this.advanced.readiness.blockers) || []; return blockers.length ? this.$t('screenIntelligence.readinessBlockers', { blockers: blockers.join(', ') }) : this.$t('screenIntelligence.readinessPassed') }
   }
 }
 </script>
@@ -171,6 +209,8 @@ experimentReport: null,
 h3 { margin: 14px 0 8px; font-size: 13px; }
 .tab-action { margin-bottom: 10px; }
 .result-alert, .weight-list { margin-top: 12px; }
+.production-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; margin-bottom: 12px; }
+.capability-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .ant-timeline small, .ant-list-item small { display: block; margin-left: auto; color: #9ca3af; }
 .ant-modal .ant-select, .ant-modal .ant-input, .ant-modal .ant-input-number, .ant-modal .ant-alert { width: 100%; margin-bottom: 10px; }
 @media (max-width: 720px) { .metric-grid, .coverage-grid { grid-template-columns: 1fr 1fr; }.compare-row { align-items: stretch; flex-direction: column; }.compare-row .ant-select { width: 100%; }.center-toolbar { flex-wrap: wrap; } }
