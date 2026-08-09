@@ -39,3 +39,7 @@ test('data governance recognizes string object and array role payloads', () => {
   assert.match(workspace, /roles\.some/)
   assert.match(workspace, /adminRequired/)
 })
+
+test('workspace headings inherit readable light and dark theme text colors', () => {
+  assert.match(workspace, /h3 \{[^}]*color: inherit/)
+})

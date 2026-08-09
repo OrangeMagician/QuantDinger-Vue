@@ -171,7 +171,7 @@ capabilityCount () { return (this.dashboard.capabilities || []).length },
 .goal-wizard, .inbox-pane, .rule-canvas, .data-pane { padding: 10px; border: 1px solid #e5e7eb; }
 .goal-wizard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 8px; }
 .goal-wizard h3, .goal-wizard button { grid-column: 1 / -1; }.goal-wizard .ant-select, .goal-wizard .ant-input-number { width: 100%; }
-h3 { margin: 0; font-size: 13px; }.inbox-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+h3 { margin: 0; color: inherit; font-size: 13px; }.inbox-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rule-canvas { margin-top: 10px; }.rule-track { display: flex; gap: 8px; margin-top: 9px; overflow-x: auto; }
 .rule-node { display: grid; flex: 0 0 180px; grid-template-columns: 24px 1fr; padding: 8px; border: 1px solid #d9d9d9; gap: 2px 6px; }
 .rule-node > span { display: grid; width: 22px; height: 22px; border-radius: 50%; background: #1677ff; color: #fff; place-items: center; grid-row: 1 / 3; }.rule-node small { color: #6b7280; }.rule-node > div { grid-column: 1 / -1; text-align: right; }
