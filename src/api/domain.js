@@ -300,3 +300,91 @@ export function explainAdvancedScreenCandidate (data) {
 export function queueAdvancedActiveLearning (data) {
   return request({ url: '/api/v2/screens/advanced/active-learning', method: 'post', data, timeout: 20000 })
 }
+
+export function getEnterpriseScreeningDashboard () {
+  return request({ url: '/api/v2/screens/enterprise', method: 'get', timeout: 30000 })
+}
+
+export function manageEnterpriseProviders (data) {
+  return request({ url: '/api/v2/screens/enterprise/data/providers', method: data ? 'post' : 'get', data, timeout: 20000 })
+}
+
+export function createEnterpriseIngestionJob (data) {
+  return request({ url: '/api/v2/screens/enterprise/data/jobs', method: 'post', data, timeout: 20000 })
+}
+
+export function repairEnterpriseData (data) {
+  return request({ url: '/api/v2/screens/enterprise/data/repair', method: 'post', data, timeout: 20000 })
+}
+
+export function validateEnterpriseRuleTree (conditionTree) {
+  return request({ url: '/api/v2/screens/enterprise/rules/validate', method: 'post', data: { condition_tree: conditionTree }, timeout: 20000 })
+}
+
+export function runEnterpriseFormula (data) {
+  return request({ url: '/api/v2/screens/enterprise/formulas', method: 'post', data, timeout: 20000 })
+}
+
+export function compileEnterpriseCopilot (query, context = {}) {
+  return request({ url: '/api/v2/screens/enterprise/copilot', method: 'post', data: { query, context }, timeout: 20000 })
+}
+
+export function exploreEnterpriseResults (taskId, data = {}) {
+  return request({ url: `/api/v2/screens/enterprise/results/${encodeURIComponent(taskId)}`, method: 'post', data, timeout: 30000 })
+}
+
+export function manageEnterpriseViews (data) {
+  return request({ url: '/api/v2/screens/enterprise/views', method: data ? 'post' : 'get', data, timeout: 20000 })
+}
+
+export function diffEnterprisePlans (data) {
+  return request({ url: '/api/v2/screens/enterprise/plan-diff', method: 'post', data, timeout: 20000 })
+}
+
+export function getEnterpriseCandidate (symbol) {
+  return request({ url: `/api/v2/screens/enterprise/candidates/${encodeURIComponent(symbol)}`, method: 'get', timeout: 30000 })
+}
+
+export function visualizeEnterpriseFactors (data) {
+  return request({ url: '/api/v2/screens/enterprise/visualize', method: 'post', data, timeout: 30000 })
+}
+
+export function runEnterpriseResearch (data) {
+  return request({ url: '/api/v2/screens/enterprise/research', method: 'post', data, timeout: 120000 })
+}
+
+export function runEnterprisePortfolio (data) {
+  return request({ url: '/api/v2/screens/enterprise/portfolio', method: 'post', data, timeout: 120000 })
+}
+
+export function runEnterpriseMonitor (data) {
+  return request({ url: '/api/v2/screens/enterprise/monitor', method: 'post', data, timeout: 30000 })
+}
+
+export function manageEnterpriseAlerts (data) {
+  return request({ url: '/api/v2/screens/enterprise/alerts', method: data ? 'post' : 'get', data, timeout: 30000 })
+}
+
+export function manageEnterpriseLabels (data, params = {}) {
+  return request({ url: '/api/v2/screens/enterprise/labels', method: data ? 'post' : 'get', data, params, timeout: 30000 })
+}
+
+export function approveEnterpriseModel (modelId, data) {
+  return request({ url: `/api/v2/screens/enterprise/models/${encodeURIComponent(modelId)}/approval`, method: 'post', data, timeout: 20000 })
+}
+
+export function manageEnterpriseCollaboration (data) {
+  return request({ url: '/api/v2/screens/enterprise/collaboration', method: data ? 'post' : 'get', data, timeout: 20000 })
+}
+
+export function createEnterpriseReport (data) {
+  return request({ url: '/api/v2/screens/enterprise/reports', method: 'post', data, timeout: 30000 })
+}
+
+export function getEnterpriseObservability () {
+  return request({ url: '/api/v2/screens/enterprise/observability', method: 'get', timeout: 30000 })
+}
+
+export function manageEnterprisePlugins (data) {
+  return request({ url: '/api/v2/screens/enterprise/plugins', method: data ? 'post' : 'get', data, timeout: 20000 })
+}

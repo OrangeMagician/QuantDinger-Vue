@@ -27,6 +27,12 @@
       @update-portfolio="portfolio = $event"
     />
 
+    <enterprise-screening-workbench
+      :task="task"
+      :rows="displayRows"
+      :selected-rows="selectedRows"
+    />
+
     <div class="screener-layout">
       <aside class="config-panel">
         <div class="section-title section-title--first"><h2>{{ $t('marketScreener.universe') }}</h2></div>
@@ -281,6 +287,7 @@
 import { mapState } from 'vuex'
 import { addWatchlist, getWatchlist } from '@/api/market'
 import { getUniverses } from '@/api/universe'
+import EnterpriseScreeningWorkbench from './EnterpriseScreeningWorkbench.vue'
 import ScreeningIntelligencePanel from './ScreeningIntelligencePanel.vue'
 import { watchResearchTask } from '@/utils/researchTaskStream'
 import {
@@ -306,7 +313,7 @@ import {
 
 export default {
   name: 'MarketScreener',
-  components: { ScreeningIntelligencePanel },
+  components: { EnterpriseScreeningWorkbench, ScreeningIntelligencePanel },
   data () {
     return {
       loadingCatalog: false,
