@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 const screenerPath = fileURLToPath(new URL('../../src/views/market-screener/index.vue', import.meta.url))
 const screener = fs.readFileSync(screenerPath, 'utf8')
+const domainApiPath = fileURLToPath(new URL('../../src/api/domain.js', import.meta.url))
+const domainApi = fs.readFileSync(domainApiPath, 'utf8')
 const editorPath = fileURLToPath(new URL('../../src/views/strategy-center/components/LiveStrategyEditor.vue', import.meta.url))
 const editor = fs.readFileSync(editorPath, 'utf8')
 
@@ -35,6 +37,8 @@ test('stock screener groups and searches A-share industries and market themes', 
   assert.match(screener, /marketScreener\.industryGroup/)
   assert.match(screener, /filterClassificationOption/)
   assert.match(screener, /optionData\.classifications/)
+  assert.match(screener, /marketScreener\.classificationLoading/)
+  assert.match(domainApi, /stock-pools\/options'[\s\S]*timeout: 60000/)
 })
 
 test('live strategy editor shows the concrete source compilation error', () => {

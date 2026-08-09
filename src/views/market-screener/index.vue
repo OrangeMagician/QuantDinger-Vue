@@ -27,8 +27,10 @@
               mode="multiple"
               allow-clear
               show-search
+              :loading="loadingCatalog"
               :max-tag-count="2"
               :placeholder="$t('marketScreener.classificationPlaceholder')"
+              :not-found-content="loadingCatalog ? $t('marketScreener.classificationLoading') : undefined"
               :filter-option="filterClassificationOption"
             >
               <a-select-opt-group

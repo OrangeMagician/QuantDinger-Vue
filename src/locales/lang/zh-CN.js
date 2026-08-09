@@ -7152,6 +7152,7 @@ export default {
   "marketScreener.concepts": "概念题材",
   "marketScreener.industryGroup": "行业",
   "marketScreener.classificationPlaceholder": "搜索 PCB、光模块、AI 应用等板块",
+  "marketScreener.classificationLoading": "正在加载行业与概念题材",
   "marketScreener.conditions": "筛选条件",
   "marketScreener.addCondition": "添加条件",
   "marketScreener.removeCondition": "删除条件",

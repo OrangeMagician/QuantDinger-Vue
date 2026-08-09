@@ -7364,6 +7364,7 @@ export default {
   "marketScreener.concepts": "Market themes",
   "marketScreener.industryGroup": "Industries",
   "marketScreener.classificationPlaceholder": "Search PCB, optical modules, AI applications, etc.",
+  "marketScreener.classificationLoading": "Loading industries and market themes",
   "marketScreener.conditions": "Conditions",
   "marketScreener.addCondition": "Add condition",
   "marketScreener.removeCondition": "Remove condition",

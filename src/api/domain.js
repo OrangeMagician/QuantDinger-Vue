@@ -86,7 +86,7 @@ export function evaluateSignalGraph (data) {
 }
 
 export function getStockPoolOptions () {
-  return request({ url: '/api/v2/stock-pools/options', method: 'get', timeout: 20000 })
+  return request({ url: '/api/v2/stock-pools/options', method: 'get', timeout: 60000 })
 }
 
 export function createScreen (data, idempotencyKey) {
