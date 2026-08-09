@@ -29,6 +29,14 @@ test('stock screener labels run settings instead of exposing internal codes', ()
   assert.match(screener, /marketScreener\.barLimit/)
 })
 
+test('stock screener groups and searches A-share industries and market themes', () => {
+  assert.match(screener, /classificationGroups/)
+  assert.match(screener, /marketScreener\.concepts/)
+  assert.match(screener, /marketScreener\.industryGroup/)
+  assert.match(screener, /filterClassificationOption/)
+  assert.match(screener, /optionData\.classifications/)
+})
+
 test('live strategy editor shows the concrete source compilation error', () => {
   assert.match(editor, /:description="sourceContractErrorMessage \|\| \$t\('strategyV2\.compileFailedHint'\)"/)
   assert.match(editor, /contractResult\.error\.backendMessage/)

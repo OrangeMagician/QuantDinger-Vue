@@ -22,8 +22,27 @@
           <label><a-checkbox v-model="pool.exclude_st" />{{ $t('marketScreener.excludeSt') }}</label>
           <label><span>{{ $t('marketScreener.poolLimit') }}</span><a-input-number v-model="pool.pool_limit" :min="1" :max="100" /></label>
           <label><span>{{ $t('marketScreener.industries') }}</span>
-            <a-select v-model="pool.industries" mode="multiple" allow-clear :max-tag-count="2">
-              <a-select-option v-for="item in industries" :key="item" :value="item">{{ item }}</a-select-option>
+            <a-select
+              v-model="pool.industries"
+              mode="multiple"
+              allow-clear
+              show-search
+              :max-tag-count="2"
+              :placeholder="$t('marketScreener.classificationPlaceholder')"
+              :filter-option="filterClassificationOption"
+            >
+              <a-select-opt-group
+                v-for="group in classificationGroups"
+                :key="group.key"
+                :label="group.label"
+              >
+                <a-select-option
+                  v-for="item in group.items"
+                  :key="item.value"
+                  :value="item.value"
+                  :title="classificationSearchText(item)"
+                >{{ item.label }}</a-select-option>
+              </a-select-opt-group>
             </a-select>
           </label>
         </div>
@@ -112,7 +131,7 @@ export default {
       loadingCatalog: false,
       running: false,
       catalog: {},
-      industries: [],
+      classifications: [],
       watchlistSymbols: [],
       universeMode: 'watchlist',
       manualSymbols: '',
@@ -149,6 +168,17 @@ export default {
         label: this.catalogItemLabel(item)
       })))
     },
+    classificationGroups () {
+      const groups = [
+        { key: 'concept', label: this.$t('marketScreener.concepts'), items: [] },
+        { key: 'industry', label: this.$t('marketScreener.industryGroup'), items: [] }
+      ]
+      for (const item of this.classifications) {
+        const group = groups.find(row => row.key === item.group) || groups[1]
+        group.items.push(item)
+      }
+      return groups.filter(group => group.items.length)
+    },
     manualSymbolList () {
       return [...new Set(this.manualSymbols.split(/[\s,;]+/).map(item => item.trim().toUpperCase()).filter(Boolean))].slice(0, 100)
     },
@@ -169,7 +199,11 @@ export default {
       try {
         const [catalog, options, watchlist] = await Promise.all([getFactorCatalog(), getStockPoolOptions(), getWatchlist()])
         this.catalog = catalog.data || {}
-        this.industries = (options.data && options.data.industries) || []
+        const optionData = options.data || {}
+        const classifications = Array.isArray(optionData.classifications) ? optionData.classifications : []
+        this.classifications = classifications.length
+          ? classifications
+          : (optionData.industries || []).map(item => ({ value: item, label: item, group: 'industry', aliases: [] }))
         const rows = Array.isArray(watchlist.data) ? watchlist.data : []
         this.watchlistSymbols = rows.filter(item => item.market === 'CNStock').map(item => this.normalizeSymbol(item.symbol))
         if (!this.conditions.length && this.catalogItems.length) this.addCondition()
@@ -185,6 +219,13 @@ export default {
       const code = raw.replace(/\D/g, '').slice(0, 6)
       if (!code) return raw
       return `${code}.${code.startsWith('6') ? 'SH' : code.startsWith('8') || code.startsWith('4') ? 'BJ' : 'SZ'}`
+    },
+    classificationSearchText (item) {
+      return [item.label, ...(item.aliases || [])].filter(Boolean).join(' ')
+    },
+    filterClassificationOption (input, option) {
+      const props = (option && option.componentOptions && option.componentOptions.propsData) || {}
+      return String(props.title || props.value || '').toLowerCase().includes(String(input || '').trim().toLowerCase())
     },
     addCondition () {
       const first = this.catalogItems[0]
