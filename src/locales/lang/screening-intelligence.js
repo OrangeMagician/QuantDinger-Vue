@@ -37,7 +37,76 @@ const en = {
   'screenIntelligence.pipelineTrack': 'Track',
   'screenIntelligence.pointInTimeUniverse': 'Point-in-time universe',
   'screenIntelligence.currentMarketUniverse': 'Current active market (default)',
-  'screenIntelligence.asOfDate': 'Universe as-of date'
+  'screenIntelligence.asOfDate': 'Universe as-of date',
+  'screenIntelligence.decisionCenter': 'Decision center',
+  'screenIntelligence.dailySummary': 'Create daily summary',
+  'screenIntelligence.governanceStatus': '{count} open data issues',
+  'screenIntelligence.overview': 'Overview',
+  'screenIntelligence.plans': 'Plans',
+  'screenIntelligence.runs': 'Runs',
+  'screenIntelligence.savedPortfolios': 'Saved portfolios',
+  'screenIntelligence.experiments': 'Experiments',
+  'screenIntelligence.recentRuns': 'Recent screening runs',
+  'screenIntelligence.leftRun': 'Baseline run',
+  'screenIntelligence.rightRun': 'Comparison run',
+  'screenIntelligence.compare': 'Compare',
+  'screenIntelligence.compareResult': '{added} added, {removed} removed, {common} unchanged',
+  'screenIntelligence.versions': 'Versions',
+  'screenIntelligence.dataFoundation': 'Data foundation',
+  'screenIntelligence.symbolCoverage': 'symbols covered',
+  'screenIntelligence.openDataIssues': '{count} reconciliation issues require attention',
+  'screenIntelligence.noDataIssues': 'No open reconciliation issues',
+  'screenIntelligence.newExperiment': 'New shadow experiment',
+  'screenIntelligence.report': 'Report',
+  'screenIntelligence.experimentResult': '{runs} runs, challenger excess return {excess}',
+  'screenIntelligence.manualPromotion': 'Promotion always requires a human decision.',
+  'screenIntelligence.personalization': 'Feedback and alerts',
+  'screenIntelligence.preferenceReady': 'Preference model is ready from {samples} labels',
+  'screenIntelligence.preferenceNeedsSamples': '{samples} labels collected; {needed} more required before learning',
+  'screenIntelligence.alerts': 'Differential alerts',
+  'screenIntelligence.experimentName': 'Experiment name',
+  'screenIntelligence.champion': 'Champion plan',
+  'screenIntelligence.challenger': 'Challenger plan',
+  'screenIntelligence.shadowOnly': 'Both plans run in shadow mode. The system never replaces production automatically.',
+  'screenIntelligence.runId': 'Run',
+  'screenIntelligence.status': 'Status',
+  'screenIntelligence.created': 'Created',
+  'screenIntelligence.plan': 'Plan',
+  'screenIntelligence.version': 'Version',
+  'screenIntelligence.access': 'Access',
+  'screenIntelligence.dataset': 'Dataset',
+  'screenIntelligence.issue': 'Issue',
+  'screenIntelligence.severity': 'Severity',
+  'screenIntelligence.count': 'Count',
+  'screenIntelligence.summaryCreated': 'Summary created: {added} additions and {removed} removals',
+  'screenIntelligence.coverage.fundamentals': 'Point-in-time fundamentals',
+  'screenIntelligence.coverage.corporate_actions': 'Corporate actions',
+  'screenIntelligence.coverage.trading_status': 'Trading status history',
+  'screenIntelligence.coverage.lifecycle': 'Listing lifecycle',
+  'screenIntelligence.candidateTimeline': 'Candidate research timeline',
+  'screenIntelligence.noTimeline': 'No prior screening or event history',
+  'screenIntelligence.selected': 'Selected',
+  'screenIntelligence.notSelected': 'Not selected'
+  , 'screenIntelligence.manualReviewRequired': 'Manual review required'
+  , 'screenIntelligence.optimizeRisk': 'Risk optimize'
+  , 'screenIntelligence.startSimulation': 'Start simulation'
+  , 'screenIntelligence.expectedVolatility': 'Expected volatility'
+  , 'screenIntelligence.turnover': 'Turnover'
+  , 'screenIntelligence.estimatedCost': 'Estimated cost'
+  , 'screenIntelligence.scenario': 'Scenario'
+  , 'screenIntelligence.portfolioLoss': 'Portfolio loss'
+  , 'screenIntelligence.liquidatableWeight': 'Liquidatable weight'
+  , 'screenIntelligence.exitDays': 'Exit days'
+  , 'screenIntelligence.cannotExit': 'Cannot exit'
+  , 'screenIntelligence.simulation': 'Screen simulation'
+  , 'screenIntelligence.simulationStarted': 'Simulation started with {orders} orders'
+  , 'screenIntelligence.researchDiagnostics': 'Research robustness'
+  , 'screenIntelligence.deflatedSharpeProbability': 'Deflated Sharpe probability'
+  , 'screenIntelligence.fdrAccepted': 'FDR-significant factors'
+  , 'screenIntelligence.factorClusters': 'Factor clusters'
+  , 'screenIntelligence.purgedSamples': 'Purged and embargoed samples'
+  , 'screenIntelligence.syncFundamentals': 'Sync A-share fundamentals'
+  , 'screenIntelligence.fundamentalSyncQueued': 'Full-market point-in-time fundamental sync queued'
 }
 
 const zhCN = {
@@ -79,7 +148,76 @@ const zhCN = {
   'screenIntelligence.pipelineTrack': '跟踪',
   'screenIntelligence.pointInTimeUniverse': '时点化股票池',
   'screenIntelligence.currentMarketUniverse': '当前活跃市场（默认）',
-  'screenIntelligence.asOfDate': '股票池时点日期'
+  'screenIntelligence.asOfDate': '股票池时点日期',
+  'screenIntelligence.decisionCenter': '选股决策中心',
+  'screenIntelligence.dailySummary': '生成每日摘要',
+  'screenIntelligence.governanceStatus': '{count} 个待处理数据问题',
+  'screenIntelligence.overview': '总览',
+  'screenIntelligence.plans': '方案',
+  'screenIntelligence.runs': '运行',
+  'screenIntelligence.savedPortfolios': '已存组合',
+  'screenIntelligence.experiments': '实验',
+  'screenIntelligence.recentRuns': '最近选股运行',
+  'screenIntelligence.leftRun': '基准运行',
+  'screenIntelligence.rightRun': '对比运行',
+  'screenIntelligence.compare': '对比',
+  'screenIntelligence.compareResult': '新增 {added}、移除 {removed}、保持 {common}',
+  'screenIntelligence.versions': '版本记录',
+  'screenIntelligence.dataFoundation': '数据底座',
+  'screenIntelligence.symbolCoverage': '只标的已覆盖',
+  'screenIntelligence.openDataIssues': '有 {count} 个对账问题需要处理',
+  'screenIntelligence.noDataIssues': '当前没有待处理对账问题',
+  'screenIntelligence.newExperiment': '新建影子实验',
+  'screenIntelligence.report': '报告',
+  'screenIntelligence.experimentResult': '已运行 {runs} 次，挑战方案超额收益 {excess}',
+  'screenIntelligence.manualPromotion': '方案晋级始终需要人工确认。',
+  'screenIntelligence.personalization': '反馈与告警',
+  'screenIntelligence.preferenceReady': '已根据 {samples} 条标注生成偏好模型',
+  'screenIntelligence.preferenceNeedsSamples': '已有 {samples} 条标注，还需 {needed} 条才会开始学习',
+  'screenIntelligence.alerts': '差异化告警',
+  'screenIntelligence.experimentName': '实验名称',
+  'screenIntelligence.champion': '主方案',
+  'screenIntelligence.challenger': '挑战方案',
+  'screenIntelligence.shadowOnly': '两个方案只进行影子运行，系统不会自动替换生产方案。',
+  'screenIntelligence.runId': '运行',
+  'screenIntelligence.status': '状态',
+  'screenIntelligence.created': '创建时间',
+  'screenIntelligence.plan': '方案',
+  'screenIntelligence.version': '版本',
+  'screenIntelligence.access': '权限',
+  'screenIntelligence.dataset': '数据集',
+  'screenIntelligence.issue': '问题',
+  'screenIntelligence.severity': '等级',
+  'screenIntelligence.count': '数量',
+  'screenIntelligence.summaryCreated': '摘要已生成：新增 {added}、移除 {removed}',
+  'screenIntelligence.coverage.fundamentals': '时点财务',
+  'screenIntelligence.coverage.corporate_actions': '公司行为',
+  'screenIntelligence.coverage.trading_status': '历史交易状态',
+  'screenIntelligence.coverage.lifecycle': '上市生命周期',
+  'screenIntelligence.candidateTimeline': '候选股研究时间轴',
+  'screenIntelligence.noTimeline': '暂无历史选股或事件记录',
+  'screenIntelligence.selected': '入选',
+  'screenIntelligence.notSelected': '未入选'
+  , 'screenIntelligence.manualReviewRequired': '需要人工审核'
+  , 'screenIntelligence.optimizeRisk': '风险优化'
+  , 'screenIntelligence.startSimulation': '建立模拟组合'
+  , 'screenIntelligence.expectedVolatility': '预期波动率'
+  , 'screenIntelligence.turnover': '换手率'
+  , 'screenIntelligence.estimatedCost': '预计成本'
+  , 'screenIntelligence.scenario': '压力情景'
+  , 'screenIntelligence.portfolioLoss': '组合损失'
+  , 'screenIntelligence.liquidatableWeight': '可变现权重'
+  , 'screenIntelligence.exitDays': '退出天数'
+  , 'screenIntelligence.cannotExit': '无法退出'
+  , 'screenIntelligence.simulation': '选股模拟组合'
+  , 'screenIntelligence.simulationStarted': '模拟组合已生成 {orders} 笔订单'
+  , 'screenIntelligence.researchDiagnostics': '研究稳健性'
+  , 'screenIntelligence.deflatedSharpeProbability': '校正夏普概率'
+  , 'screenIntelligence.fdrAccepted': 'FDR 显著因子'
+  , 'screenIntelligence.factorClusters': '因子簇'
+  , 'screenIntelligence.purgedSamples': '清除与隔离样本'
+  , 'screenIntelligence.syncFundamentals': '同步 A 股财务数据'
+  , 'screenIntelligence.fundamentalSyncQueued': '全市场时点财务同步已进入队列'
 }
 
 export default {

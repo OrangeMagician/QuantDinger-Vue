@@ -228,3 +228,51 @@ export function compareScreens (params) {
 export function getScreenEvents (taskId, params = {}) {
   return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/events`, method: 'get', params, timeout: 20000 })
 }
+
+export function getScreenDecisionCenter () {
+  return request({ url: '/api/v2/screens/decision-center', method: 'get', timeout: 20000 })
+}
+
+export function getScreenDataGovernance () {
+  return request({ url: '/api/v2/screens/data-governance', method: 'get', timeout: 20000 })
+}
+
+export function syncScreenFundamentals (data = {}) {
+  return request({ url: '/api/v2/screens/data-governance/fundamentals/sync', method: 'post', data, timeout: 15000 })
+}
+
+export function ingestScreenDataset (dataset, data) {
+  return request({ url: `/api/v2/screens/data-governance/${encodeURIComponent(dataset)}/ingest`, method: 'post', data, timeout: 60000 })
+}
+
+export function getScreenCandidateTimeline (symbol) {
+  return request({ url: `/api/v2/screens/candidates/${encodeURIComponent(symbol)}/timeline`, method: 'get', timeout: 20000 })
+}
+
+export function createScreenDailySummary (taskId) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/daily-summary`, method: 'post', timeout: 20000 })
+}
+
+export function getScreenPersonalization () {
+  return request({ url: '/api/v2/screens/personalization', method: 'get', timeout: 15000 })
+}
+
+export function createScreenExperiment (data) {
+  return request({ url: '/api/v2/screens/experiments', method: 'post', data, timeout: 15000 })
+}
+
+export function getScreenExperiment (experimentId) {
+  return request({ url: `/api/v2/screens/experiments/${encodeURIComponent(experimentId)}`, method: 'get', timeout: 15000 })
+}
+
+export function optimizeScreenPortfolio (data) {
+  return request({ url: '/api/v2/screens/portfolio-optimize', method: 'post', data, timeout: 30000 })
+}
+
+export function createScreenPortfolioAccount (data) {
+  return request({ url: '/api/v2/screens/portfolio-accounts', method: 'post', data, timeout: 15000 })
+}
+
+export function rebalanceScreenPortfolioAccount (accountId, data) {
+  return request({ url: `/api/v2/screens/portfolio-accounts/${encodeURIComponent(accountId)}/rebalance`, method: 'post', data, timeout: 30000 })
+}

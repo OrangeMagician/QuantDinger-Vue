@@ -27,6 +27,7 @@
       <label><span>{{ $t('screenIntelligence.capital') }}</span><a-input-number :value="portfolio.capital" :min="10000" :max="1000000000" :step="100000" @change="value => updatePortfolio('capital', value)" /></label>
       <label><span>{{ $t('screenIntelligence.participationRate') }}</span><a-input-number :value="portfolio.participation_rate" :min="0.001" :max="0.5" :step="0.01" @change="value => updatePortfolio('participation_rate', value)" /></label>
       <a-button icon="pie-chart" :disabled="!task || task.status !== 'SUCCEEDED'" :loading="savingPortfolio" @click="savePortfolio">{{ $t('screenIntelligence.savePortfolio') }}</a-button>
+      <a-button icon="dashboard" @click="decisionCenterVisible = true">{{ $t('screenIntelligence.decisionCenter') }}</a-button>
       <a-popover placement="bottomRight" trigger="click">
         <div slot="content" class="schedule-popover">
           <label><span>{{ $t('screenIntelligence.runTime') }}</span><a-time-picker v-model="scheduleTime" format="HH:mm" value-format="HH:mm" :minute-step="5" /></label>
@@ -43,6 +44,7 @@
       <span><b>{{ proposedHoldings.length }}</b>{{ $t('screenIntelligence.portfolio') }}</span>
       <div class="holding-strip"><a-tag v-for="item in proposedHoldings.slice(0, 10)" :key="item.symbol">{{ item.symbol }} {{ percent(item.target_weight) }}</a-tag></div>
     </div>
+    <decision-center-drawer :visible="decisionCenterVisible" :task-id="task ? task.task_id : ''" @close="decisionCenterVisible = false" />
   </section>
 </template>
 
@@ -53,9 +55,11 @@ import {
   getScreenDataQuality,
   saveScreenSchedule
 } from '@/api/domain'
+import DecisionCenterDrawer from './DecisionCenterDrawer.vue'
 
 export default {
   name: 'ScreeningIntelligencePanel',
+  components: { DecisionCenterDrawer },
   props: {
     task: { type: Object, default: null },
     result: { type: Object, default: null },
@@ -72,7 +76,8 @@ export default {
       portfolioSaved: false,
       quality: {},
       scheduleTime: '16:30',
-      scheduleEnabled: true
+      scheduleEnabled: true,
+      decisionCenterVisible: false
     }
   },
   computed: {

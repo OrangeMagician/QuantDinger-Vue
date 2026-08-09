@@ -229,7 +229,30 @@
         :pagination="false"
         size="small"
       />
-      <a-empty v-else :description="$t('marketScreener.noValidationSamples')" />
+      <a-collapse v-if="validationResult && validationResult.research_diagnostics" class="research-diagnostics">
+        <a-collapse-panel key="research" :header="$t('screenIntelligence.researchDiagnostics')">
+          <div class="diagnostic-strip">
+            <span><b>{{ percent((((researchDiagnostics || {}).deflated_sharpe || {}).probability)) }}</b>{{ $t('screenIntelligence.deflatedSharpeProbability') }}</span>
+            <span><b>{{ ((researchDiagnostics.multiple_testing || {}).accepted || []).length }}</b>{{ $t('screenIntelligence.fdrAccepted') }}</span>
+            <span><b>{{ (researchDiagnostics.clusters || []).length }}</b>{{ $t('screenIntelligence.factorClusters') }}</span>
+            <span><b>{{ purgeSamples }}</b>{{ $t('screenIntelligence.purgedSamples') }}</span>
+          </div>
+          <div class="weight-tags"><a-tag v-for="(value, key) in (researchDiagnostics.stable_weights || {})" :key="key">{{ key }} {{ Number(value).toFixed(3) }}</a-tag></div>
+        </a-collapse-panel>
+      </a-collapse>
+      <div v-if="validationResult" class="validation-actions">
+        <a-button type="primary" icon="sliders" :loading="optimizing" @click="optimizeValidatedPortfolio">{{ $t('screenIntelligence.optimizeRisk') }}</a-button>
+        <a-button icon="account-book" :disabled="!optimizationResult" :loading="startingSimulation" @click="startPortfolioSimulation">{{ $t('screenIntelligence.startSimulation') }}</a-button>
+      </div>
+      <template v-if="optimizationResult">
+        <div class="optimization-summary">
+          <span><b>{{ percent((optimizationResult.risk || {}).expected_volatility) }}</b>{{ $t('screenIntelligence.expectedVolatility') }}</span>
+          <span><b>{{ percent((optimizationResult.costs || {}).turnover) }}</b>{{ $t('screenIntelligence.turnover') }}</span>
+          <span><b>{{ percent((optimizationResult.costs || {}).estimated_rate) }}</b>{{ $t('screenIntelligence.estimatedCost') }}</span>
+        </div>
+        <a-table row-key="name" :columns="stressColumns" :data-source="optimizationResult.stress_tests || []" :pagination="false" size="small" />
+      </template>
+      <a-empty v-if="!validationMetrics.length" :description="$t('marketScreener.noValidationSamples')" />
     </a-modal>
 
     <a-drawer :visible="detailVisible" :title="detailRow ? `${detailRow.symbol} ${detailRow.name || ''}` : ''" width="560" @close="detailVisible = false">
@@ -243,6 +266,11 @@
         <a-alert :type="detailRow.error ? 'error' : detailRow.passed ? 'success' : 'warning'" show-icon :message="detailRow.error || detailRow.explanation || $t('marketScreener.noExplanation')" />
         <h3>{{ $t('marketScreener.conditionDiagnosis') }}</h3>
         <a-list :data-source="detailRow.condition_results || []" size="small"><a-list-item slot="renderItem" slot-scope="item"><a-tag :color="conditionTagColor(item)">{{ item.matched ? $t('marketScreener.yes') : $t('marketScreener.no') }}</a-tag><b>{{ item.label }}</b><span>{{ conditionActual(item) }}</span></a-list-item></a-list>
+        <h3>{{ $t('screenIntelligence.candidateTimeline') }}</h3>
+        <a-spin :spinning="timelineLoading">
+          <a-timeline v-if="candidateTimeline.length"><a-timeline-item v-for="item in candidateTimeline" :key="`${item.kind}-${item.id || item.task_id}-${item.time}`" :color="item.color"><b>{{ item.title }}</b><p>{{ item.detail }}</p><small>{{ formatDate(item.time) }}</small></a-timeline-item></a-timeline>
+          <a-empty v-else :description="$t('screenIntelligence.noTimeline')" />
+        </a-spin>
         <router-link :to="chartRoute(detailRow)"><a-button type="primary" icon="line-chart">{{ $t('marketScreener.openChart') }}</a-button></router-link>
       </template>
     </a-drawer>
@@ -258,16 +286,20 @@ import { watchResearchTask } from '@/utils/researchTaskStream'
 import {
   cancelTask,
   createScreen,
+  createScreenPortfolioAccount,
   deleteScreenPlan,
   getFactorCatalog,
+  getScreenCandidateTimeline,
   getScreenHistory,
   getScreenRows,
   getStockPoolOptions,
   getTask,
   listScreenPlans,
+  optimizeScreenPortfolio,
   previewStockPool,
   saveScreenPlan,
   saveScreenFeedback,
+  rebalanceScreenPortfolioAccount,
   submitScreenReviewSignals,
   validateScreen
 } from '@/api/domain'
@@ -320,8 +352,13 @@ export default {
       validationVisible: false,
       validationTask: null,
       validationResult: null,
+      optimizing: false,
+      startingSimulation: false,
+      optimizationResult: null,
       detailVisible: false,
       detailRow: null,
+      timelineLoading: false,
+      timeline: { runs: [], events: [], signals: [] },
       columns: [
         { title: this.$t('marketScreener.symbol'), dataIndex: 'symbol', width: 145, scopedSlots: { customRender: 'symbol' } },
         { title: this.$t('marketScreener.matchScore'), dataIndex: 'match_score', width: 90, scopedSlots: { customRender: 'matchScore' } },
@@ -338,6 +375,12 @@ export default {
         { title: this.$t('marketScreener.medianReturn'), dataIndex: 'median_return' },
         { title: this.$t('marketScreener.winRate'), dataIndex: 'win_rate' },
         { title: this.$t('marketScreener.worstReturn'), dataIndex: 'worst_return' }
+      ],
+      stressColumns: [
+        { title: this.$t('screenIntelligence.scenario'), dataIndex: 'name' },
+        { title: this.$t('screenIntelligence.portfolioLoss'), dataIndex: 'portfolio_loss', customRender: value => this.percent(value) },
+        { title: this.$t('screenIntelligence.liquidatableWeight'), dataIndex: 'liquidatable_weight', customRender: value => this.percent(value) },
+        { title: this.$t('screenIntelligence.exitDays'), dataIndex: 'estimated_exit_days', customRender: value => value == null ? this.$t('screenIntelligence.cannotExit') : value }
       ]
     }
   },
@@ -357,6 +400,12 @@ export default {
         ['template_signal', this.$t('marketScreener.groupTemplate')]
       ]
       return definitions.map(([key, label]) => ({ key, label, items: this.catalogItems.filter(item => item.source === key) })).filter(group => group.items.length)
+    },
+    candidateTimeline () {
+      const runs = (this.timeline.runs || []).map(item => ({ kind: 'run', task_id: item.task_id, time: item.created_at, color: item.passed ? 'green' : 'gray', title: item.passed ? this.$t('screenIntelligence.selected') : this.$t('screenIntelligence.notSelected'), detail: `${this.$t('screenIntelligence.decisionScore')} ${Number(((item.row_data || {}).decision_score) || 0).toFixed(1)}${item.decision ? ` · ${item.decision}` : ''}` }))
+      const events = (this.timeline.events || []).map(item => ({ kind: 'event', id: item.id, time: item.event_time, color: 'blue', title: item.title || item.event_type, detail: item.source || '' }))
+      const signals = (this.timeline.signals || []).map(item => ({ kind: 'signal', id: item.signal_id, time: item.created_at, color: item.status === 'PENDING' ? 'orange' : item.status === 'APPROVED' ? 'green' : 'red', title: `${item.action} · ${item.status}`, detail: item.manual_review_required ? this.$t('screenIntelligence.manualReviewRequired') : '' }))
+      return [...runs, ...events, ...signals].sort((left, right) => new Date(right.time) - new Date(left.time))
     },
     classificationGroups () {
       const groups = [{ key: 'concept', label: this.$t('marketScreener.concepts'), items: [] }, { key: 'industry', label: this.$t('marketScreener.industryGroup'), items: [] }]
@@ -395,7 +444,9 @@ export default {
     validationMetrics () {
       const metrics = (this.validationResult && this.validationResult.metrics) || {}
       return Object.entries(metrics).map(([horizon, value]) => ({ horizon: this.$t('marketScreener.horizonBars', { count: horizon }), samples: value.samples, average_return: this.percent(value.average_return), median_return: this.percent(value.median_return), win_rate: this.percent(value.win_rate), worst_return: this.percent(value.worst_return) }))
-    }
+    },
+    researchDiagnostics () { return (this.validationResult && this.validationResult.research_diagnostics) || {} },
+    purgeSamples () { return ((this.validationResult && this.validationResult.walk_forward) || []).reduce((sum, item) => sum + Number(item.purged_samples || 0) + Number(item.embargoed_samples || 0), 0) }
   },
   created () { this.loadReferenceData() },
   methods: {
@@ -469,14 +520,40 @@ export default {
     handleTableChange (pagination) { this.resultPage = pagination.current; this.resultPageSize = pagination.pageSize; this.loadResultRows() },
     async addResultToWatchlist (row) { try { await addWatchlist({ market: 'CNStock', symbol: String(row.symbol).split('.')[0], name: row.name || row.symbol }); this.$message.success(this.$t('marketScreener.addedWatchlist')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     async addSelectedToWatchlist () { const results = await Promise.allSettled(this.selectedRows.map(this.addResultToWatchlist)); const failed = results.filter(item => item.status === 'rejected').length; if (!failed) this.$message.success(this.$t('marketScreener.batchAdded', { count: results.length })) },
-    async validateSelection () { this.validating = true; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 100).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10, split_ratio: [0.6, 0.2, 0.2], walk_forward_folds: 3 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
+    async validateSelection () { this.validating = true; this.optimizationResult = null; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 100).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10, split_ratio: [0.6, 0.2, 0.2], walk_forward_folds: 3, embargo_bars: 5 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
+    async optimizeValidatedPortfolio () {
+      this.optimizing = true
+      try {
+        const returns = {}
+        for (const item of (this.validationResult.observations || [])) {
+          if (!returns[item.symbol]) returns[item.symbol] = []
+          if (item.returns && item.returns['10'] != null) returns[item.symbol].push(Number(item.returns['10']))
+        }
+        const candidates = this.selectedRows.filter(item => (returns[item.symbol] || []).length >= 2)
+        const response = await optimizeScreenPortfolio({ candidates, returns, configuration: { ...this.portfolio, industry_caps: {}, commission_rate: 0.0003, stamp_duty_rate: 0.001, impact_rate: 0.0005 } })
+        this.optimizationResult = response.data
+      } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.optimizing = false }
+    },
+    async startPortfolioSimulation () {
+      this.startingSimulation = true
+      try {
+        const created = await createScreenPortfolioAccount({ name: `${this.$t('screenIntelligence.simulation')} ${new Date().toLocaleDateString()}`, initial_cash: this.portfolio.capital, configuration: this.portfolio })
+        const market = {}
+        for (const row of this.selectedRows) market[row.symbol] = { price: Number(((row.bar || {}).close) || ((row.pool || {}).price) || 0), volume: Number(((row.bar || {}).volume) || 0), status: { can_buy: (row.data_quality || {}).eligible !== false } }
+        const response = await rebalanceScreenPortfolioAccount(created.data.id, { task_id: this.task.task_id, trade_date: new Date().toISOString().slice(0, 10), targets: this.optimizationResult.holdings, market })
+        this.$message.success(this.$t('screenIntelligence.simulationStarted', { orders: response.data.orders.length }))
+      } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.startingSimulation = false }
+    },
     async saveFeedback (row, decision) { try { await saveScreenFeedback(this.task.task_id, { symbol: row.symbol, decision }); this.$set(row, 'feedback', decision); this.$message.success(this.$t('screenIntelligence.feedbackSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     submitForReview () { this.$confirm({ title: this.$t('marketScreener.reviewConfirmTitle'), content: this.$t('marketScreener.reviewConfirmBody', { count: Math.min(this.selectedRows.length, 20) }), okText: this.$t('marketScreener.confirm'), cancelText: this.$t('marketScreener.cancel'), onOk: this.doSubmitForReview }) },
     async doSubmitForReview () { this.submittingReview = true; try { const response = await submitScreenReviewSignals(this.task.task_id, { symbols: this.selectedRows.slice(0, 20).map(row => row.symbol), quantity: 100 }); const data = response.data || {}; this.$message.success(this.$t('marketScreener.reviewSubmitted', { count: (data.submitted || []).length })) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.submittingReview = false } },
     async reloadHistory () { const response = await getScreenHistory({ limit: 30 }); this.historyItems = (response.data && response.data.items) || [] },
     historyTitle (item) { const summary = item.summary || {}; return this.$t('marketScreener.historyTitle', { requested: summary.requested || item.progress.total || 0, matched: summary.matched || item.progress.matched || 0 }) },
     async openHistoricalTask (taskId) { this.historyVisible = false; const response = await getTask(taskId); this.task = response.data; this.result = this.task.result && this.task.result.payload; this.resultState = 'matched'; this.resultPage = 1; await this.loadResultRows() },
-    openDetails (row) { this.detailRow = row; this.detailVisible = true },
+    async openDetails (row) {
+      this.detailRow = row; this.detailVisible = true; this.timeline = { runs: [], events: [], signals: [] }; this.timelineLoading = true
+      try { const response = await getScreenCandidateTimeline(row.symbol); this.timeline = response.data || this.timeline } catch (error) { this.timeline = { runs: [], events: [], signals: [] } } finally { this.timelineLoading = false }
+    },
     chartRoute (row) { return { path: '/indicator-ide', query: { market: 'CNStock', symbol: row.symbol, timeframe: this.timeframe, builtin: 'czsc' } } },
     conditionTagColor (item) { const mode = String((item.condition && item.condition.mode) || 'must'); if (mode === 'exclude') return item.matched ? 'red' : 'green'; return item.matched ? 'green' : 'orange' },
     conditionActual (item) { const actual = item && item.actual; const expected = item && item.expected; const value = typeof actual === 'object' ? JSON.stringify(actual) : String(actual == null ? '-' : actual); const target = typeof expected === 'object' ? JSON.stringify(expected) : String(expected == null ? '-' : expected); return `${value} / ${target}` },
@@ -540,6 +617,15 @@ export default {
 .detail-scores + .ant-alert { margin-bottom: 18px; }
 .feedback-actions { display: flex; gap: 8px; margin-bottom: 12px; }
 .generalization-alert { margin-bottom: 12px; }
+.validation-actions { display: flex; gap: 8px; margin: 12px 0; }
+.research-diagnostics { margin-top: 10px; }
+.diagnostic-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e5e7eb; }
+.diagnostic-strip span { display: flex; padding: 8px; background: #fff; color: #6b7280; font-size: 11px; flex-direction: column; }
+.diagnostic-strip b { color: #111827; font-size: 14px; }
+.weight-tags { margin-top: 8px; }
+.optimization-summary { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; border: 1px solid #e5e7eb; }
+.optimization-summary span { display: flex; padding: 9px; color: #6b7280; font-size: 11px; flex-direction: column; }
+.optimization-summary b { color: #111827; font-size: 15px; }
 .detail-scores ~ h3 { margin-top: 18px; font-size: 13px; }
 .screener-page--dark { color: #e5e7eb; background: #111827; }
 .screener-page--dark .screener-layout { border-color: #30363d; background: #171b22; }
