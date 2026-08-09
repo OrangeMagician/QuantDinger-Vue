@@ -388,3 +388,47 @@ export function getEnterpriseObservability () {
 export function manageEnterprisePlugins (data) {
   return request({ url: '/api/v2/screens/enterprise/plugins', method: data ? 'post' : 'get', data, timeout: 20000 })
 }
+
+export function getScreenOperatingDashboard () {
+  return request({ url: '/api/v2/screens/os', method: 'get', timeout: 30000 })
+}
+
+export function runScreenProvider (data) {
+  return request({ url: '/api/v2/screens/os/provider-run', method: 'post', data, timeout: 180000 })
+}
+
+export function saveScreenDataContract (data) {
+  return request({ url: '/api/v2/screens/os/contracts', method: 'post', data, timeout: 30000 })
+}
+
+export function getScreenDataLineage (params) {
+  return request({ url: '/api/v2/screens/os/lineage', method: 'get', params, timeout: 30000 })
+}
+
+export function analyzeScreenRules (data) {
+  return request({ url: '/api/v2/screens/os/rules/analyze', method: 'post', data, timeout: 30000 })
+}
+
+export function getScreenWorkspaceDraft (workspaceKey = 'default') {
+  return request({ url: `/api/v2/screens/os/drafts/${encodeURIComponent(workspaceKey)}`, method: 'get', timeout: 20000 })
+}
+
+export function saveScreenWorkspaceDraft (data) {
+  return request({ url: '/api/v2/screens/os/drafts', method: 'put', data, timeout: 20000 })
+}
+
+export function runScreenOperatingResearch (action, payload = {}) {
+  return request({ url: '/api/v2/screens/os/research', method: 'post', data: { action, payload }, timeout: 120000 })
+}
+
+export function runScreenDecisionAction (action, payload = {}) {
+  return request({ url: '/api/v2/screens/os/decisions', method: 'post', data: { action, payload }, timeout: 30000 })
+}
+
+export function saveScreenThesis (data) {
+  return request({ url: '/api/v2/screens/os/theses', method: 'post', data, timeout: 30000 })
+}
+
+export function runScreenPlatformAction (action, payload = {}) {
+  return request({ url: '/api/v2/screens/os/platform', method: 'post', data: { action, payload }, timeout: 30000 })
+}

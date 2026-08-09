@@ -16,7 +16,18 @@
       </div>
     </header>
 
+    <screening-operating-workspace
+      :mode="operatingMode"
+      :task="task"
+      :rows="displayRows"
+      :conditions="conditions"
+      @mode-change="operatingMode = $event"
+      @apply-goal="applyGoalProfile"
+      @move-condition="moveCondition"
+    />
+
     <screening-intelligence-panel
+      v-if="operatingMode === 'daily'"
       :task="task"
       :result="result"
       :plan-key="activePlanKey || ''"
@@ -27,13 +38,7 @@
       @update-portfolio="portfolio = $event"
     />
 
-    <enterprise-screening-workbench
-      :task="task"
-      :rows="displayRows"
-      :selected-rows="selectedRows"
-    />
-
-    <div class="screener-layout">
+    <div v-if="operatingMode === 'daily'" class="screener-layout">
       <aside class="config-panel">
         <div class="section-title section-title--first"><h2>{{ $t('marketScreener.universe') }}</h2></div>
         <a-radio-group v-model="universeMode" button-style="solid" size="small">
@@ -287,7 +292,7 @@
 import { mapState } from 'vuex'
 import { addWatchlist, getWatchlist } from '@/api/market'
 import { getUniverses } from '@/api/universe'
-import EnterpriseScreeningWorkbench from './EnterpriseScreeningWorkbench.vue'
+import ScreeningOperatingWorkspace from './ScreeningOperatingWorkspace.vue'
 import ScreeningIntelligencePanel from './ScreeningIntelligencePanel.vue'
 import { watchResearchTask } from '@/utils/researchTaskStream'
 import {
@@ -313,10 +318,11 @@ import {
 
 export default {
   name: 'MarketScreener',
-  components: { EnterpriseScreeningWorkbench, ScreeningIntelligencePanel },
+  components: { ScreeningOperatingWorkspace, ScreeningIntelligencePanel },
   data () {
     return {
       loadingCatalog: false,
+      operatingMode: 'daily',
       previewingPool: false,
       running: false,
       loadingRows: false,
@@ -500,6 +506,21 @@ export default {
     conditionValueStep (condition) { const values = Array.isArray(condition.value) ? condition.value : [condition.value]; return values.some(value => Math.abs(Number(value)) > 0 && Math.abs(Number(value)) < 1) ? 0.01 : 1 },
     conditionComplete (condition) { if (!condition || !condition.catalogKey || !condition.operator) return false; if (!condition.needsValue) return true; if (condition.operator === 'between') return Array.isArray(condition.value) && condition.value.length === 2 && condition.value.every(value => Number.isFinite(Number(value))); return condition.value !== '' && condition.value !== null && condition.value !== undefined },
     applyBuiltinTemplate ({ key }) { const template = this.builtinTemplates.find(item => item.key === key); if (!template) return; const found = template.items.map(id => this.catalogItems.find(item => item.id === id || item.factor_id === id || item.signal_type === id)).filter(Boolean); if (!found.length) return; this.conditions = []; found.forEach(item => this.addCondition(item)) },
+    applyGoalProfile (goal) {
+      const size = Number(goal.size || 20)
+      const profiles = {
+        quality: { template: 'pullback', weighting: 'score', maxWeight: 0.08 },
+        value: { template: 'reversal', weighting: 'score', maxWeight: 0.08 },
+        momentum: { template: 'trend', weighting: 'score', maxWeight: 0.1 },
+        balanced: { template: 'trend', weighting: 'risk_parity', maxWeight: 0.08 }
+      }
+      const profile = profiles[goal.style] || profiles.balanced
+      this.portfolio = { ...this.portfolio, size, weighting: profile.weighting, max_weight: goal.risk === 'low' ? Math.min(profile.maxWeight, 0.06) : goal.risk === 'high' ? 0.12 : profile.maxWeight }
+      this.limit = goal.horizon === 'short' ? 500 : goal.horizon === 'long' ? 2000 : 1000
+      this.applyBuiltinTemplate({ key: profile.template })
+      this.clearPoolPreview()
+    },
+    moveCondition ({ from, to }) { if (to < 0 || to >= this.conditions.length) return; const next = [...this.conditions]; const moved = next.splice(from, 1)[0]; next.splice(to, 0, moved); this.conditions = next },
     planDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit, ranking: { ...this.ranking }, portfolio: { ...this.portfolio } } },
     openSavePlan () { const current = this.plans.find(item => item.plan_key === this.activePlanKey); this.planName = current ? current.name : ''; this.savePlanVisible = true },
     async saveCurrentPlan () { this.savingPlan = true; try { const response = await saveScreenPlan({ plan_key: this.activePlanKey, name: this.planName, definition: this.planDefinition() }); this.activePlanKey = response.data.plan_key; this.savePlanVisible = false; await this.loadPlansOnly(); this.$message.success(this.$t('marketScreener.planSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.savingPlan = false } },
