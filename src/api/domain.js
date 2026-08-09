@@ -180,3 +180,51 @@ export function evaluateStrategySignal (strategyId, data, idempotencyKey) {
 export function reviewSignal (signalId, data) {
   return request({ url: `/api/v2/signals/${encodeURIComponent(signalId)}/reviews`, method: 'post', data, timeout: 15000 })
 }
+
+export function compileScreenQuery (query) {
+  return request({ url: '/api/v2/screens/compile-query', method: 'post', data: { query }, timeout: 20000 })
+}
+
+export function getScreenDataQuality () {
+  return request({ url: '/api/v2/screens/data-quality', method: 'get', timeout: 20000 })
+}
+
+export function createScreenPortfolio (taskId, data = {}) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/portfolio`, method: 'post', data, timeout: 20000 })
+}
+
+export function listScreenPortfolios (params = {}) {
+  return request({ url: '/api/v2/screen-portfolios', method: 'get', params, timeout: 20000 })
+}
+
+export function saveScreenFeedback (taskId, data) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/feedback`, method: 'post', data, timeout: 15000 })
+}
+
+export function getScreenFeedbackAnalytics () {
+  return request({ url: '/api/v2/screens/feedback/analytics', method: 'get', timeout: 15000 })
+}
+
+export function listScreenSchedules () {
+  return request({ url: '/api/v2/screen-schedules', method: 'get', timeout: 15000 })
+}
+
+export function saveScreenSchedule (planKey, data) {
+  return request({ url: `/api/v2/screen-schedules/${encodeURIComponent(planKey)}`, method: 'put', data, timeout: 15000 })
+}
+
+export function listScreenPlanVersions (planKey) {
+  return request({ url: `/api/v2/screen-plans/${encodeURIComponent(planKey)}/versions`, method: 'get', timeout: 15000 })
+}
+
+export function listScreenPlanLibrary (params = {}) {
+  return request({ url: '/api/v2/screen-plan-library', method: 'get', params, timeout: 15000 })
+}
+
+export function compareScreens (params) {
+  return request({ url: '/api/v2/screens/compare', method: 'get', params, timeout: 20000 })
+}
+
+export function getScreenEvents (taskId, params = {}) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/events`, method: 'get', params, timeout: 20000 })
+}

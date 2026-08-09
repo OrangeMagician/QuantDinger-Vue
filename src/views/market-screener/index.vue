@@ -16,6 +16,17 @@
       </div>
     </header>
 
+    <screening-intelligence-panel
+      :task="task"
+      :result="result"
+      :plan-key="activePlanKey || ''"
+      :ranking="ranking"
+      :portfolio="portfolio"
+      @apply-query="applyCompiledQuery"
+      @update-ranking="ranking = $event"
+      @update-portfolio="portfolio = $event"
+    />
+
     <div class="screener-layout">
       <aside class="config-panel">
         <div class="section-title section-title--first"><h2>{{ $t('marketScreener.universe') }}</h2></div>
@@ -29,6 +40,12 @@
         <a-textarea v-if="universeMode === 'manual'" v-model="manualSymbols" class="manual-symbols" :rows="4" :placeholder="$t('marketScreener.symbolPlaceholder')" />
 
         <div v-if="universeMode === 'pool'" class="pool-settings">
+          <label class="wide-field"><span>{{ $t('screenIntelligence.pointInTimeUniverse') }}</span>
+            <a-select v-model="pool.universe_id" allow-clear :placeholder="$t('screenIntelligence.currentMarketUniverse')" @change="clearPoolPreview">
+              <a-select-option v-for="item in pointInTimeUniverses" :key="item.id" :value="item.id">{{ item.name }} · {{ item.member_count || 0 }}</a-select-option>
+            </a-select>
+          </label>
+          <label v-if="pool.universe_id" class="wide-field"><span>{{ $t('screenIntelligence.asOfDate') }}</span><a-date-picker v-model="pool.as_of" value-format="YYYY-MM-DD" @change="clearPoolPreview" /></label>
           <label class="wide-field"><span>{{ $t('marketScreener.industries') }}</span>
             <a-select
               v-model="pool.industries"
@@ -174,6 +191,7 @@
           >
             <template slot="symbol" slot-scope="value, row"><a @click="openDetails(row)"><strong>{{ value }}</strong><small>{{ row.name || '' }}</small></a></template>
             <template slot="matchScore" slot-scope="value"><b :class="Number(value) >= 80 ? 'score-high' : ''">{{ Number(value || 0).toFixed(0) }}%</b></template>
+            <template slot="decisionScore" slot-scope="value"><b :class="Number(value) >= 75 ? 'score-high' : ''">{{ Number(value || 0).toFixed(1) }}</b></template>
             <template slot="technicalScore" slot-scope="value">{{ Number(value || 0).toFixed(1) }}</template>
             <template slot="conditionResults" slot-scope="value"><div class="condition-matrix"><a-tag v-for="(item, index) in (value || [])" :key="index" :color="conditionTagColor(item)">{{ item.label }}: {{ conditionActual(item) }}</a-tag></div></template>
             <template slot="barTime" slot-scope="value">{{ value ? formatDate(value) : '-' }}</template>
@@ -196,6 +214,13 @@
     </a-drawer>
 
     <a-modal v-model="validationVisible" :title="$t('marketScreener.validationResult')" :footer="null" width="760px">
+      <a-alert
+        v-if="validationResult && validationResult.generalization"
+        class="generalization-alert"
+        :type="validationResult.generalization.review_ready ? 'success' : 'warning'"
+        show-icon
+        :message="`${$t('screenIntelligence.generalization')} ${Number(validationResult.generalization.score || 0).toFixed(1)} · ${$t(validationResult.generalization.review_ready ? 'screenIntelligence.reviewReady' : 'screenIntelligence.notReviewReady')}`"
+      />
       <a-table
         v-if="validationMetrics.length"
         row-key="horizon"
@@ -210,6 +235,11 @@
     <a-drawer :visible="detailVisible" :title="detailRow ? `${detailRow.symbol} ${detailRow.name || ''}` : ''" width="560" @close="detailVisible = false">
       <template v-if="detailRow">
         <div class="detail-scores"><span>{{ $t('marketScreener.matchScore') }} <b>{{ Number(detailRow.match_score || 0).toFixed(0) }}%</b></span><span>{{ $t('marketScreener.technicalScore') }} <b>{{ Number(detailRow.technical_score || 0).toFixed(1) }}</b></span></div>
+        <div class="feedback-actions">
+          <a-button icon="check" @click="saveFeedback(detailRow, 'accepted')">{{ $t('screenIntelligence.feedbackAccepted') }}</a-button>
+          <a-button icon="eye" @click="saveFeedback(detailRow, 'watching')">{{ $t('screenIntelligence.feedbackWatching') }}</a-button>
+          <a-button icon="close" @click="saveFeedback(detailRow, 'rejected')">{{ $t('screenIntelligence.feedbackRejected') }}</a-button>
+        </div>
         <a-alert :type="detailRow.error ? 'error' : detailRow.passed ? 'success' : 'warning'" show-icon :message="detailRow.error || detailRow.explanation || $t('marketScreener.noExplanation')" />
         <h3>{{ $t('marketScreener.conditionDiagnosis') }}</h3>
         <a-list :data-source="detailRow.condition_results || []" size="small"><a-list-item slot="renderItem" slot-scope="item"><a-tag :color="conditionTagColor(item)">{{ item.matched ? $t('marketScreener.yes') : $t('marketScreener.no') }}</a-tag><b>{{ item.label }}</b><span>{{ conditionActual(item) }}</span></a-list-item></a-list>
@@ -222,6 +252,9 @@
 <script>
 import { mapState } from 'vuex'
 import { addWatchlist, getWatchlist } from '@/api/market'
+import { getUniverses } from '@/api/universe'
+import ScreeningIntelligencePanel from './ScreeningIntelligencePanel.vue'
+import { watchResearchTask } from '@/utils/researchTaskStream'
 import {
   cancelTask,
   createScreen,
@@ -234,12 +267,14 @@ import {
   listScreenPlans,
   previewStockPool,
   saveScreenPlan,
+  saveScreenFeedback,
   submitScreenReviewSignals,
   validateScreen
 } from '@/api/domain'
 
 export default {
   name: 'MarketScreener',
+  components: { ScreeningIntelligencePanel },
   data () {
     return {
       loadingCatalog: false,
@@ -251,15 +286,18 @@ export default {
       savingPlan: false,
       catalog: {},
       classifications: [],
+      pointInTimeUniverses: [],
       watchlistSymbols: [],
       universeMode: 'pool',
       manualSymbols: '',
-      pool: { exclude_st: true, exclude_recent_days: 60, industries: [], exchanges: [], price_min: null, price_max: null, market_cap_min: null, market_cap_max: null, pe_min: null, pe_max: null, pb_min: null, pb_max: null, pool_limit: 500, sort_by: 'sort_order' },
+      pool: { exclude_st: true, exclude_recent_days: 60, industries: [], exchanges: [], price_min: null, price_max: null, market_cap_min: null, market_cap_max: null, pe_min: null, pe_max: null, pb_min: null, pb_max: null, pool_limit: 500, sort_by: 'sort_order', universe_id: null, as_of: null },
       marketCapMinYi: null,
       marketCapMaxYi: null,
       poolMax: 6000,
       poolPreview: null,
       snapshotStatus: {},
+      ranking: { enabled: true, neutralize_industry: true, factors: [] },
+      portfolio: { size: 20, max_weight: 0.1, max_industry_weight: 0.3, capital: 1000000, participation_rate: 0.1, weighting: 'score' },
       conditions: [],
       logic: 'and',
       timeframe: '1d',
@@ -287,6 +325,7 @@ export default {
       columns: [
         { title: this.$t('marketScreener.symbol'), dataIndex: 'symbol', width: 145, scopedSlots: { customRender: 'symbol' } },
         { title: this.$t('marketScreener.matchScore'), dataIndex: 'match_score', width: 90, scopedSlots: { customRender: 'matchScore' } },
+        { title: this.$t('screenIntelligence.decisionScore'), dataIndex: 'decision_score', width: 90, scopedSlots: { customRender: 'decisionScore' } },
         { title: this.$t('marketScreener.technicalScore'), dataIndex: 'technical_score', width: 90, scopedSlots: { customRender: 'technicalScore' } },
         { title: this.$t('marketScreener.conditionDiagnosis'), dataIndex: 'condition_results', scopedSlots: { customRender: 'conditionResults' } },
         { title: this.$t('marketScreener.dataTime'), dataIndex: 'bar_time', width: 145, scopedSlots: { customRender: 'barTime' } },
@@ -363,7 +402,7 @@ export default {
     async loadReferenceData () {
       this.loadingCatalog = true
       try {
-        const [catalog, options, watchlist, plans, history] = await Promise.all([getFactorCatalog(), getStockPoolOptions(), getWatchlist(), listScreenPlans(), getScreenHistory({ limit: 30 })])
+        const [catalog, options, watchlist, plans, history, universes] = await Promise.all([getFactorCatalog(), getStockPoolOptions(), getWatchlist(), listScreenPlans(), getScreenHistory({ limit: 30 }), getUniverses()])
         this.catalog = catalog.data || {}
         const optionData = options.data || {}
         const classifications = Array.isArray(optionData.classifications) ? optionData.classifications : []
@@ -374,6 +413,7 @@ export default {
         this.watchlistSymbols = rows.filter(item => item.market === 'CNStock').map(item => this.normalizeSymbol(item.symbol))
         this.plans = plans.data || []
         this.historyItems = (history.data && history.data.items) || []
+        this.pointInTimeUniverses = ((universes.data && universes.data.items) || universes.data || []).filter(item => ['CNStock', 'Mixed'].includes(item.market))
         if (!this.conditions.length && this.catalogItems.length) this.applyBuiltinTemplate({ key: 'trend' })
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadFailed')) } finally { this.loadingCatalog = false }
     },
@@ -402,16 +442,17 @@ export default {
     conditionValueStep (condition) { const values = Array.isArray(condition.value) ? condition.value : [condition.value]; return values.some(value => Math.abs(Number(value)) > 0 && Math.abs(Number(value)) < 1) ? 0.01 : 1 },
     conditionComplete (condition) { if (!condition || !condition.catalogKey || !condition.operator) return false; if (!condition.needsValue) return true; if (condition.operator === 'between') return Array.isArray(condition.value) && condition.value.length === 2 && condition.value.every(value => Number.isFinite(Number(value))); return condition.value !== '' && condition.value !== null && condition.value !== undefined },
     applyBuiltinTemplate ({ key }) { const template = this.builtinTemplates.find(item => item.key === key); if (!template) return; const found = template.items.map(id => this.catalogItems.find(item => item.id === id || item.factor_id === id || item.signal_type === id)).filter(Boolean); if (!found.length) return; this.conditions = []; found.forEach(item => this.addCondition(item)) },
-    planDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit } },
+    planDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit, ranking: { ...this.ranking }, portfolio: { ...this.portfolio } } },
     openSavePlan () { const current = this.plans.find(item => item.plan_key === this.activePlanKey); this.planName = current ? current.name : ''; this.savePlanVisible = true },
     async saveCurrentPlan () { this.savingPlan = true; try { const response = await saveScreenPlan({ plan_key: this.activePlanKey, name: this.planName, definition: this.planDefinition() }); this.activePlanKey = response.data.plan_key; this.savePlanVisible = false; await this.loadPlansOnly(); this.$message.success(this.$t('marketScreener.planSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.savingPlan = false } },
     async loadPlansOnly () { const response = await listScreenPlans(); this.plans = response.data || [] },
-    loadPlan (key) { const plan = this.plans.find(item => item.plan_key === key); if (!plan) return; const value = plan.definition || {}; this.universeMode = value.universeMode || 'pool'; this.manualSymbols = value.manualSymbols || ''; this.pool = { ...this.pool, ...(value.pool || {}) }; this.logic = value.logic || 'and'; this.timeframe = value.timeframe || '1d'; this.limit = value.limit || 1000; this.conditions = []; for (const saved of value.conditions || []) { const item = this.catalogItems.find(row => (saved.factor && (row.id === saved.factor || row.factor_id === saved.factor)) || (saved.signal_type && row.signal_type === saved.signal_type) || (saved.template_id && row.template_id === saved.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: saved.operator || this.conditions[index].operator, value: saved.value, mode: saved.mode || 'must', lookbackBars: saved.lookback_bars || 1 }) } },
+    loadPlan (key) { const plan = this.plans.find(item => item.plan_key === key); if (!plan) return; const value = plan.definition || {}; this.universeMode = value.universeMode || 'pool'; this.manualSymbols = value.manualSymbols || ''; this.pool = { ...this.pool, ...(value.pool || {}) }; this.logic = value.logic || 'and'; this.timeframe = value.timeframe || '1d'; this.limit = value.limit || 1000; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const saved of value.conditions || []) { const item = this.catalogItems.find(row => (saved.factor && (row.id === saved.factor || row.factor_id === saved.factor)) || (saved.signal_type && row.signal_type === saved.signal_type) || (saved.template_id && row.template_id === saved.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: saved.operator || this.conditions[index].operator, value: saved.value, mode: saved.mode || 'must', lookbackBars: saved.lookback_bars || 1 }) } },
+    applyCompiledQuery (compiled) { const value = compiled || {}; this.universeMode = 'pool'; this.pool = { ...this.pool, ...(value.universe || {}) }; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const raw of value.conditions || []) { const item = this.catalogItems.find(row => (raw.factor && (row.id === raw.factor || row.factor_id === raw.factor)) || (raw.signal_type && row.signal_type === raw.signal_type) || (raw.template_id && row.template_id === raw.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: raw.operator || this.conditions[index].operator, value: raw.value, mode: raw.mode || 'must' }) } this.clearPoolPreview() },
     async deleteActivePlan () { if (!this.activePlanKey) return; await deleteScreenPlan(this.activePlanKey); this.activePlanKey = undefined; await this.loadPlansOnly() },
     async runScreen () {
       this.running = true; this.result = null; this.resultRows = []; this.selectedRowKeys = []; this.selectedRows = []
       try {
-        const payload = { operation: 'signal_factor_screener', timeframe: this.timeframe, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, limit: this.limit, result_limit: 100 }
+        const payload = { operation: 'signal_factor_screener', timeframe: this.timeframe, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, limit: this.limit, result_limit: 100, ranking: this.ranking, portfolio: this.portfolio }
         if (this.universeMode === 'pool') payload.universe = { ...this.pool, enabled: true }
         else payload.symbols = this.universeMode === 'watchlist' ? this.watchlistSymbols : this.manualSymbolList.map(this.normalizeSymbol)
         const response = await createScreen(payload, `screen-${Date.now()}`)
@@ -422,13 +463,14 @@ export default {
         this.resultState = 'matched'; this.resultPage = 1; await this.loadResultRows(); await this.reloadHistory()
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.running = false }
     },
-    async waitTask (taskId, timeout = 3600000, trackCurrent = true) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const response = await getTask(taskId); if (!response || response.code !== 1) throw new Error(response && response.msg); if (trackCurrent) this.task = response.data; if (response.data.status === 'SUCCEEDED') return response.data; if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(response.data.status)) throw new Error(response.data.error_message || response.data.status); await new Promise(resolve => setTimeout(resolve, 1500)) } throw new Error(this.$t('trendChart.taskTimeout')) },
+    async waitTask (taskId, timeout = 3600000, trackCurrent = true) { try { const task = await watchResearchTask(taskId, value => { if (trackCurrent) this.task = value }, timeout); if (task.status === 'SUCCEEDED') return task; throw new Error(task.error_message || task.status) } catch (streamError) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const response = await getTask(taskId); if (!response || response.code !== 1) throw new Error(response && response.msg); if (trackCurrent) this.task = response.data; if (response.data.status === 'SUCCEEDED') return response.data; if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(response.data.status)) throw new Error(response.data.error_message || response.data.status); await new Promise(resolve => setTimeout(resolve, 3000)) } throw streamError } },
     async cancelCurrentTask () { if (!this.task) return; await cancelTask(this.task.task_id); this.$message.info(this.$t('marketScreener.cancelRequested')) },
     async loadResultRows () { if (!this.task) return; this.loadingRows = true; this.selectedRowKeys = []; this.selectedRows = []; try { const response = await getScreenRows(this.task.task_id, { state: this.resultState, page: this.resultPage, page_size: this.resultPageSize }); const data = response.data || {}; this.resultRows = data.items || []; this.resultTotal = Number(data.total || 0) } catch (error) { this.resultRows = []; this.resultTotal = 0 } finally { this.loadingRows = false } },
     handleTableChange (pagination) { this.resultPage = pagination.current; this.resultPageSize = pagination.pageSize; this.loadResultRows() },
     async addResultToWatchlist (row) { try { await addWatchlist({ market: 'CNStock', symbol: String(row.symbol).split('.')[0], name: row.name || row.symbol }); this.$message.success(this.$t('marketScreener.addedWatchlist')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     async addSelectedToWatchlist () { const results = await Promise.allSettled(this.selectedRows.map(this.addResultToWatchlist)); const failed = results.filter(item => item.status === 'rejected').length; if (!failed) this.$message.success(this.$t('marketScreener.batchAdded', { count: results.length })) },
-    async validateSelection () { this.validating = true; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 30).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
+    async validateSelection () { this.validating = true; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 100).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10, split_ratio: [0.6, 0.2, 0.2], walk_forward_folds: 3 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
+    async saveFeedback (row, decision) { try { await saveScreenFeedback(this.task.task_id, { symbol: row.symbol, decision }); this.$set(row, 'feedback', decision); this.$message.success(this.$t('screenIntelligence.feedbackSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
     submitForReview () { this.$confirm({ title: this.$t('marketScreener.reviewConfirmTitle'), content: this.$t('marketScreener.reviewConfirmBody', { count: Math.min(this.selectedRows.length, 20) }), okText: this.$t('marketScreener.confirm'), cancelText: this.$t('marketScreener.cancel'), onOk: this.doSubmitForReview }) },
     async doSubmitForReview () { this.submittingReview = true; try { const response = await submitScreenReviewSignals(this.task.task_id, { symbols: this.selectedRows.slice(0, 20).map(row => row.symbol), quantity: 100 }); const data = response.data || {}; this.$message.success(this.$t('marketScreener.reviewSubmitted', { count: (data.submitted || []).length })) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.submittingReview = false } },
     async reloadHistory () { const response = await getScreenHistory({ limit: 30 }); this.historyItems = (response.data && response.data.items) || [] },
@@ -496,6 +538,8 @@ export default {
 .detail-scores { display: flex; gap: 24px; margin-bottom: 14px; }
 .detail-scores b { font-size: 18px; }
 .detail-scores + .ant-alert { margin-bottom: 18px; }
+.feedback-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.generalization-alert { margin-bottom: 12px; }
 .detail-scores ~ h3 { margin-top: 18px; font-size: 13px; }
 .screener-page--dark { color: #e5e7eb; background: #111827; }
 .screener-page--dark .screener-layout { border-color: #30363d; background: #171b22; }

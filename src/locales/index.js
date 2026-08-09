@@ -11,6 +11,7 @@ import strategyLiveRiskMessages from './lang/strategy-live-risk'
 import robotBuilderMessages from './lang/robot-builder-overrides'
 import strategyTradeRecordMessages from './lang/strategy-trade-records'
 import marketColorConventionMessages from './lang/market-color-convention'
+import screeningIntelligenceMessages from './lang/screening-intelligence'
 
 Vue.use(VueI18n)
 
@@ -26,7 +27,8 @@ const messages = {
     ...(strategyLiveRiskMessages[defaultLang] || {}),
     ...(robotBuilderMessages[defaultLang] || {}),
     ...(strategyTradeRecordMessages[defaultLang] || {}),
-    ...(marketColorConventionMessages[defaultLang] || {})
+    ...(marketColorConventionMessages[defaultLang] || {}),
+    ...(screeningIntelligenceMessages[defaultLang] || {})
   }
 }
 
@@ -101,7 +103,8 @@ function mergeLocaleOverrides (lang) {
     ...(strategyLiveRiskMessages[lang] || {}),
     ...(robotBuilderMessages[lang] || {}),
     ...(strategyTradeRecordMessages[lang] || {}),
-    ...(marketColorConventionMessages[lang] || {})
+    ...(marketColorConventionMessages[lang] || {}),
+    ...(screeningIntelligenceMessages[lang] || {})
   }
   i18n.setLocaleMessage(lang, {
     ...(i18n.getLocaleMessage(lang) || {}),
@@ -129,7 +132,8 @@ export async function loadLanguageAsync (lang = defaultLang) {
       ...(strategyLiveRiskMessages[lang] || {}),
       ...(robotBuilderMessages[lang] || {}),
       ...(strategyTradeRecordMessages[lang] || {}),
-      ...(marketColorConventionMessages[lang] || {})
+      ...(marketColorConventionMessages[lang] || {}),
+      ...(screeningIntelligenceMessages[lang] || {})
     })
     i18n.setLocaleMessage(lang, locale)
     loadedLanguages.push(lang)
