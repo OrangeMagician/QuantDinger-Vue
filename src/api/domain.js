@@ -89,6 +89,22 @@ export function getStockPoolOptions () {
   return request({ url: '/api/v2/stock-pools/options', method: 'get', timeout: 60000 })
 }
 
+export function previewStockPool (data) {
+  return request({ url: '/api/v2/stock-pools/preview', method: 'post', data, timeout: 60000 })
+}
+
+export function listScreenPlans () {
+  return request({ url: '/api/v2/screen-plans', method: 'get', timeout: 15000 })
+}
+
+export function saveScreenPlan (data) {
+  return request({ url: '/api/v2/screen-plans', method: 'post', data, timeout: 15000 })
+}
+
+export function deleteScreenPlan (planKey) {
+  return request({ url: `/api/v2/screen-plans/${encodeURIComponent(planKey)}`, method: 'delete', timeout: 15000 })
+}
+
 export function createScreen (data, idempotencyKey) {
   return request({
     url: '/api/v2/screens',
@@ -97,6 +113,22 @@ export function createScreen (data, idempotencyKey) {
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
     timeout: 15000
   })
+}
+
+export function getScreenRows (taskId, params = {}) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/rows`, method: 'get', params, timeout: 20000 })
+}
+
+export function getScreenHistory (params = {}) {
+  return request({ url: '/api/v2/screens/history', method: 'get', params, timeout: 20000 })
+}
+
+export function validateScreen (taskId, data = {}) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/validate`, method: 'post', data, timeout: 15000 })
+}
+
+export function submitScreenReviewSignals (taskId, data) {
+  return request({ url: `/api/v2/screens/${encodeURIComponent(taskId)}/review-signals`, method: 'post', data, timeout: 60000 })
 }
 
 export function listTasks (params = {}) {

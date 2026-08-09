@@ -41,6 +41,30 @@ test('stock screener groups and searches A-share industries and market themes', 
   assert.match(domainApi, /stock-pools\/options'[\s\S]*timeout: 60000/)
 })
 
+test('stock screener exposes explainable results and the research workflow', () => {
+  assert.match(screener, /modeMust/)
+  assert.match(screener, /lookbackBars/)
+  assert.match(screener, /match_score/)
+  assert.match(screener, /technical_score/)
+  assert.match(screener, /condition_results/)
+  assert.match(screener, /getScreenRows/)
+  assert.match(screener, /validateScreen/)
+  assert.match(screener, /submitScreenReviewSignals/)
+  assert.match(screener, /manual_review_required|reviewConfirmBody/)
+})
+
+test('stock screener supports large-pool preview, saved plans, progress, and history', () => {
+  assert.match(screener, /previewStockPool/)
+  assert.match(screener, /poolMax/)
+  assert.match(screener, /listScreenPlans/)
+  assert.match(screener, /saveScreenPlan/)
+  assert.match(screener, /progressPercent/)
+  assert.match(screener, /getScreenHistory/)
+  assert.match(domainApi, /stock-pools\/preview/)
+  assert.match(domainApi, /screen-plans/)
+  assert.match(domainApi, /review-signals/)
+})
+
 test('live strategy editor shows the concrete source compilation error', () => {
   assert.match(editor, /:description="sourceContractErrorMessage \|\| \$t\('strategyV2\.compileFailedHint'\)"/)
   assert.match(editor, /contractResult\.error\.backendMessage/)
