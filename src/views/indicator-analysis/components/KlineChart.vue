@@ -180,6 +180,7 @@ import { usePyodide } from '@/services/pyodide/usePyodide'
 import { computeChartLayers } from '@/api/domain'
 import { createChartAnnotationLaneAllocator } from '@/utils/chartAnnotationLayout'
 import { clearCzscOverlays, registerCzscOverlays, renderCzscOverlays, reserveCzscAnnotationLanes } from '@/utils/czscChartLayers'
+import { formatMarketKlineTime, getKlineMarketTimezone, resolveMarketKlineTimestampMs } from '@/utils/klineMarketTime'
 import {
   calculateSMA,
   calculateEMA,
@@ -495,6 +496,11 @@ export default {
         return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - daysFromMonday * TIMEFRAME_MS['1D']
       }
       return Math.floor(ts / interval) * interval
+    }
+
+    const syncChartTimezone = () => {
+      if (!chartRef.value || typeof chartRef.value.setTimezone !== 'function') return
+      chartRef.value.setTimezone(getKlineMarketTimezone(props.market))
     }
 
     const mergeKlineBar = (base, incoming, timestamp = base && base.timestamp) => {
@@ -2334,7 +2340,12 @@ registerOverlay({
 
     const formatKlineData = (data) => {
       const bars = data.map(item => {
-        const timeValue = alignKlineTimestampMs(item.time || item.timestamp)
+        const timeValue = resolveMarketKlineTimestampMs(
+          item,
+          props.market,
+          props.timeframe,
+          timestamp => alignKlineTimestampMs(timestamp)
+        )
         return {
           timestamp: timeValue,
           open: parseFloat(item.open),
@@ -2574,6 +2585,7 @@ registerOverlay({
           if (!chartRef.value) {
             initChart()
           } else {
+            syncChartTimezone()
             if (typeof chartRef.value.setPriceVolumePrecision === 'function') {
               chartRef.value.setPriceVolumePrecision(pricePrecision.value, 0)
             }
@@ -3189,6 +3201,7 @@ registerOverlay({
 
         try {
           chartRef.value = init(container, {
+            timezone: getKlineMarketTimezone(props.market),
             drawingBarVisible: true,
             overlay: {
               visible: true
@@ -3209,6 +3222,8 @@ registerOverlay({
         if (!chartRef.value) {
           throw new Error('K-line chart initialization failed')
         }
+
+        syncChartTimezone()
 
         if (chartRef.value) {
           if (typeof chartRef.value.setDrawingBarVisible === 'function') {
@@ -3462,10 +3477,9 @@ registerOverlay({
               proxy.$t('dashboard.indicator.tooltip.volume')
             ],
             values: (kLineData) => {
-              const d = new Date(kLineData.timestamp)
               const p = pricePrecision.value
               return [
-                `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`,
+                formatMarketKlineTime(kLineData.timestamp, props.market, props.timeframe),
                 kLineData.open.toFixed(p),
                 kLineData.high.toFixed(p),
                 kLineData.low.toFixed(p),
