@@ -87,6 +87,17 @@ test('A-share indicator chart can sync temporary current-day bars and reload in 
   assert.match(indicatorIdeSource, /syncingTodayKline: false/)
 })
 
+test('hidden quick trade panel does not poll an invalid market during indicator initialization', () => {
+  assert.match(
+    indicatorIdeSource,
+    /<div v-if="quickTradeDrawerVisible" class="ide-quick-right ide-quick-right--chart-fs">/
+  )
+  assert.doesNotMatch(
+    indicatorIdeSource,
+    /<div v-show="quickTradeDrawerVisible" class="ide-quick-right ide-quick-right--chart-fs">/
+  )
+})
+
 test('chart annotations share collision lanes and keep labels away from candle bodies', () => {
   assert.match(klineChartSource, /reserveCzscAnnotationLanes\(\{[\s\S]*?allocateLane: allocateAnnotationLane/)
   assert.match(klineChartSource, /labelLane: text \? allocateLane\(\{ timestamp: end, side: labelSide, text/)

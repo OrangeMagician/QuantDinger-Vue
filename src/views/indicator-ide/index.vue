@@ -473,7 +473,7 @@
                   />
                 </div>
               </div>
-              <div v-show="quickTradeDrawerVisible" class="ide-quick-right ide-quick-right--chart-fs">
+              <div v-if="quickTradeDrawerVisible" class="ide-quick-right ide-quick-right--chart-fs">
                 <div class="ide-quick-panel-head">
                   <span class="ide-quick-panel-head-title">
                     <a-icon type="thunderbolt" theme="filled" class="ide-quick-panel-head-icon" />
