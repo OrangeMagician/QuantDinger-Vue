@@ -262,7 +262,7 @@ export default {
       default: null
     }
   },
-  emits: ['retry', 'price-change', 'load', 'indicator-toggle', 'indicators-updated', 'czsc-state-change'],
+  emits: ['retry', 'price-change', 'load', 'indicator-toggle', 'indicators-updated', 'czsc-state-change', 'data-quality-change'],
   setup (props, { emit }) {
     const klineData = shallowRef([])
     const loading = ref(false)
@@ -270,6 +270,15 @@ export default {
     const loadFailurePending = ref(false)
     const loadingHistory = ref(false)
     const hasMoreHistory = ref(true)
+    const applyResponseMeta = (meta = {}, requestedLimit = 0) => {
+      const normalized = meta && typeof meta === 'object' ? meta : {}
+      if (Object.prototype.hasOwnProperty.call(normalized, 'has_more')) {
+        hasMoreHistory.value = normalized.has_more !== false
+      } else if (requestedLimit > 0 && Number.isFinite(Number(normalized.bar_count))) {
+        hasMoreHistory.value = Number(normalized.bar_count) >= requestedLimit
+      }
+      emit('data-quality-change', normalized)
+    }
     let loadingHistoryPromise = null
     let loadGeneration = 0
     let activeLoadContextKey = ''
@@ -2537,6 +2546,7 @@ registerOverlay({
 
       try {
         let formattedData = []
+        let responseMeta = {}
         const initialLimit = getInitialKlineLimit()
         for (let attempt = 1; attempt <= KLINE_LOAD_MAX_ATTEMPTS; attempt += 1) {
           try {
@@ -2551,6 +2561,7 @@ registerOverlay({
 
             if (response.code === 1 && response.data && Array.isArray(response.data)) {
               formattedData = formatKlineData(response.data)
+              responseMeta = response.meta || {}
               if (formattedData.length > 0) break
               throw new Error('No K-line data returned')
             }
@@ -2574,7 +2585,7 @@ registerOverlay({
         }
 
         klineData.value = formattedData
-        hasMoreHistory.value = true
+        applyResponseMeta(responseMeta, initialLimit)
 
         pricePrecision.value = calcPricePrecision(formattedData)
 
@@ -2697,6 +2708,9 @@ registerOverlay({
 
           if (response.code === 1 && response.data && Array.isArray(response.data)) {
             const newData = formatKlineData(response.data)
+            if (response.meta && Object.prototype.hasOwnProperty.call(response.meta, 'has_more')) {
+              hasMoreHistory.value = response.meta.has_more !== false
+            }
 
             if (newData.length === 0) {
               hasMoreHistory.value = false
@@ -2818,6 +2832,9 @@ registerOverlay({
 
         if (response.code === 1 && response.data && Array.isArray(response.data)) {
           const newData = formatKlineData(response.data)
+          if (response.meta && Object.prototype.hasOwnProperty.call(response.meta, 'has_more')) {
+            hasMoreHistory.value = response.meta.has_more !== false
+          }
 
           if (newData.length === 0) {
             hasMoreHistory.value = false

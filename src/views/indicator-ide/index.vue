@@ -219,6 +219,15 @@
                   <div class="chart-panel-toolbar-top">
                     <span class="chart-panel-toolbar-title">{{ $t('indicatorIde.chartWindow') }}</span>
                     <div class="chart-panel-toolbar-top-actions">
+                      <a-tooltip v-if="market === 'CNStock' && klineDataQuality.bar_count" placement="bottom" :title="klineQualityTooltip">
+                        <span
+                          class="chart-panel-data-quality"
+                          :class="{ 'chart-panel-data-quality--warning': klineDataQuality.quality_status !== 'complete' }"
+                        >
+                          <a-icon :type="klineDataQuality.quality_status === 'complete' ? 'check-circle' : 'warning'" />
+                          {{ klineQualityText }}
+                        </span>
+                      </a-tooltip>
                       <a-button
                         size="small"
                         class="chart-panel-action-btn chart-panel-signal-alert-btn"
@@ -460,6 +469,7 @@
                     :realtime-enabled="klineRealtimeEnabled"
                     @indicator-toggle="handleIndicatorToggle"
                     @czsc-state-change="handleCzscStateChange"
+                    @data-quality-change="handleKlineDataQuality"
                   />
                 </div>
               </div>
@@ -1079,6 +1089,7 @@ export default {
       czscLayerVisibility: { fractals: true, strokes: true, unfinished: true, signals: true },
       czscLayerState: { state: 'idle', message: '' },
       syncingTodayKline: false,
+      klineDataQuality: {},
       quickTradeDrawerVisible: false,
       paramDrawerVisible: false,
       indicatorParamOverrides: {},
@@ -1209,6 +1220,23 @@ export default {
     klineRealtimeEnabled () {
       return !!(this.symbol && String(this.symbol).trim())
     },
+    klineQualityText () {
+      const quality = this.klineDataQuality || {}
+      const source = quality.derived
+        ? this.$t('indicatorIde.klineQuality.derived', { timeframe: quality.source_timeframe || '-' })
+        : (quality.source_timeframe || this.timeframe)
+      return this.$t('indicatorIde.klineQuality.summary', {
+        source,
+        date: quality.latest_trade_date || '-',
+        count: Number(quality.bar_count || 0)
+      })
+    },
+    klineQualityTooltip () {
+      const quality = this.klineDataQuality || {}
+      const statusKey = quality.quality_status === 'complete' ? 'complete' : 'limited'
+      const temporary = quality.temporary_active ? this.$t('indicatorIde.klineQuality.temporary') : ''
+      return `${this.$t(`indicatorIde.klineQuality.${statusKey}`)}${temporary ? ` · ${temporary}` : ''}`
+    },
     selectedIndicatorObj () {
       return this.selectedIndicatorId ? this.indicators.find(i => i.id === this.selectedIndicatorId) : null
     },
@@ -1329,6 +1357,9 @@ export default {
     } catch (_) {}
   },
   methods: {
+    handleKlineDataQuality (quality) {
+      this.klineDataQuality = quality && typeof quality === 'object' ? quality : {}
+    },
     async syncTodayKline () {
       if (this.market !== 'CNStock' || !this.symbol || this.syncingTodayKline) return
       this.syncingTodayKline = true
@@ -3687,6 +3718,29 @@ export default {
   gap: 6px;
   flex-shrink: 0;
 }
+.chart-panel-data-quality {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 260px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #b7eb8f;
+  border-radius: 6px;
+  color: #237804;
+  background: #f6ffed;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-panel-data-quality--warning {
+  border-color: #ffe58f;
+  color: #ad6800;
+  background: #fffbe6;
+}
 .chart-panel-action-btn {
   height: 28px !important;
   padding: 0 12px !important;
@@ -3742,6 +3796,17 @@ export default {
   white-space: nowrap;
 }
 @media (max-width: 1180px) {
+  .chart-panel-data-quality {
+    width: 28px;
+    max-width: 28px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
+    .anticon {
+      font-size: 13px;
+    }
+  }
   .chart-panel-action-btn {
     width: 28px;
     min-width: 28px !important;
@@ -5683,6 +5748,16 @@ body.dark .ide-signal-alert-modal-wrap {
     .chart-panel-toolbar-controls .ide-toolbar-label {
       color: rgba(255, 255, 255, 0.45);
     }
+  }
+  .chart-panel-data-quality {
+    border-color: rgba(82, 196, 26, 0.4);
+    color: #95de64;
+    background: rgba(82, 196, 26, 0.1);
+  }
+  .chart-panel-data-quality--warning {
+    border-color: rgba(250, 173, 20, 0.42);
+    color: #ffc53d;
+    background: rgba(250, 173, 20, 0.1);
   }
   .chart-panel-qt-btn.ant-btn-default {
     background: #262626;

@@ -7578,5 +7578,10 @@ export default {
   "indicatorIde.syncTodayKline": "Sync Today's Bars",
   "indicatorIde.syncTodayKlineHint": "Fetch today's minute and daily bars for the current A-share from Tencent and keep them temporarily on the server until complete canonical data is available",
   "indicatorIde.syncTodayKlineSuccess": "Today's bars synced: {minute} one-minute bars and {daily} daily bar(s)",
-  "indicatorIde.syncTodayKlineFailed": "Failed to sync today's bars"
+  "indicatorIde.syncTodayKlineFailed": "Failed to sync today's bars",
+  "indicatorIde.klineQuality.derived": "Derived from {timeframe}",
+  "indicatorIde.klineQuality.summary": "{source} · through {date} · {count} bars",
+  "indicatorIde.klineQuality.complete": "The requested range is complete",
+  "indicatorIde.klineQuality.limited": "Available history is shorter than requested",
+  "indicatorIde.klineQuality.temporary": "Includes temporary server bars"
 }

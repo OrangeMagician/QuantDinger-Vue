@@ -7366,5 +7366,10 @@ export default {
   "indicatorIde.syncTodayKline": "同步当天 K 线",
   "indicatorIde.syncTodayKlineHint": "从腾讯获取当前 A 股的当天分钟线和日线，临时保存在服务器；完整行情到位后自动清理",
   "indicatorIde.syncTodayKlineSuccess": "当天 K 线已同步：{minute} 条 1 分钟线，{daily} 条日线",
-  "indicatorIde.syncTodayKlineFailed": "同步当天 K 线失败"
+  "indicatorIde.syncTodayKlineFailed": "同步当天 K 线失败",
+  "indicatorIde.klineQuality.derived": "由 {timeframe} 聚合",
+  "indicatorIde.klineQuality.summary": "{source} · 截止 {date} · {count} 根",
+  "indicatorIde.klineQuality.complete": "当前请求范围数据完整",
+  "indicatorIde.klineQuality.limited": "可用历史少于请求数量",
+  "indicatorIde.klineQuality.temporary": "包含服务器临时行情"
 }
