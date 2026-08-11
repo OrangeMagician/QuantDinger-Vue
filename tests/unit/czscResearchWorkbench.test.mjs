@@ -88,6 +88,7 @@ test('CZSC is a selectable built-in indicator and the legacy trend page keeps mu
   assert.match(ide, /czscLayerVisibility/)
   assert.match(chart, /computeChartLayers/)
   assert.match(chart, /bars: bars\.map/)
+  assert.match(chart, /template_id: 'classic_bs_v1'/)
 })
 
 test('structure chart renders volume, MACD and aligned CZSC overlays', async () => {
@@ -106,8 +107,25 @@ test('structure chart renders volume, MACD and aligned CZSC overlays', async () 
   assert.match(layers, /normalizeEpochMilliseconds\(stroke\.start_timestamp\)/)
   assert.match(layers, /normalizeEpochMilliseconds\(fractal\.timestamp\)/)
   assert.match(layers, /signal\?\.conditions\?\.fractal_datetime/)
+  assert.match(layers, /result\?\.template_signal_events/)
   assert.match(layers, /reserveCzscAnnotationLanes/)
   assert.match(layers, /confirmedKeys\.has/)
+})
+
+test('indicator IDE localizes the official SuperTrend sample in Chinese', async () => {
+  const [ide, chart, zh] = await Promise.all([
+    source('views/indicator-ide/index.vue'),
+    source('views/indicator-analysis/components/KlineChart.vue'),
+    source('locales/lang/zh-CN.js')
+  ])
+
+  assert.match(ide, /indicatorIde\.builtin\.superTrendName/)
+  assert.match(chart, /localizeOfficialSuperTrendResult/)
+  assert.match(chart, /indicatorIde\.builtin\.buyPointShort/)
+  assert.match(chart, /indicatorIde\.builtin\.sellPointShort/)
+  assert.match(zh, /\[示例\] SuperTrend 趋势跟踪/)
+  assert.match(zh, /SuperTrend 上涨趋势/)
+  assert.match(zh, /SuperTrend 下跌趋势/)
 })
 
 test('research workflows use one task center and product task IDs', async () => {

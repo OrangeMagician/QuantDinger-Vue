@@ -657,6 +657,7 @@ export default {
           symbol: props.symbol,
           name: props.symbol,
           timeframe: props.timeframe,
+          template_id: 'classic_bs_v1',
           bars: bars.map(item => ({
             timestamp: Number(item.timestamp),
             open: Number(item.open),
@@ -1269,6 +1270,38 @@ export default {
       }
     }
 
+    const localizeOfficialSuperTrendResult = (result, indicatorInfo = {}) => {
+      const code = String(indicatorInfo.code || indicatorInfo.userCode || '')
+      const name = String(indicatorInfo.name || result?.name || '')
+      const official = name === '[Sample] SuperTrend Trend-Following' ||
+        code.includes('# [Sample] SuperTrend Trend-Following -- classic ATR channel flip')
+      if (!official || !result || typeof result !== 'object') return result
+
+      const translate = (key, fallback) => proxy.$te(key) ? proxy.$t(key) : fallback
+      result.name = translate('indicatorIde.builtin.superTrendName', name)
+      result.description = translate('indicatorIde.builtin.superTrendDescription', result.description || '')
+      result.plots = (result.plots || []).map(plot => {
+        if (plot.name === 'SuperTrend Up') {
+          return { ...plot, name: translate('indicatorIde.builtin.superTrendUp', plot.name) }
+        }
+        if (plot.name === 'SuperTrend Down') {
+          return { ...plot, name: translate('indicatorIde.builtin.superTrendDown', plot.name) }
+        }
+        return plot
+      })
+      result.signals = (result.signals || []).map(signal => {
+        const side = String(signal.type || signal.action || '').toLowerCase()
+        if (side === 'buy') {
+          return { ...signal, text: translate('indicatorIde.builtin.buyPointShort', signal.text || 'B') }
+        }
+        if (side === 'sell') {
+          return { ...signal, text: translate('indicatorIde.builtin.sellPointShort', signal.text || 'S') }
+        }
+        return signal
+      })
+      return result
+    }
+
     const parsePythonStrategy = (code) => {
       if (!code || typeof code !== 'string') {
         return null
@@ -1383,7 +1416,7 @@ export default {
           result.calculatedVars = {}
         }
 
-        return result
+        return localizeOfficialSuperTrendResult(result, indicatorInfo)
       } catch (err) {
         throw new Error(`Python execution failed: ${err.message}`)
       }

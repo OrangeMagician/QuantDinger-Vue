@@ -2205,7 +2205,13 @@ export default {
       if (!ind.id && !ind.name) return '--'
       const code = this.getIndicatorExecutableCode(ind, undefined)
       const codeName = this.extractIndicatorNameFromCode(code)
-      return codeName || ind.name || (`Indicator #${ind.id}`)
+      const rawName = codeName || ind.name || (`Indicator #${ind.id}`)
+      if (rawName === '[Sample] SuperTrend Trend-Following') {
+        return this.$te('indicatorIde.builtin.superTrendName')
+          ? this.$t('indicatorIde.builtin.superTrendName')
+          : rawName
+      }
+      return rawName
     },
     resolveIndicatorNameForSave (indicator, code) {
       const ind = indicator || {}

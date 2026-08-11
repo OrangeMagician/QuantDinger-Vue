@@ -31,7 +31,7 @@ const collectCzscAnnotations = ({ result, visibility, translate }) => {
       }))
     : []
   const signals = enabled.signals
-    ? ((result?.enhanced_signals || []).filter(signal => {
+    ? ([...(result?.template_signal_events || []), ...(result?.enhanced_signals || [])].filter(signal => {
         if (signal?.category !== 'fractal' || !enabled.fractals) return true
         const mark = signal.chart_mark || {}
         const kind = String(signal.signal_type || '').includes('top') ? 'top' : 'bottom'
@@ -277,7 +277,7 @@ export function renderCzscOverlays ({ chart, result, visibility, dark, marketCol
         points: [{ timestamp, value: Number(mark.price) }],
         extendData: {
           text,
-          color: mark.color,
+          color: mark.color || (signal.direction === 'bearish' ? market.fall : market.rise),
           position: mark.position,
           lane: annotationLayout.lanes.get(signal) || 0
         },
