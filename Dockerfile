@@ -1,7 +1,7 @@
 # QuantDinger Frontend — multi-arch image published to GHCR.
 #
 # Stage 1 (builder) is pinned to --platform=$BUILDPLATFORM so the Vue build
-# runs once natively on the host (typically linux/amd64 on GitHub Actions),
+# runs once natively on the build host (typically linux/amd64),
 # NOT twice with the arm64 manifest entry forced through QEMU emulation
 # (~5–10× slower). The build output (/app/dist) is pure static JS/CSS,
 # byte-identical across architectures; the nginx stage just COPYs those
