@@ -229,6 +229,18 @@
                         <span>通知</span>
                         <em>{{ runningSignalAlertCount }}</em>
                       </a-button>
+                      <a-tooltip v-if="market === 'CNStock'" placement="bottom" :title="$t('indicatorIde.syncTodayKlineHint')">
+                        <a-button
+                          size="small"
+                          class="chart-panel-action-btn chart-panel-sync-kline-btn"
+                          :loading="syncingTodayKline"
+                          :disabled="!symbol"
+                          @click="syncTodayKline"
+                        >
+                          <a-icon v-if="!syncingTodayKline" type="sync" />
+                          <span>{{ $t('indicatorIde.syncTodayKline') }}</span>
+                        </a-button>
+                      </a-tooltip>
                       <a-tooltip
                         placement="bottom"
                         :title="selectedIndicatorCodeHidden ? $t('indicatorIde.aiConvertHiddenBlocked') : $t('indicatorIde.aiConvertToStrategy')"
@@ -985,6 +997,7 @@ import { getUserInfo } from '@/api/login'
 import { getNotificationSettings } from '@/api/user'
 import { getWatchlist, addWatchlist, searchSymbols } from '@/api/market'
 import { getPublicSettingsConfig } from '@/api/settings'
+import { syncTodayMarketBars } from '@/api/domain'
 import { extractIndicatorSignalLabels } from '@/utils/indicatorSignalOptions'
 import KlineChart from '@/views/indicator-analysis/components/KlineChart.vue'
 import QuickTradePanel from '@/components/QuickTradePanel/QuickTradePanel'
@@ -1065,6 +1078,7 @@ export default {
       czscIndicatorEnabled: false,
       czscLayerVisibility: { fractals: true, strokes: true, unfinished: true, signals: true },
       czscLayerState: { state: 'idle', message: '' },
+      syncingTodayKline: false,
       quickTradeDrawerVisible: false,
       paramDrawerVisible: false,
       indicatorParamOverrides: {},
@@ -1315,6 +1329,32 @@ export default {
     } catch (_) {}
   },
   methods: {
+    async syncTodayKline () {
+      if (this.market !== 'CNStock' || !this.symbol || this.syncingTodayKline) return
+      this.syncingTodayKline = true
+      try {
+        const response = await syncTodayMarketBars({ market: this.market, symbol: this.symbol })
+        if (!response || response.code !== 1 || !response.data) {
+          throw new Error((response && response.msg) || this.$t('indicatorIde.syncTodayKlineFailed'))
+        }
+        const counts = response.data.bar_counts || {}
+        this.$message.success(this.$t('indicatorIde.syncTodayKlineSuccess', {
+          minute: Number(counts['1m'] || 0),
+          daily: Number(counts['1D'] || 0)
+        }))
+        await this.$nextTick()
+        const chart = this.$refs.klineChart
+        if (chart && typeof chart.loadKlineData === 'function') {
+          await chart.loadKlineData()
+        }
+      } catch (error) {
+        const fallback = this.$t('indicatorIde.syncTodayKlineFailed')
+        const detail = error && error.message ? String(error.message) : ''
+        this.$message.error(detail && detail !== fallback ? `${fallback}: ${detail}` : fallback)
+      } finally {
+        this.syncingTodayKline = false
+      }
+    },
     toggleCodeDrawer () {
       this.codeDrawerVisible = !this.codeDrawerVisible
     },

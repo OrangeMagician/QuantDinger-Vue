@@ -12,6 +12,10 @@ export function getMarketBars (params = {}) {
   return request({ url: '/api/v2/market/bars', method: 'get', params, timeout: 30000 })
 }
 
+export function syncTodayMarketBars (data = {}) {
+  return request({ url: '/api/v2/market/bars/sync-today', method: 'post', data, timeout: 45000 })
+}
+
 export function createChartLayerRun (data, idempotencyKey) {
   return request({
     url: '/api/v2/chart-layer-runs',

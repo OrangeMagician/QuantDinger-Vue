@@ -7574,5 +7574,9 @@ export default {
   "settings.group.page_preferences": "Page Settings",
   "settings.page.language": "Interface language",
   "settings.page.languageDescription": "Choose the language used for system menus and page text",
-  "profile.credits.wallet": "Wallet"
+  "profile.credits.wallet": "Wallet",
+  "indicatorIde.syncTodayKline": "Sync Today's Bars",
+  "indicatorIde.syncTodayKlineHint": "Fetch today's minute and daily bars for the current A-share from Tencent and keep them temporarily on the server until complete canonical data is available",
+  "indicatorIde.syncTodayKlineSuccess": "Today's bars synced: {minute} one-minute bars and {daily} daily bar(s)",
+  "indicatorIde.syncTodayKlineFailed": "Failed to sync today's bars"
 }

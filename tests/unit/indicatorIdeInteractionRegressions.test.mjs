@@ -75,6 +75,18 @@ test('transient kline failures stay in loading state until failure is confirmed'
   assert.match(klineChartSource, /v-if="error && !loading && !loadFailurePending"/)
 })
 
+test('A-share indicator chart can sync temporary current-day bars and reload in place', () => {
+  assert.match(
+    indicatorIdeSource,
+    /v-if="market === 'CNStock'"[\s\S]*?@click="syncTodayKline"[\s\S]*?indicatorIde\.syncTodayKline/
+  )
+  assert.match(
+    indicatorIdeSource,
+    /async syncTodayKline \(\)[\s\S]*?syncTodayMarketBars\(\{ market: this\.market, symbol: this\.symbol \}\)[\s\S]*?chart\.loadKlineData\(\)/
+  )
+  assert.match(indicatorIdeSource, /syncingTodayKline: false/)
+})
+
 test('chart annotations share collision lanes and keep labels away from candle bodies', () => {
   assert.match(klineChartSource, /reserveCzscAnnotationLanes\(\{[\s\S]*?allocateLane: allocateAnnotationLane/)
   assert.match(klineChartSource, /labelLane: text \? allocateLane\(\{ timestamp: end, side: labelSide, text/)

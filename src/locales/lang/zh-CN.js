@@ -7362,5 +7362,9 @@ export default {
   "settings.group.page_preferences": "页面设置",
   "settings.page.language": "界面语言",
   "settings.page.languageDescription": "切换系统菜单和页面文字使用的语言",
-  "profile.credits.wallet": "钱包"
+  "profile.credits.wallet": "钱包",
+  "indicatorIde.syncTodayKline": "同步当天 K 线",
+  "indicatorIde.syncTodayKlineHint": "从腾讯获取当前 A 股的当天分钟线和日线，临时保存在服务器；完整行情到位后自动清理",
+  "indicatorIde.syncTodayKlineSuccess": "当天 K 线已同步：{minute} 条 1 分钟线，{daily} 条日线",
+  "indicatorIde.syncTodayKlineFailed": "同步当天 K 线失败"
 }
