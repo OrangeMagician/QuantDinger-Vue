@@ -885,6 +885,75 @@
         <pre>{{ codeVersionPreview.code }}</pre>
       </div>
     </a-drawer>
+    <a-drawer
+      :title="$t('indicatorIde.czsc.multiPeriod')"
+      :visible="czscMultiPeriodDrawerVisible"
+      :width="520"
+      :get-container="ideModalGetContainer"
+      :wrap-class-name="isDarkTheme ? 'ide-drawer-wrap ide-drawer-wrap--dark' : 'ide-drawer-wrap'"
+      @close="closeCzscMultiPeriod"
+    >
+      <div class="czsc-multi-drawer">
+        <div class="czsc-multi-context">
+          <div>
+            <strong>{{ czscMultiPeriodSymbolLabel }}</strong>
+            <span>{{ $t('indicatorIde.czsc.multiPeriodContext', { timeframe }) }}</span>
+          </div>
+          <a-button
+            size="small"
+            icon="reload"
+            :loading="czscMultiPeriodLoading"
+            @click="loadCzscMultiPeriod"
+          >{{ $t('indicatorIde.czsc.refreshMultiPeriod') }}</a-button>
+        </div>
+        <div class="czsc-multi-selector">
+          <span class="czsc-multi-selector__label">{{ $t('indicatorIde.czsc.periods') }}</span>
+          <a-checkbox-group
+            v-model="czscMultiPeriodTimeframes"
+            :options="czscMultiPeriodOptions"
+            @change="loadCzscMultiPeriod"
+          />
+        </div>
+        <a-alert
+          v-if="czscMultiPeriodError"
+          type="warning"
+          show-icon
+          :message="$t('trendChart.multiFailed')"
+          :description="czscMultiPeriodError"
+        />
+        <a-spin :spinning="czscMultiPeriodLoading">
+          <a-empty
+            v-if="!czscMultiPeriodLoading && !czscMultiPeriodResult && !czscMultiPeriodError"
+            :description="$t('indicatorIde.czsc.multiPeriodEmpty')"
+          />
+          <template v-if="czscMultiPeriodResult">
+            <div class="czsc-multi-summary">
+              <div><span>{{ $t('trendChart.direction') }}</span><strong :class="`is-${czscDirectionClass(czscMultiPeriodResult.summary && czscMultiPeriodResult.summary.direction)}`">{{ directionLabel(czscMultiPeriodResult.summary && czscMultiPeriodResult.summary.direction) }}</strong></div>
+              <div><span>{{ $t('trendChart.resonance') }}</span><strong>{{ czscMultiPeriodResult.summary && czscMultiPeriodResult.summary.resonance_level || '-' }}</strong></div>
+              <div><span>{{ $t('trendChart.bullishPeriods') }}</span><strong>{{ czscMultiPeriodResult.summary && czscMultiPeriodResult.summary.bullish_periods || 0 }}</strong></div>
+              <div><span>{{ $t('trendChart.bearishPeriods') }}</span><strong>{{ czscMultiPeriodResult.summary && czscMultiPeriodResult.summary.bearish_periods || 0 }}</strong></div>
+            </div>
+            <div class="czsc-multi-period-list">
+              <article v-for="row in czscMultiPeriodRows" :key="row.timeframe" class="czsc-multi-period-card">
+                <header>
+                  <strong>{{ row.timeframe }}</strong>
+                  <a-tag :color="directionColor(row.direction)">{{ directionLabel(row.direction) }}</a-tag>
+                </header>
+                <dl>
+                  <div><dt>{{ $t('trendChart.score') }}</dt><dd>{{ Number(row.score || 0).toFixed(1) }}</dd></div>
+                  <div><dt>MACD</dt><dd>{{ row.features && row.features.macd_cross || '-' }}</dd></div>
+                  <div><dt>MA</dt><dd>{{ row.features && row.features.ma_state || '-' }}</dd></div>
+                </dl>
+                <p>{{ (row.signals || []).slice(0, 3).map(item => item.signal_type_label || item.signal_type).join(' · ') || $t('trendChart.noSignals') }}</p>
+                <a-button type="link" size="small" icon="line-chart" @click="applyCzscMultiPeriodTimeframe(row.timeframe)">
+                  {{ $t('indicatorIde.czsc.applyToChart') }}
+                </a-button>
+              </article>
+            </div>
+          </template>
+        </a-spin>
+      </div>
+    </a-drawer>
     <a-modal
       :title="publishIndicator && publishIndicator.publish_to_community ? $t('dashboard.indicator.publish.editTitle') : $t('dashboard.indicator.publish.title')"
       :visible="showPublishModal"
@@ -1007,7 +1076,8 @@ import { getUserInfo } from '@/api/login'
 import { getNotificationSettings } from '@/api/user'
 import { getWatchlist, addWatchlist, searchSymbols } from '@/api/market'
 import { getPublicSettingsConfig } from '@/api/settings'
-import { syncTodayMarketBars } from '@/api/domain'
+import { computeChartLayers, createMultiPeriodRun, getMarketBars, getTask, syncTodayMarketBars } from '@/api/domain'
+import { normalizeCzscSymbol } from '@/utils/czscSymbols'
 import { extractIndicatorSignalLabels } from '@/utils/indicatorSignalOptions'
 import KlineChart from '@/views/indicator-analysis/components/KlineChart.vue'
 import QuickTradePanel from '@/components/QuickTradePanel/QuickTradePanel'
@@ -1089,6 +1159,18 @@ export default {
       czscIndicatorEnabled: false,
       czscLayerVisibility: { fractals: true, strokes: true, unfinished: true, signals: true },
       czscLayerState: { state: 'idle', message: '' },
+      czscMultiPeriodDrawerVisible: false,
+      czscMultiPeriodLoading: false,
+      czscMultiPeriodError: '',
+      czscMultiPeriodResult: null,
+      czscMultiPeriodTimeframes: ['1d', '30m', '5m'],
+      czscMultiPeriodOptions: [
+        { label: '1D', value: '1d' },
+        { label: '30m', value: '30m' },
+        { label: '5m', value: '5m' },
+        { label: '1m', value: '1m' }
+      ],
+      czscMultiPeriodGeneration: 0,
       syncingTodayKline: false,
       klineDataQuality: {},
       quickTradeDrawerVisible: false,
@@ -1300,6 +1382,14 @@ export default {
       if (!n) return this.$t('indicatorIde.indicatorPickPlaceholder')
       if (!customCount) return `${this.$t('indicatorIde.czsc.name')} · ${this.$t('indicatorIde.indicatorCountOnChart', { n })}`
       return `${edLabel} · ${this.$t('indicatorIde.indicatorCountOnChart', { n })}`
+    },
+    czscMultiPeriodRows () {
+      const result = this.czscMultiPeriodResult || {}
+      return Array.isArray(result.signal_tree) ? result.signal_tree : []
+    },
+    czscMultiPeriodSymbolLabel () {
+      const item = (this.watchlist || []).find(row => this.watchlistContextKey(row) === this.selectedWatchlistKey)
+      return item && item.name ? `${this.symbol} ${item.name}` : this.symbol
     }
   },
   created: async function () {
@@ -1331,6 +1421,7 @@ export default {
     })
   },
   beforeDestroy () {
+    this.czscMultiPeriodGeneration += 1
     if (this._persistIdeUiTimer) {
       clearTimeout(this._persistIdeUiTimer)
       this._persistIdeUiTimer = null
@@ -1379,6 +1470,8 @@ export default {
         if (chart && typeof chart.loadKlineData === 'function') {
           await chart.loadKlineData()
         }
+        this.resetCzscMultiPeriodResult()
+        if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
       } catch (error) {
         const fallback = this.$t('indicatorIde.syncTodayKlineFailed')
         const detail = error && error.message ? String(error.message) : ''
@@ -1683,10 +1776,140 @@ export default {
     },
     openCzscMultiPeriod () {
       this.indicatorDropdownVisible = false
-      this.$router.push({
-        path: '/trend-chart',
-        query: { symbol: this.symbol, timeframe: this.timeframe, mode: 'multi-period' }
-      }).catch(() => {})
+      this.czscMultiPeriodDrawerVisible = true
+      this.loadCzscMultiPeriod()
+    },
+    closeCzscMultiPeriod () {
+      this.czscMultiPeriodDrawerVisible = false
+    },
+    resetCzscMultiPeriodResult () {
+      this.czscMultiPeriodGeneration += 1
+      this.czscMultiPeriodLoading = false
+      this.czscMultiPeriodError = ''
+      this.czscMultiPeriodResult = null
+    },
+    marketRequestForCzsc (timeframe, limit = 1000) {
+      const params = { market: this.market, symbol: this.symbol, timeframe, limit }
+      if (this.market === 'Crypto') {
+        params.exchange_id = this.cryptoExchangeId
+        params.market_type = this.cryptoMarketType
+      }
+      if (this.currentInstrumentId) params.instrument_id = this.currentInstrumentId
+      return params
+    },
+    normalizeCzscAnalysisBars (rows) {
+      return (rows || []).map(item => ({
+        timestamp: item.timestamp != null ? item.timestamp : item.time,
+        open: Number(item.open),
+        high: Number(item.high),
+        low: Number(item.low),
+        close: Number(item.close),
+        ...(item.volume != null || item.vol != null ? { volume: Number(item.volume != null ? item.volume : item.vol) } : {}),
+        ...(item.turnover != null || item.amount != null ? { turnover: Number(item.turnover != null ? item.turnover : item.amount) } : {})
+      })).filter(item => item.timestamp != null && [item.open, item.high, item.low, item.close].every(Number.isFinite))
+    },
+    async loadCzscMultiPeriod () {
+      const selected = Array.isArray(this.czscMultiPeriodTimeframes) ? this.czscMultiPeriodTimeframes.filter(Boolean) : []
+      const generation = ++this.czscMultiPeriodGeneration
+      this.czscMultiPeriodError = ''
+      this.czscMultiPeriodResult = null
+      if (selected.length < 2) {
+        this.czscMultiPeriodLoading = false
+        this.czscMultiPeriodError = this.$t('indicatorIde.czsc.multiPeriodSelectAtLeast')
+        return
+      }
+      this.czscMultiPeriodLoading = true
+      try {
+        if (this.market === 'CNStock') {
+          const response = await createMultiPeriodRun({
+            symbol: normalizeCzscSymbol(this.symbol),
+            timeframes: selected,
+            limit: 1000
+          }, `indicator-multi-${this.market}-${this.symbol}-${selected.join('-')}-${Date.now()}`)
+          if (!response || response.code !== 1 || !response.data || !response.data.task_id) {
+            throw new Error(response && response.msg || this.$t('trendChart.multiFailed'))
+          }
+          const task = await this.waitForCzscMultiPeriodTask(response.data.task_id, generation)
+          if (generation === this.czscMultiPeriodGeneration) this.czscMultiPeriodResult = task.result && task.result.payload
+          return
+        }
+        const rows = await Promise.all(selected.map(timeframe => this.loadCzscMultiPeriodBars(timeframe, generation)))
+        if (generation !== this.czscMultiPeriodGeneration) return
+        const bullish = rows.filter(row => row.direction === 'bullish').length
+        const bearish = rows.filter(row => row.direction === 'bearish').length
+        this.czscMultiPeriodResult = {
+          summary: {
+            direction: bullish > bearish ? 'bullish' : bearish > bullish ? 'bearish' : 'neutral',
+            resonance_level: bullish === rows.length || bearish === rows.length ? 'strong' : bullish || bearish ? 'mixed' : 'neutral',
+            bullish_periods: bullish,
+            bearish_periods: bearish
+          },
+          signal_tree: rows
+        }
+      } catch (error) {
+        if (generation === this.czscMultiPeriodGeneration) this.czscMultiPeriodError = error.backendMessage || error.message || String(error)
+      } finally {
+        if (generation === this.czscMultiPeriodGeneration) this.czscMultiPeriodLoading = false
+      }
+    },
+    async loadCzscMultiPeriodBars (timeframe, generation) {
+      const barsResponse = await getMarketBars(this.marketRequestForCzsc(timeframe))
+      if (!barsResponse || barsResponse.code !== 1) throw new Error(barsResponse && barsResponse.msg || this.$t('trendChart.multiFailed'))
+      const payload = barsResponse.data || {}
+      const bars = this.normalizeCzscAnalysisBars(Array.isArray(payload.bars) ? payload.bars : [])
+      if (bars.length < 20) throw new Error(this.$t('indicatorIde.czsc.notEnoughBars'))
+      const layerResponse = await computeChartLayers({
+        market: this.market,
+        symbol: this.symbol,
+        timeframe,
+        bars,
+        snapshot_id: payload.data_provenance && (payload.data_provenance.snapshot_id || payload.data_provenance.snapshotId)
+      })
+      if (!layerResponse || layerResponse.code !== 1) throw new Error(layerResponse && layerResponse.msg || this.$t('trendChart.multiFailed'))
+      if (generation !== this.czscMultiPeriodGeneration) return { timeframe, direction: 'neutral', score: 0, features: {}, signals: [] }
+      const result = layerResponse.data || {}
+      const strokeDirection = result.summary && result.summary.last_stroke_direction
+      return {
+        timeframe,
+        direction: strokeDirection === 'up' ? 'bullish' : strokeDirection === 'down' ? 'bearish' : 'neutral',
+        score: result.factor_features && result.factor_features.score || 0,
+        features: result.factor_features || {},
+        signals: result.enhanced_signals || [],
+        data_provenance: result.data_provenance || result.dataProvenance || null
+      }
+    },
+    async waitForCzscMultiPeriodTask (taskId, generation) {
+      const deadline = Date.now() + 180000
+      while (Date.now() < deadline && generation === this.czscMultiPeriodGeneration) {
+        const response = await getTask(taskId)
+        if (!response || response.code !== 1) throw new Error(response && response.msg || this.$t('trendChart.taskFailed'))
+        const task = response.data
+        if (task.status === 'SUCCEEDED') return task
+        if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(task.status)) throw new Error(task.error_message || task.status)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+      throw new Error(this.$t('trendChart.taskTimeout'))
+    },
+    directionLabel (value) {
+      if (['bullish', 'up'].includes(value)) return this.$t('trendChart.bullish')
+      if (['bearish', 'down'].includes(value)) return this.$t('trendChart.bearish')
+      return this.$t('trendChart.neutral')
+    },
+    directionColor (value) {
+      if (typeof this.$marketColor === 'function') {
+        if (['bullish', 'up'].includes(value)) return this.$marketColor('bullish')
+        if (['bearish', 'down'].includes(value)) return this.$marketColor('bearish')
+      }
+      return ['bullish', 'up'].includes(value) ? 'green' : ['bearish', 'down'].includes(value) ? 'red' : 'blue'
+    },
+    czscDirectionClass (value) {
+      return ['bullish', 'up'].includes(value) ? 'bullish' : ['bearish', 'down'].includes(value) ? 'bearish' : 'neutral'
+    },
+    applyCzscMultiPeriodTimeframe (value) {
+      const raw = String(value || '')
+      const next = Object.keys(TF_MAX_DAYS).find(item => item.toLowerCase() === raw.toLowerCase()) || raw
+      if (Object.prototype.hasOwnProperty.call(TF_MAX_DAYS, next)) this.timeframe = next
+      this.$message.success(this.$t('indicatorIde.czsc.appliedToChart', { timeframe: next }))
     },
     pruneChartVisibleIndicatorIds () {
       const set = new Set(this.indicators.map(i => Number(i.id)))
@@ -3611,14 +3834,18 @@ export default {
     },
     market () {
       this.schedulePersistIdeUiState()
+      this.resetCzscMultiPeriodResult()
+      if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
     },
     cryptoExchangeId () {
       this.ensureChartReady()
       this.schedulePersistIdeUiState()
+      if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
     },
     cryptoMarketType () {
       this.ensureChartReady()
       this.schedulePersistIdeUiState()
+      if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
     },
     selectedIndicatorId () {
       this.schedulePersistIdeUiState()
@@ -3677,10 +3904,14 @@ export default {
       this.qtSymbol = this.symbol
       this.ensureChartReady()
       this.schedulePersistIdeUiState()
+      this.resetCzscMultiPeriodResult()
+      if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
     },
     timeframe () {
       this.ensureChartReady()
       this.schedulePersistIdeUiState()
+      this.resetCzscMultiPeriodResult()
+      if (this.czscMultiPeriodDrawerVisible) this.loadCzscMultiPeriod()
     },
     aiGenerating (val) {
       if (val) {
@@ -5191,6 +5422,46 @@ body.dark .ide-signal-alert-modal-wrap {
     background: linear-gradient(135deg, var(--primary-color, #1890ff) 0%, var(--primary-color-active, #096dd9) 100%);
     box-shadow: 0 2px 6px rgba(24, 144, 255, 0.28);
   }
+}
+
+.czsc-multi-drawer {
+  color: #1f2937;
+}
+.czsc-multi-context,
+.czsc-multi-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.czsc-multi-context > div { min-width: 0; }
+.czsc-multi-context strong,
+.czsc-multi-context span { display: block; }
+.czsc-multi-context strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.czsc-multi-context span { margin-top: 3px; color: #8c8c8c; font-size: 12px; }
+.czsc-multi-selector { align-items: flex-start; justify-content: flex-start; padding: 10px 12px; border: 1px solid #e5e7eb; background: #fafafa; }
+.czsc-multi-selector__label { min-width: 66px; padding-top: 3px; color: #6b7280; font-size: 12px; }
+.czsc-multi-summary { display: grid; grid-template-columns: repeat(4, 1fr); margin: 14px 0; border: 1px solid #e5e7eb; }
+.czsc-multi-summary div { min-width: 0; padding: 10px; border-right: 1px solid #e5e7eb; }
+.czsc-multi-summary div:last-child { border-right: 0; }
+.czsc-multi-summary span, .czsc-multi-summary strong { display: block; }
+.czsc-multi-summary span { color: #8c8c8c; font-size: 11px; }
+.czsc-multi-summary strong { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.czsc-multi-summary strong.is-bullish { color: #389e0d; }
+.czsc-multi-summary strong.is-bearish { color: #cf1322; }
+.czsc-multi-period-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.czsc-multi-period-card { padding: 12px; border: 1px solid #e5e7eb; border-radius: 4px; }
+.czsc-multi-period-card header { display: flex; align-items: center; justify-content: space-between; }
+.czsc-multi-period-card dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 12px 0 8px; }
+.czsc-multi-period-card dt { color: #8c8c8c; font-size: 11px; }
+.czsc-multi-period-card dd { margin: 2px 0 0; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.czsc-multi-period-card p { min-height: 18px; margin: 0 0 4px; color: #6b7280; font-size: 12px; }
+@media (max-width: 560px) {
+  .czsc-multi-summary { grid-template-columns: repeat(2, 1fr); }
+  .czsc-multi-summary div:nth-child(2) { border-right: 0; }
+  .czsc-multi-summary div:nth-child(-n + 2) { border-bottom: 1px solid #e5e7eb; }
+  .czsc-multi-period-list { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 360px) {
