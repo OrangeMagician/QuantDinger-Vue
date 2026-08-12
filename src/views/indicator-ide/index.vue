@@ -1063,7 +1063,8 @@ export default {
       codeDirty: false,
       cmInstance: null,
 
-      codeDrawerVisible: true,
+      // Keep the editor out of the way on first load; the code rail can reopen it.
+      codeDrawerVisible: false,
       codePanelExpanded: true,
       paramsPanelExpanded: true,
 
@@ -3755,6 +3756,12 @@ export default {
 .chart-panel-convert-strategy-btn {
   min-width: 92px;
 }
+.chart-panel-sync-kline-btn {
+  width: 128px !important;
+  min-width: 128px !important;
+  flex: 0 0 128px;
+  white-space: nowrap;
+}
 .chart-panel-signal-alert-btn {
   min-width: 78px;
   border-color: color-mix(in srgb, var(--primary-color, #1890ff) 36%, #d9d9d9) !important;
@@ -3815,6 +3822,16 @@ export default {
 
     span {
       display: none;
+    }
+  }
+  .chart-panel-sync-kline-btn {
+    width: 128px !important;
+    min-width: 128px !important;
+    flex-basis: 128px;
+    padding: 0 10px !important;
+
+    span {
+      display: inline !important;
     }
   }
   .chart-panel-convert-strategy-btn {
