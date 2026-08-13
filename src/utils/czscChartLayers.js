@@ -2,6 +2,7 @@ import { registerOverlay } from 'klinecharts'
 import { marketPalette } from '@/utils/marketColors'
 import { normalizeEpochMilliseconds } from '@/utils/timestamps'
 import { createChartAnnotationLaneAllocator } from '@/utils/chartAnnotationLayout'
+import { selectCompletedStrokeFractals } from '@/utils/czscFractalFilter'
 
 let overlaysRegistered = false
 
@@ -21,7 +22,7 @@ const signalTimestamp = signal => {
 
 const collectCzscAnnotations = ({ result, visibility, translate }) => {
   const enabled = { fractals: true, unfinished: true, signals: true, ...(visibility || {}) }
-  const fractals = enabled.fractals ? (result?.fractals || []) : []
+  const fractals = enabled.fractals ? selectCompletedStrokeFractals(result) : []
   const confirmedKeys = new Set(fractals.map(fractal => {
     return annotationKey(fractal, normalizeEpochMilliseconds(fractal.timestamp))
   }))
