@@ -87,6 +87,15 @@ test('A-share indicator chart can sync temporary current-day bars and reload in 
   assert.match(indicatorIdeSource, /syncingTodayKline: false/)
 })
 
+test('indicator chart reviews screener candidates in place and returns to the source task', () => {
+  assert.match(indicatorIdeSource, /loadCandidateContext/)
+  assert.match(indicatorIdeSource, /screener-review-strip/)
+  assert.match(indicatorIdeSource, /screenerCandidatePosition/)
+  assert.match(indicatorIdeSource, /moveScreenerCandidate \(offset\)/)
+  assert.match(indicatorIdeSource, /this\.\$router\.replace\(\{ path: '\/indicator-ide', query \}\)/)
+  assert.match(indicatorIdeSource, /returnToScreener \(\)[\s\S]*?path: '\/market-screener'[\s\S]*?task_id: taskId/)
+})
+
 test('indicator chart exposes detailed K-line quality and stable multi-period reuse', () => {
   assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.gaps/)
   assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.incomplete/)

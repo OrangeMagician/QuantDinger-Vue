@@ -6,11 +6,16 @@
         <p>{{ $t('marketScreener.subtitle') }}</p>
       </div>
       <div class="header-actions">
+        <span class="draft-state" :class="{ 'draft-state--dirty': draftDirty }">
+          <a-icon :type="draftDirty ? 'edit' : 'check-circle'" />
+          {{ draftStateText }}
+        </span>
         <a-select v-model="activePlanKey" allow-clear :placeholder="$t('marketScreener.planSelect')" @change="loadPlan">
           <a-select-option v-for="plan in plans" :key="plan.plan_key" :value="plan.plan_key">{{ plan.name }}</a-select-option>
         </a-select>
         <a-tooltip :title="$t('marketScreener.savePlan')"><a-button icon="save" @click="openSavePlan" /></a-tooltip>
         <a-tooltip :title="$t('marketScreener.history')"><a-button icon="history" @click="historyVisible = true" /></a-tooltip>
+        <a-tooltip :title="$t('marketScreener.resetConfiguration')"><a-button icon="undo" @click="confirmResetConfiguration" /></a-tooltip>
         <router-link to="/tasks"><a-button icon="profile">{{ $t('menu.dashboard.taskCenter') }}</a-button></router-link>
         <a-tooltip :title="$t('marketScreener.refresh')"><a-button icon="reload" :loading="loadingCatalog" @click="loadReferenceData" /></a-tooltip>
       </div>
@@ -48,7 +53,17 @@
         </a-radio-group>
 
         <a-alert v-if="universeMode === 'watchlist' && !watchlistSymbols.length" class="config-alert" type="warning" show-icon :message="$t('marketScreener.emptyWatchlist')" />
-        <a-textarea v-if="universeMode === 'manual'" v-model="manualSymbols" class="manual-symbols" :rows="4" :placeholder="$t('marketScreener.symbolPlaceholder')" />
+        <template v-if="universeMode === 'manual'">
+          <a-textarea v-model="manualSymbols" class="manual-symbols" :rows="4" :placeholder="$t('marketScreener.symbolPlaceholder')" />
+          <div class="manual-symbol-status">
+            <span><a-icon type="check-circle" /> {{ $t('marketScreener.validSymbols', { count: manualSymbolList.length }) }}</span>
+            <a-tooltip v-if="manualInvalidSymbols.length" :title="manualInvalidSymbols.join(', ')">
+              <a-button type="link" size="small" icon="warning" @click="removeInvalidManualSymbols">
+                {{ $t('marketScreener.invalidSymbols', { count: manualInvalidSymbols.length }) }}
+              </a-button>
+            </a-tooltip>
+          </div>
+        </template>
 
         <div v-if="universeMode === 'pool'" class="pool-settings">
           <label class="wide-field"><span>{{ $t('screenIntelligence.pointInTimeUniverse') }}</span>
@@ -104,14 +119,23 @@
           <a-button type="link" icon="plus" :disabled="conditions.length >= 12" @click="addCondition">{{ $t('marketScreener.addCondition') }}</a-button>
         </div>
 
-        <div v-for="(condition, index) in conditions" :key="condition.key" class="condition-row">
+        <div
+          v-for="(condition, index) in conditions"
+          :key="condition.key"
+          :ref="`condition-${index}`"
+          class="condition-row"
+          :class="{ 'condition-row--invalid': !conditionComplete(condition) }"
+        >
           <div class="condition-topline">
             <a-radio-group v-model="condition.mode" size="small" button-style="solid">
               <a-radio-button value="must">{{ $t('marketScreener.modeMust') }}</a-radio-button>
               <a-radio-button value="should">{{ $t('marketScreener.modeShould') }}</a-radio-button>
               <a-radio-button value="exclude">{{ $t('marketScreener.modeExclude') }}</a-radio-button>
             </a-radio-group>
-            <a-tooltip :title="$t('marketScreener.removeCondition')"><a-button class="condition-delete" shape="circle" icon="delete" size="small" @click="removeCondition(index)" /></a-tooltip>
+            <div class="condition-row-actions">
+              <a-tooltip :title="$t('marketScreener.duplicateCondition')"><a-button shape="circle" icon="copy" size="small" :disabled="conditions.length >= 12" @click="duplicateCondition(index)" /></a-tooltip>
+              <a-tooltip :title="$t('marketScreener.removeCondition')"><a-button class="condition-delete" shape="circle" icon="delete" size="small" @click="removeCondition(index)" /></a-tooltip>
+            </div>
           </div>
           <label class="condition-field condition-field--type"><span>{{ $t('marketScreener.conditionType') }}</span>
             <a-select v-model="condition.catalogKey" show-search option-filter-prop="children" @change="value => chooseCondition(index, value)">
@@ -143,13 +167,21 @@
           <label><span>{{ $t('marketScreener.timeframe') }}</span><a-select v-model="timeframe"><a-select-option value="5m">{{ $t('marketScreener.timeframe5m') }}</a-select-option><a-select-option value="30m">{{ $t('marketScreener.timeframe30m') }}</a-select-option><a-select-option value="1d">{{ $t('marketScreener.timeframe1d') }}</a-select-option></a-select></label>
           <label><span>{{ $t('marketScreener.barLimit') }}</span><a-input-number v-model="limit" :min="200" :max="5000" :step="100" /></label>
         </div>
+        <a-alert
+          class="run-readiness"
+          :type="runIssues.length ? 'warning' : 'success'"
+          show-icon
+          :message="runReadinessText"
+        >
+          <template v-if="runIssues.length" slot="action"><a-button size="small" type="link" @click="focusFirstRunIssue">{{ $t('marketScreener.fixIssue') }}</a-button></template>
+        </a-alert>
         <a-button
           type="primary"
           block
           size="large"
           icon="filter"
           :loading="running"
-          :disabled="runDisabled"
+          :disabled="runDisabled || running"
           @click="runScreen"
         >{{ $t('marketScreener.run') }}</a-button>
       </aside>
@@ -161,8 +193,16 @@
             <a-tag v-if="selectedRows.length" color="blue">{{ $t('marketScreener.selectedCount', { count: selectedRows.length }) }}</a-tag>
             <a-button v-if="selectedRows.length" icon="close-circle" @click="clearSelection">{{ $t('marketScreener.clearSelection') }}</a-button>
             <a-tooltip :title="$t('marketScreener.refreshResults')"><a-button icon="reload" :loading="loadingRows" :disabled="!task" @click="loadResultRows" /></a-tooltip>
-            <a-button icon="download" :loading="exportLoading" :disabled="!displayRows.length" @click="exportCurrentRows">{{ $t('marketScreener.exportResults') }}</a-button>
+            <a-dropdown :trigger="['click']" :disabled="!displayRows.length && !selectedRows.length">
+              <a-button icon="download" :loading="exportLoading">{{ $t('marketScreener.exportResults') }} <a-icon type="down" /></a-button>
+              <a-menu slot="overlay" @click="handleExportMenu">
+                <a-menu-item key="page">{{ $t('marketScreener.exportCurrentPage') }}</a-menu-item>
+                <a-menu-item key="selected" :disabled="!selectedRows.length">{{ $t('marketScreener.exportSelected', { count: selectedRows.length }) }}</a-menu-item>
+              </a-menu>
+            </a-dropdown>
             <a-button icon="star" :disabled="!selectedRows.length" @click="addSelectedToWatchlist">{{ $t('marketScreener.batchWatchlist') }}</a-button>
+            <a-button icon="table" :disabled="selectedRows.length < 2" @click="compareVisible = true">{{ $t('marketScreener.compareCandidates') }}</a-button>
+            <a-button icon="line-chart" :disabled="!selectedRows.length && !displayRows.length" @click="openCandidateReviewQueue">{{ $t('marketScreener.reviewCharts') }}</a-button>
             <a-button icon="fund" :disabled="!task || !selectedRows.length" :loading="validating" @click="validateSelection">{{ $t('marketScreener.validate') }}</a-button>
             <a-button type="primary" icon="audit" :disabled="!task || !selectedRows.length" :loading="submittingReview" @click="submitForReview">{{ $t('marketScreener.sendReview') }}</a-button>
           </div>
@@ -203,6 +243,15 @@
             <a-tab-pane key="all" :tab="$t('marketScreener.tabAll')" />
           </a-tabs>
           <div v-if="task" class="result-toolbar">
+            <a-input-search
+              v-model="resultQuery"
+              size="small"
+              allow-clear
+              class="result-toolbar-search"
+              :placeholder="$t('marketScreener.searchResults')"
+              @change="scheduleResultReload"
+              @search="applyResultFilters"
+            />
             <a-select v-model="resultQuality" size="small" class="result-toolbar-select" @change="loadResultRows">
               <a-select-option value="all">{{ $t('marketScreener.qualityAll') }}</a-select-option>
               <a-select-option value="eligible">{{ $t('marketScreener.qualityEligible') }}</a-select-option>
@@ -215,7 +264,16 @@
               <a-select-option value="bar_time">{{ $t('marketScreener.sortLatest') }}</a-select-option>
               <a-select-option value="symbol">{{ $t('marketScreener.sortSymbol') }}</a-select-option>
             </a-select>
+            <label class="result-score-filter"><span>{{ $t('marketScreener.minDecision') }}</span><a-input-number v-model="resultMinDecisionScore" size="small" :min="0" :max="100" @change="applyResultFilters" /></label>
+            <label class="result-score-filter"><span>{{ $t('marketScreener.minMatch') }}</span><a-input-number v-model="resultMinMatchScore" size="small" :min="0" :max="100" @change="applyResultFilters" /></label>
             <a-button size="small" icon="sort-ascending" @click="toggleResultSortOrder">{{ resultSortOrder === 'desc' ? $t('marketScreener.sortDesc') : $t('marketScreener.sortAsc') }}</a-button>
+            <a-button v-if="resultFiltersActive" size="small" icon="filter" @click="resetResultFilters">{{ $t('marketScreener.resetFilters') }}</a-button>
+            <span class="result-toolbar-hint">{{ $t('marketScreener.filteredCount', { count: resultTotal }) }}</span>
+          </div>
+          <div v-if="selectedRows.length" class="selection-bar">
+            <span><a-icon type="check-square" /> {{ $t('marketScreener.selectionPersists', { count: selectedRows.length }) }}</span>
+            <a-button size="small" type="link" @click="selectCurrentPage">{{ $t('marketScreener.selectCurrentPage') }}</a-button>
+            <a-button size="small" type="link" @click="selectTopCandidates">{{ $t('marketScreener.selectTopCandidates') }}</a-button>
           </div>
           <a-alert v-if="resultQualitySummary" class="quality-summary-alert" type="info" show-icon :message="resultQualitySummary" />
           <a-empty v-if="!loadingRows && !displayRows.length" :description="$t('marketScreener.noResults')" />
@@ -227,6 +285,7 @@
             :loading="loadingRows"
             :row-selection="rowSelection"
             :pagination="paginationConfig"
+            :custom-row="resultTableRow"
             size="middle"
             @change="handleTableChange"
           >
@@ -236,7 +295,7 @@
             <template slot="technicalScore" slot-scope="value">{{ Number(value || 0).toFixed(1) }}</template>
             <template slot="conditionResults" slot-scope="value"><div class="condition-matrix"><a-tag v-for="(item, index) in (value || [])" :key="index" :color="conditionTagColor(item)">{{ item.label }}: {{ conditionActual(item) }}</a-tag></div></template>
             <template slot="barTime" slot-scope="value">{{ value ? formatDate(value) : '-' }}</template>
-            <template slot="action" slot-scope="value, row"><a-tooltip :title="$t('marketScreener.addWatchlist')"><a-button type="link" icon="star" @click="addResultToWatchlist(row)" /></a-tooltip><a-tooltip :title="$t('marketScreener.openChart')"><router-link :to="chartRoute(row)"><a-button type="link" icon="line-chart" /></router-link></a-tooltip></template>
+            <template slot="action" slot-scope="value, row"><a-tooltip :title="$t('marketScreener.addWatchlist')"><a-button type="link" icon="star" @click.stop="addResultToWatchlist(row)" /></a-tooltip><a-tooltip :title="$t('marketScreener.openChart')"><a-button type="link" icon="line-chart" @click.stop="openCandidateChart(row)" /></a-tooltip></template>
           </a-table>
         </template>
       </main>
@@ -299,6 +358,11 @@
 
     <a-drawer :visible="detailVisible" :title="detailRow ? `${detailRow.symbol} ${detailRow.name || ''}` : ''" width="560" @close="detailVisible = false">
       <template v-if="detailRow">
+        <div class="detail-navigation">
+          <a-button icon="left" size="small" :disabled="detailRowIndex <= 0" @click="moveDetail(-1)">{{ $t('marketScreener.previousCandidate') }}</a-button>
+          <span>{{ $t('marketScreener.candidatePosition', { current: detailRowIndex + 1, total: displayRows.length }) }}</span>
+          <a-button size="small" :disabled="detailRowIndex < 0 || detailRowIndex >= displayRows.length - 1" @click="moveDetail(1)">{{ $t('marketScreener.nextCandidate') }} <a-icon type="right" /></a-button>
+        </div>
         <div class="detail-scores"><span>{{ $t('marketScreener.matchScore') }} <b>{{ Number(detailRow.match_score || 0).toFixed(0) }}%</b></span><span>{{ $t('marketScreener.technicalScore') }} <b>{{ Number(detailRow.technical_score || 0).toFixed(1) }}</b></span></div>
         <div class="feedback-actions">
           <a-button icon="check" @click="saveFeedback(detailRow, 'accepted')">{{ $t('screenIntelligence.feedbackAccepted') }}</a-button>
@@ -313,9 +377,25 @@
           <a-timeline v-if="candidateTimeline.length"><a-timeline-item v-for="item in candidateTimeline" :key="`${item.kind}-${item.id || item.task_id}-${item.time}`" :color="item.color"><b>{{ item.title }}</b><p>{{ item.detail }}</p><small>{{ formatDate(item.time) }}</small></a-timeline-item></a-timeline>
           <a-empty v-else :description="$t('screenIntelligence.noTimeline')" />
         </a-spin>
-        <router-link :to="chartRoute(detailRow)"><a-button type="primary" icon="line-chart">{{ $t('marketScreener.openChart') }}</a-button></router-link>
+        <a-button type="primary" icon="line-chart" @click="openCandidateChart(detailRow)">{{ $t('marketScreener.openChart') }}</a-button>
       </template>
     </a-drawer>
+
+    <a-modal v-model="compareVisible" :title="$t('marketScreener.compareCandidates')" :footer="null" width="920px">
+      <a-alert v-if="selectedRows.length > 4" type="info" show-icon :message="$t('marketScreener.compareLimit')" />
+      <div class="candidate-comparison">
+        <section v-for="row in comparisonRows" :key="row.symbol">
+          <header><strong>{{ row.symbol }}</strong><small>{{ row.name || '' }}</small></header>
+          <dl>
+            <div><dt>{{ $t('screenIntelligence.decisionScore') }}</dt><dd>{{ Number(row.decision_score || 0).toFixed(1) }}</dd></div>
+            <div><dt>{{ $t('marketScreener.matchScore') }}</dt><dd>{{ Number(row.match_score || 0).toFixed(0) }}%</dd></div>
+            <div><dt>{{ $t('marketScreener.technicalScore') }}</dt><dd>{{ Number(row.technical_score || 0).toFixed(1) }}</dd></div>
+          </dl>
+          <div class="condition-matrix"><a-tag v-for="(item, index) in (row.condition_results || [])" :key="index" :color="conditionTagColor(item)">{{ item.label }}: {{ conditionActual(item) }}</a-tag></div>
+          <a-button block size="small" icon="line-chart" @click="openCandidateChart(row)">{{ $t('marketScreener.openChart') }}</a-button>
+        </section>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -326,6 +406,7 @@ import { getUniverses } from '@/api/universe'
 import ScreeningOperatingWorkspace from './ScreeningOperatingWorkspace.vue'
 import ScreeningIntelligencePanel from './ScreeningIntelligencePanel.vue'
 import { watchResearchTask } from '@/utils/researchTaskStream'
+import { buildCandidateContext, saveCandidateContext } from '@/utils/screenerCandidateContext'
 import {
   cancelTask,
   createScreen,
@@ -364,6 +445,9 @@ export default {
       retrying: false,
       exportLoading: false,
       draftTimer: null,
+      draftDirty: false,
+      draftSavedAt: null,
+      restoringTask: false,
       terminalFailureStatuses: ['FAILED', 'CANCELLED', 'TIMED_OUT'],
       pendingDraft: null,
       catalog: {},
@@ -394,6 +478,10 @@ export default {
       resultSortBy: 'decision_score',
       resultSortOrder: 'desc',
       resultQuality: 'all',
+      resultQuery: '',
+      resultMinDecisionScore: null,
+      resultMinMatchScore: null,
+      resultSearchTimer: null,
       resultLoadGeneration: 0,
       selectedRowKeys: [],
       selectedRows: [],
@@ -412,6 +500,7 @@ export default {
       optimizationResult: null,
       detailVisible: false,
       detailRow: null,
+      compareVisible: false,
       timelineLoading: false,
       timeline: { runs: [], events: [], signals: [] },
       columns: [
@@ -467,7 +556,9 @@ export default {
       for (const item of this.classifications) (groups.find(row => row.key === item.group) || groups[1]).items.push(item)
       return groups.filter(group => group.items.length)
     },
-    manualSymbolList () { return [...new Set(this.manualSymbols.split(/[\s,;]+/).map(item => item.trim().toUpperCase()).filter(Boolean))].slice(0, 6000) },
+    manualSymbolTokens () { return [...new Set(this.manualSymbols.split(/[\s,;]+/).map(item => item.trim().toUpperCase()).filter(Boolean))].slice(0, 6000) },
+    manualSymbolList () { return this.manualSymbolTokens.filter(item => /^(?:(?:SH|SZ|BJ)?\d{6}|\d{6}\.(?:SH|SZ|BJ))$/.test(item)).map(this.normalizeSymbol) },
+    manualInvalidSymbols () { return this.manualSymbolTokens.filter(item => !/^(?:(?:SH|SZ|BJ)?\d{6}|\d{6}\.(?:SH|SZ|BJ))$/.test(item)) },
     summary () { return this.result && this.result.summary },
     summaryText () { return this.summary ? this.$t('marketScreener.summary', { requested: this.summary.requested || 0, matched: this.summary.matched || 0 }) : '' },
     nearCount () { return this.summary ? Math.max(0, Number(this.summary.evaluated || 0) - Number(this.summary.matched || 0)) : 0 },
@@ -476,20 +567,47 @@ export default {
       return quality ? this.$t('marketScreener.qualitySummary', { eligible: quality.eligible || 0, blocked: quality.blocked || 0 }) : ''
     },
     runDisabled () {
-      const noUniverse = this.universeMode === 'watchlist' ? !this.watchlistSymbols.length : this.universeMode === 'manual' ? !this.manualSymbolList.length : false
-      return noUniverse || !this.conditions.length || this.conditions.some(condition => !this.conditionComplete(condition))
+      return this.runIssues.length > 0
+    },
+    runIssues () {
+      const issues = []
+      if (this.universeMode === 'watchlist' && !this.watchlistSymbols.length) issues.push({ key: 'universe', message: this.$t('marketScreener.issueEmptyWatchlist') })
+      if (this.universeMode === 'manual' && !this.manualSymbolList.length) issues.push({ key: 'universe', message: this.$t('marketScreener.issueNoValidSymbols') })
+      if (this.universeMode === 'manual' && this.manualInvalidSymbols.length) issues.push({ key: 'universe', message: this.$t('marketScreener.issueInvalidSymbols', { count: this.manualInvalidSymbols.length }) })
+      if (!this.conditions.length) issues.push({ key: 'conditions', message: this.$t('marketScreener.issueNoConditions') })
+      const invalidIndex = this.conditions.findIndex(condition => !this.conditionComplete(condition))
+      if (invalidIndex >= 0) issues.push({ key: 'condition', index: invalidIndex, message: this.$t('marketScreener.issueIncompleteCondition', { index: invalidIndex + 1 }) })
+      return issues
+    },
+    estimatedUniverseCount () {
+      if (this.universeMode === 'watchlist') return this.watchlistSymbols.length
+      if (this.universeMode === 'manual') return this.manualSymbolList.length
+      return Number((this.poolPreview && this.poolPreview.selected) || this.pool.pool_limit || 0)
+    },
+    runReadinessText () {
+      return this.runIssues.length
+        ? this.runIssues[0].message
+        : this.$t('marketScreener.readySummary', { symbols: this.estimatedUniverseCount, conditions: this.conditions.length, timeframe: this.timeframe })
+    },
+    draftStateText () {
+      if (this.draftDirty) return this.$t('marketScreener.draftSaving')
+      if (this.draftSavedAt) return this.$t('marketScreener.draftSaved', { time: new Date(this.draftSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+      return this.$t('marketScreener.draftReady')
     },
     progressPercent () { return Number((this.task && this.task.progress && this.task.progress.percent) || 0) },
     progressLabel () { return this.task && this.task.status ? `${this.$t('marketScreener.running')} · ${this.task.status}` : this.$t('marketScreener.running') },
     poolPreviewText () { const value = this.poolPreview || {}; return this.$t('marketScreener.poolPreviewSummary', { selected: value.selected || 0, total: value.total || 0, st: value.excluded_st || 0, industry: value.excluded_industry || 0, fundamental: value.excluded_fundamental || 0, metadata: value.metadata_available || 0 }) },
     displayRows () {
-      if (this.resultRows.length || this.resultTotal) return this.resultRows
+      if (this.task) return this.resultRows
       const rows = (this.result && this.result.results) || []
       if (this.resultState === 'matched') return rows.filter(row => row.passed && !row.error)
       if (this.resultState === 'near') return rows.filter(row => !row.passed && !row.error)
       if (this.resultState === 'failed') return rows.filter(row => row.error)
       return rows
     },
+    resultFiltersActive () { return Boolean(String(this.resultQuery || '').trim() || this.resultQuality !== 'all' || this.resultMinDecisionScore != null || this.resultMinMatchScore != null) },
+    comparisonRows () { return this.selectedRows.slice(0, 4) },
+    detailRowIndex () { return this.detailRow ? this.displayRows.findIndex(row => row.symbol === this.detailRow.symbol) : -1 },
     rowSelection () { return { selectedRowKeys: this.selectedRowKeys, onChange: this.handleRowSelection } },
     paginationConfig () { return { current: this.resultPage, pageSize: this.resultPageSize, total: this.resultTotal || this.displayRows.length, showSizeChanger: true, pageSizeOptions: ['20', '50', '100'] } },
     builtinTemplates () {
@@ -507,8 +625,8 @@ export default {
     researchDiagnostics () { return (this.validationResult && this.validationResult.research_diagnostics) || {} },
     purgeSamples () { return ((this.validationResult && this.validationResult.walk_forward) || []).reduce((sum, item) => sum + Number(item.purged_samples || 0) + Number(item.embargoed_samples || 0), 0) }
   },
-  created () { this.restoreDraft(); this.loadReferenceData() },
-  beforeDestroy () { if (this.draftTimer) clearTimeout(this.draftTimer); this.persistDraft() },
+  created () { this.restoreDraft(); this.loadReferenceData().then(() => this.restoreLastTask()) },
+  beforeDestroy () { if (this.draftTimer) clearTimeout(this.draftTimer); if (this.resultSearchTimer) clearTimeout(this.resultSearchTimer); this.persistDraft() },
   watch: {
     universeMode: 'scheduleDraftSave',
     manualSymbols: 'scheduleDraftSave',
@@ -523,11 +641,64 @@ export default {
   methods: {
     draftStorageKey () { return 'qd_market_screener_draft_v1' },
     draftDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit, ranking: { ...this.ranking }, portfolio: { ...this.portfolio }, savedAt: new Date().toISOString() } },
-    scheduleDraftSave () { if (this.draftTimer) clearTimeout(this.draftTimer); this.draftTimer = setTimeout(() => this.persistDraft(), 500) },
-    persistDraft () { try { window.localStorage.setItem(this.draftStorageKey(), JSON.stringify(this.draftDefinition())) } catch (_) {} },
-    restoreDraft () { try { const raw = window.localStorage.getItem(this.draftStorageKey()); if (raw) this.pendingDraft = JSON.parse(raw) } catch (_) { this.pendingDraft = null } },
+    scheduleDraftSave () { this.draftDirty = true; if (this.draftTimer) clearTimeout(this.draftTimer); this.draftTimer = setTimeout(() => this.persistDraft(), 500) },
+    persistDraft () { try { const draft = this.draftDefinition(); window.localStorage.setItem(this.draftStorageKey(), JSON.stringify(draft)); this.draftSavedAt = draft.savedAt; this.draftDirty = false } catch (_) {} },
+    restoreDraft () { try { const raw = window.localStorage.getItem(this.draftStorageKey()); if (raw) { this.pendingDraft = JSON.parse(raw); this.draftSavedAt = this.pendingDraft.savedAt || null } } catch (_) { this.pendingDraft = null } },
     applyPendingDraft () { if (!this.pendingDraft || !this.catalogItems.length) return; const draft = this.pendingDraft; this.pendingDraft = null; this.applyDefinition(draft); this.$message.info(this.$t('marketScreener.draftRestored')) },
     clearDraft () { try { window.localStorage.removeItem(this.draftStorageKey()) } catch (_) {} },
+    confirmResetConfiguration () {
+      this.$confirm({
+        title: this.$t('marketScreener.resetConfiguration'),
+        content: this.$t('marketScreener.resetConfigurationConfirm'),
+        okText: this.$t('marketScreener.confirm'),
+        cancelText: this.$t('marketScreener.cancel'),
+        onOk: this.resetConfiguration
+      })
+    },
+    resetConfiguration () {
+      this.activePlanKey = undefined
+      this.universeMode = 'pool'
+      this.manualSymbols = ''
+      this.pool = { exclude_st: true, exclude_recent_days: 60, industries: [], exchanges: [], price_min: null, price_max: null, market_cap_min: null, market_cap_max: null, pe_min: null, pe_max: null, pb_min: null, pb_max: null, pool_limit: 500, sort_by: 'sort_order', universe_id: null, as_of: null }
+      this.marketCapMinYi = null
+      this.marketCapMaxYi = null
+      this.logic = 'and'
+      this.timeframe = '1d'
+      this.limit = 1000
+      this.ranking = { enabled: true, neutralize_industry: true, factors: [] }
+      this.portfolio = { size: 20, max_weight: 0.1, max_industry_weight: 0.3, capital: 1000000, participation_rate: 0.1, weighting: 'score' }
+      this.conditions = []
+      this.applyBuiltinTemplate({ key: 'trend' })
+      this.clearPoolPreview()
+      this.clearDraft()
+      this.persistDraft()
+    },
+    taskStorageKey () { return 'qd_market_screener_last_task_v1' },
+    persistTaskReference (task) { try { if (task && task.task_id) window.localStorage.setItem(this.taskStorageKey(), String(task.task_id)) } catch (_) {} },
+    async restoreLastTask () {
+      if (this.task || this.restoringTask) return
+      let taskId = String((this.$route && this.$route.query && this.$route.query.task_id) || '').trim()
+      if (!taskId) {
+        try { taskId = window.localStorage.getItem(this.taskStorageKey()) || '' } catch (_) {}
+      }
+      if (!taskId) return
+      this.restoringTask = true
+      const generation = ++this.resultLoadGeneration
+      try {
+        const response = await getTask(taskId)
+        if (generation !== this.resultLoadGeneration || !response || response.code !== 1) return
+        this.task = response.data
+        this.persistTaskReference(this.task)
+        if (['PENDING', 'RUNNING'].includes(this.task.status)) {
+          this.running = true
+          this.task = await this.waitTask(taskId)
+        }
+        this.result = this.task.result && this.task.result.payload
+        if (this.result) await this.loadResultRows()
+      } catch (_) {
+        // A deleted or expired task must not block a fresh screening run.
+      } finally { this.running = false; this.restoringTask = false }
+    },
     async loadReferenceData () {
       this.loadingCatalog = true
       try {
@@ -548,12 +719,14 @@ export default {
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadFailed')) } finally { this.loadingCatalog = false }
     },
     normalizeSymbol (value) { const raw = String(value || '').toUpperCase(); if (/^\d{6}\.(SH|SZ|BJ)$/.test(raw)) return raw; const code = raw.replace(/\D/g, '').slice(0, 6); if (!code) return raw; return `${code}.${code.startsWith('6') ? 'SH' : code.startsWith('8') || code.startsWith('4') || code.startsWith('9') ? 'BJ' : 'SZ'}` },
+    removeInvalidManualSymbols () { this.manualSymbols = this.manualSymbolList.join('\n') },
     classificationSearchText (item) { return [item.label, ...(item.aliases || [])].filter(Boolean).join(' ') },
     filterClassificationOption (input, option) { const props = (option && option.componentOptions && option.componentOptions.propsData) || {}; return String(props.title || props.value || '').toLowerCase().includes(String(input || '').trim().toLowerCase()) },
     clearPoolPreview () { this.poolPreview = null },
     setMarketCap () { this.pool.market_cap_min = this.marketCapMinYi == null ? null : Number(this.marketCapMinYi) * 100000000; this.pool.market_cap_max = this.marketCapMaxYi == null ? null : Number(this.marketCapMaxYi) * 100000000; this.clearPoolPreview() },
     async previewPool () { this.previewingPool = true; try { const response = await previewStockPool({ ...this.pool, enabled: true }); this.poolPreview = response.data.summary || {} } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.previewingPool = false } },
     addCondition (catalogItem) { const item = catalogItem || this.catalogItems[0]; if (!item) return; this.conditions.push({ key: `${Date.now()}-${this.conditions.length}`, catalogKey: item.key, mode: 'must', lookbackBars: 1, ...this.conditionFromCatalog(item) }) },
+    duplicateCondition (index) { const current = this.conditions[index]; if (!current || this.conditions.length >= 12) return; const copy = { ...current, key: `${Date.now()}-${this.conditions.length}`, value: Array.isArray(current.value) ? [...current.value] : current.value, options: [...(current.options || [])], presets: [...(current.presets || [])] }; this.conditions.splice(index + 1, 0, copy) },
     removeCondition (index) { this.conditions.splice(index, 1) },
     chooseCondition (index, key) { const item = this.catalogItems.find(row => row.key === key); if (item) this.$set(this.conditions, index, { ...this.conditions[index], catalogKey: key, ...this.conditionFromCatalog(item) }) },
     chooseOperator (index, operator) { const current = this.conditions[index]; if (!current) return; this.$set(this.conditions, index, { ...current, operator, needsValue: this.operatorNeedsValue(operator), value: operator === 'between' ? this.rangeValue(current.value) : (Array.isArray(current.value) ? current.value[0] : current.value) }) },
@@ -571,6 +744,7 @@ export default {
     setRangeValue (conditionIndex, valueIndex, value) { const condition = this.conditions[conditionIndex]; if (!condition) return; const next = this.rangeValue(condition.value); next[valueIndex] = value; this.$set(condition, 'value', next) },
     conditionValueStep (condition) { const values = Array.isArray(condition.value) ? condition.value : [condition.value]; return values.some(value => Math.abs(Number(value)) > 0 && Math.abs(Number(value)) < 1) ? 0.01 : 1 },
     conditionComplete (condition) { if (!condition || !condition.catalogKey || !condition.operator) return false; if (!condition.needsValue) return true; if (condition.operator === 'between') return Array.isArray(condition.value) && condition.value.length === 2 && condition.value.every(value => Number.isFinite(Number(value))); return condition.value !== '' && condition.value !== null && condition.value !== undefined },
+    focusFirstRunIssue () { const issue = this.runIssues[0]; if (!issue) return; if (issue.key === 'condition') { const ref = this.$refs[`condition-${issue.index}`]; const element = Array.isArray(ref) ? ref[0] : ref; if (element && element.scrollIntoView) element.scrollIntoView({ behavior: 'smooth', block: 'center' }) } else { const panel = this.$el && this.$el.querySelector('.config-panel'); if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' }) } },
     applyBuiltinTemplate ({ key }) { const template = this.builtinTemplates.find(item => item.key === key); if (!template) return; const found = template.items.map(id => this.catalogItems.find(item => item.id === id || item.factor_id === id || item.signal_type === id)).filter(Boolean); if (!found.length) return; this.conditions = []; found.forEach(item => this.addCondition(item)) },
     applyGoalProfile (goal) {
       const size = Number(goal.size || 20)
@@ -596,6 +770,7 @@ export default {
     applyCompiledQuery (compiled) { const value = compiled || {}; this.universeMode = 'pool'; this.pool = { ...this.pool, ...(value.universe || {}) }; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const raw of value.conditions || []) { const item = this.catalogItems.find(row => (raw.factor && (row.id === raw.factor || row.factor_id === raw.factor)) || (raw.signal_type && row.signal_type === raw.signal_type) || (raw.template_id && row.template_id === raw.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: raw.operator || this.conditions[index].operator, value: raw.value, mode: raw.mode || 'must' }) } this.clearPoolPreview() },
     async deleteActivePlan () { if (!this.activePlanKey) return; await deleteScreenPlan(this.activePlanKey); this.activePlanKey = undefined; await this.loadPlansOnly() },
     async runScreen () {
+      if (this.runDisabled || this.running) { this.focusFirstRunIssue(); return }
       this.running = true; this.result = null; this.resultRows = []; this.clearSelection(); this.resultLoadGeneration += 1
       try {
         const payload = { operation: 'signal_factor_screener', timeframe: this.timeframe, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, limit: this.limit, result_limit: 100, ranking: this.ranking, portfolio: this.portfolio }
@@ -604,24 +779,33 @@ export default {
         const response = await createScreen(payload, `screen-${this.screenRequestDigest(payload)}`)
         if (!response || response.code !== 1) throw new Error(response && response.msg)
         this.task = response.data
+        this.persistTaskReference(this.task)
         this.task = await this.waitTask(response.data.task_id)
+        this.persistTaskReference(this.task)
         this.result = this.task.result && this.task.result.payload
         this.resultState = 'matched'; this.resultPage = 1; await this.loadResultRows(); await this.reloadHistory()
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.running = false }
     },
     async waitTask (taskId, timeout = 3600000, trackCurrent = true) { try { const task = await watchResearchTask(taskId, value => { if (trackCurrent) this.task = value }, timeout); if (task.status === 'SUCCEEDED') return task; throw new Error(task.error_message || task.status) } catch (streamError) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const response = await getTask(taskId); if (!response || response.code !== 1) throw new Error(response && response.msg); if (trackCurrent) this.task = response.data; if (response.data.status === 'SUCCEEDED') return response.data; if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(response.data.status)) throw new Error(response.data.error_message || response.data.status); await new Promise(resolve => setTimeout(resolve, 3000)) } throw streamError } },
     async cancelCurrentTask () { if (!this.task) return; try { await cancelTask(this.task.task_id); this.$message.info(this.$t('marketScreener.cancelRequested')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
-    async retryCurrentTask () { if (!this.task || this.retrying) return; this.retrying = true; this.running = true; try { const response = await retryTask(this.task.task_id); this.task = response.data || response; this.task = await this.waitTask(this.task.task_id); this.result = this.task.result && this.task.result.payload; this.resultPage = 1; await this.loadResultRows(); await this.reloadHistory() } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.retrying = false; this.running = false } },
-    async loadResultRows () { if (!this.task) return; const generation = ++this.resultLoadGeneration; this.loadingRows = true; try { const response = await getScreenRows(this.task.task_id, { state: this.resultState, page: this.resultPage, page_size: this.resultPageSize, sort_by: this.resultSortBy, sort_order: this.resultSortOrder, quality: this.resultQuality }); if (generation !== this.resultLoadGeneration) return; const data = response.data || {}; this.resultRows = data.items || []; this.resultTotal = Number(data.total || 0); this.reconcileSelection() } catch (error) { if (generation === this.resultLoadGeneration) { this.resultRows = []; this.resultTotal = 0; this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadResultsFailed')) } } finally { if (generation === this.resultLoadGeneration) this.loadingRows = false } },
+    async retryCurrentTask () { if (!this.task || this.retrying) return; this.retrying = true; this.running = true; this.clearSelection(); try { const response = await retryTask(this.task.task_id); this.task = response.data || response; this.persistTaskReference(this.task); this.task = await this.waitTask(this.task.task_id); this.persistTaskReference(this.task); this.result = this.task.result && this.task.result.payload; this.resultPage = 1; await this.loadResultRows(); await this.reloadHistory() } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.retrying = false; this.running = false } },
+    async loadResultRows () { if (!this.task) return; const generation = ++this.resultLoadGeneration; this.loadingRows = true; try { const response = await getScreenRows(this.task.task_id, { state: this.resultState, page: this.resultPage, page_size: this.resultPageSize, sort_by: this.resultSortBy, sort_order: this.resultSortOrder, quality: this.resultQuality, query: String(this.resultQuery || '').trim(), min_decision_score: this.resultMinDecisionScore, min_match_score: this.resultMinMatchScore }); if (generation !== this.resultLoadGeneration) return; const data = response.data || {}; this.resultRows = data.items || []; this.resultTotal = Number(data.total || 0); this.reconcileSelection() } catch (error) { if (generation === this.resultLoadGeneration) { this.resultRows = []; this.resultTotal = 0; this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadResultsFailed')) } } finally { if (generation === this.resultLoadGeneration) this.loadingRows = false } },
+    scheduleResultReload () { if (this.resultSearchTimer) clearTimeout(this.resultSearchTimer); this.resultSearchTimer = setTimeout(this.applyResultFilters, 350) },
+    applyResultFilters () { if (this.resultSearchTimer) clearTimeout(this.resultSearchTimer); this.resultPage = 1; this.loadResultRows() },
+    resetResultFilters () { this.resultQuery = ''; this.resultQuality = 'all'; this.resultMinDecisionScore = null; this.resultMinMatchScore = null; this.applyResultFilters() },
     handleTableChange (pagination, filters, sorter) { this.resultPage = pagination.current; this.resultPageSize = pagination.pageSize; if (sorter && sorter.field && ['symbol', 'match_score', 'technical_score', 'decision_score', 'bar_time'].includes(sorter.field)) { this.resultSortBy = sorter.field; this.resultSortOrder = sorter.order === 'ascend' ? 'asc' : 'desc' } this.loadResultRows() },
     handleRowSelection (keys, rows) { for (const row of rows || []) this.$set(this.selectedRowMap, row.symbol, row); const currentKeys = new Set((this.resultRows || []).map(row => row.symbol)); for (const key of currentKeys) { if (!keys.includes(key)) this.$delete(this.selectedRowMap, key) } this.reconcileSelection() },
     reconcileSelection () { this.selectedRowKeys = Object.keys(this.selectedRowMap); this.selectedRows = Object.values(this.selectedRowMap) },
     clearSelection () { this.selectedRowKeys = []; this.selectedRows = []; this.selectedRowMap = {} },
+    selectCurrentPage () { for (const row of this.displayRows) this.$set(this.selectedRowMap, row.symbol, row); this.reconcileSelection() },
+    selectTopCandidates () { const rows = [...this.displayRows].sort((left, right) => Number(right.decision_score || 0) - Number(left.decision_score || 0)).slice(0, Math.min(20, this.displayRows.length)); for (const row of rows) this.$set(this.selectedRowMap, row.symbol, row); this.reconcileSelection() },
+    resultTableRow (row) { return { on: { dblclick: () => this.openDetails(row) } } },
     toggleResultSortOrder () { this.resultSortOrder = this.resultSortOrder === 'desc' ? 'asc' : 'desc'; this.loadResultRows() },
     screenRequestDigest (payload) { const source = JSON.stringify({ ...payload, universe: payload.universe || null, symbols: payload.symbols || null }); let hash = 2166136261; for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); return `${hash >>> 0}` },
     async addResultToWatchlist (row, silent = false) { try { await addWatchlist({ market: 'CNStock', symbol: String(row.symbol).split('.')[0], name: row.name || row.symbol }); if (!silent) this.$message.success(this.$t('marketScreener.addedWatchlist')); return true } catch (error) { if (!silent) this.$message.error(error.backendMessage || error.message); throw error } },
     async addSelectedToWatchlist () { const results = await Promise.allSettled(this.selectedRows.map(row => this.addResultToWatchlist(row, true))); const failed = results.filter(item => item.status === 'rejected').length; this.$message[failed ? 'warning' : 'success'](this.$t('marketScreener.batchAddedWithFailures', { count: results.length - failed, failed })) },
-    exportCurrentRows () { if (!this.displayRows.length || this.exportLoading) return; this.exportLoading = true; try { const columns = [{ key: 'symbol', label: this.$t('marketScreener.symbol') }, { key: 'name', label: this.$t('marketScreener.name') }, { key: 'match_score', label: this.$t('marketScreener.matchScore') }, { key: 'decision_score', label: this.$t('screenIntelligence.decisionScore') }, { key: 'technical_score', label: this.$t('marketScreener.technicalScore') }, { key: 'bar_time', label: this.$t('marketScreener.dataTime') }]; const quote = value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`; const csv = [columns.map(item => quote(item.label)).join(','), ...this.displayRows.map(row => columns.map(item => quote(row[item.key])).join(','))].join('\n'); const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `quantdinger-screen-${this.task && this.task.task_id || 'result'}.csv`; anchor.click(); URL.revokeObjectURL(url) } finally { this.exportLoading = false } },
+    handleExportMenu ({ key }) { this.exportRows(key === 'selected' ? this.selectedRows : this.displayRows, key) },
+    exportRows (rows, scope = 'page') { if (!rows.length || this.exportLoading) return; this.exportLoading = true; try { const columns = [{ key: 'symbol', label: this.$t('marketScreener.symbol') }, { key: 'name', label: this.$t('marketScreener.name') }, { key: 'match_score', label: this.$t('marketScreener.matchScore') }, { key: 'decision_score', label: this.$t('screenIntelligence.decisionScore') }, { key: 'technical_score', label: this.$t('marketScreener.technicalScore') }, { key: 'bar_time', label: this.$t('marketScreener.dataTime') }]; const quote = value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`; const csv = [columns.map(item => quote(item.label)).join(','), ...rows.map(row => columns.map(item => quote(row[item.key])).join(','))].join('\n'); const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `quantdinger-screen-${scope}-${this.task && this.task.task_id || 'result'}.csv`; anchor.click(); URL.revokeObjectURL(url) } finally { this.exportLoading = false } },
     async validateSelection () { this.validating = true; this.optimizationResult = null; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 100).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10, split_ratio: [0.6, 0.2, 0.2], walk_forward_folds: 3, embargo_bars: 5 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
     async optimizeValidatedPortfolio () {
       this.optimizing = true
@@ -651,12 +835,16 @@ export default {
     async doSubmitForReview () { this.submittingReview = true; try { const response = await submitScreenReviewSignals(this.task.task_id, { symbols: this.selectedRows.slice(0, 20).map(row => row.symbol), quantity: 100 }); const data = response.data || {}; this.$message.success(this.$t('marketScreener.reviewSubmitted', { count: (data.submitted || []).length })) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.submittingReview = false } },
     async reloadHistory () { const response = await getScreenHistory({ limit: 30 }); this.historyItems = (response.data && response.data.items) || [] },
     historyTitle (item) { const summary = item.summary || {}; return this.$t('marketScreener.historyTitle', { requested: summary.requested || item.progress.total || 0, matched: summary.matched || item.progress.matched || 0 }) },
-    async openHistoricalTask (taskId) { this.historyVisible = false; const response = await getTask(taskId); this.task = response.data; this.result = this.task.result && this.task.result.payload; this.resultState = 'matched'; this.resultPage = 1; await this.loadResultRows() },
+    async openHistoricalTask (taskId) { this.historyVisible = false; this.clearSelection(); const response = await getTask(taskId); this.task = response.data; this.persistTaskReference(this.task); this.result = this.task.result && this.task.result.payload; this.resultState = 'matched'; this.resultPage = 1; await this.loadResultRows() },
     async openDetails (row) {
       this.detailRow = row; this.detailVisible = true; this.timeline = { runs: [], events: [], signals: [] }; this.timelineLoading = true
       try { const response = await getScreenCandidateTimeline(row.symbol); this.timeline = response.data || this.timeline } catch (error) { this.timeline = { runs: [], events: [], signals: [] } } finally { this.timelineLoading = false }
     },
-    chartRoute (row) { return { path: '/indicator-ide', query: { market: 'CNStock', symbol: row.symbol, timeframe: this.timeframe, builtin: 'czsc' } } },
+    moveDetail (offset) { const row = this.displayRows[this.detailRowIndex + offset]; if (row) this.openDetails(row) },
+    candidateContext (row) { return buildCandidateContext({ rows: this.displayRows, selectedRows: this.selectedRows, current: row, taskId: this.task && this.task.task_id, timeframe: this.timeframe }) },
+    chartRoute (row) { return { path: '/indicator-ide', query: { market: 'CNStock', symbol: row.symbol, timeframe: this.timeframe, builtin: 'czsc', source: 'screener', task_id: this.task && this.task.task_id || '' } } },
+    openCandidateChart (row) { saveCandidateContext(this.candidateContext(row)); this.$router.push(this.chartRoute(row)); this.detailVisible = false; this.compareVisible = false },
+    openCandidateReviewQueue () { const row = this.selectedRows[0] || this.displayRows[0]; if (row) this.openCandidateChart(row) },
     conditionTagColor (item) { const mode = String((item.condition && item.condition.mode) || 'must'); if (mode === 'exclude') return item.matched ? 'red' : 'green'; return item.matched ? 'green' : 'orange' },
     conditionActual (item) { const actual = item && item.actual; const expected = item && item.expected; const value = typeof actual === 'object' ? JSON.stringify(actual) : String(actual == null ? '-' : actual); const target = typeof expected === 'object' ? JSON.stringify(expected) : String(expected == null ? '-' : expected); return `${value} / ${target}` },
     formatDate (value) { if (!value) return '-'; const date = new Date(value); return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString() },
@@ -671,7 +859,10 @@ export default {
 .screener-header h1 { margin: 0; font-size: 20px; }
 .screener-header p { margin: 3px 0 0; color: #6b7280; font-size: 12px; }
 .header-actions, .result-actions { display: flex; align-items: center; gap: 8px; }
+.result-actions { justify-content: flex-end; min-width: 0; flex-wrap: wrap; }
 .header-actions .ant-select { width: 180px; }
+.draft-state { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 9px; color: #389e0d; font-size: 11px; white-space: nowrap; border: 1px solid #d9f7be; border-radius: 4px; background: #f6ffed; }
+.draft-state--dirty { color: #d46b08; border-color: #ffe7ba; background: #fff7e6; }
 .screener-layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); min-height: 760px; border: 1px solid #dfe3e8; background: #fff; }
 .config-panel { padding: 14px; border-right: 1px solid #dfe3e8; }
 .result-panel { min-width: 0; padding: 14px; }
@@ -679,6 +870,8 @@ export default {
 .section-title--first { margin-top: 0; }
 .section-title h2, .result-heading h2 { margin: 0; font-size: 14px; }
 .config-alert, .manual-symbols { margin-top: 10px; }
+.manual-symbol-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; color: #389e0d; font-size: 11px; }
+.manual-symbol-status .ant-btn { padding: 0; color: #d46b08; }
 .pool-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
 .pool-settings label, .run-settings label, .condition-field { display: grid; min-width: 0; gap: 4px; }
 .pool-settings label > span, .run-settings label > span, .condition-field > span { color: #6b7280; font-size: 11px; }
@@ -691,7 +884,9 @@ export default {
 .pool-preview { margin-top: 0; }
 .snapshot-status { color: #6b7280; font-size: 11px; }
 .condition-row { margin-bottom: 9px; padding: 10px; border: 1px solid #e2e6ea; border-radius: 6px; background: #fafbfc; }
+.condition-row--invalid { border-color: #faad14; box-shadow: inset 3px 0 0 #faad14; }
 .condition-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.condition-row-actions { display: flex; align-items: center; gap: 5px; }
 .condition-help { margin: 5px 0; color: #6b7280; font-size: 11px; line-height: 1.4; }
 .condition-presets { margin-bottom: 6px; }
 .condition-presets .ant-tag { cursor: pointer; }
@@ -699,11 +894,18 @@ export default {
 .condition-controls--compact { grid-template-columns: minmax(130px, 1fr) 72px; }
 .condition-field--lookback { width: 72px; }
 .run-settings { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; margin: 14px 0; }
-.result-heading { margin: 0 0 10px; }
+.run-readiness { margin-bottom: 10px; }
+.result-heading { min-width: 0; margin: 0 0 10px; }
+.result-heading > div:first-child { min-width: 0; }
 .result-heading > div:first-child span { color: #6b7280; font-size: 12px; }
 .result-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.result-toolbar-search { width: min(240px, 100%); }
 .result-toolbar-select { min-width: 128px; }
+.result-score-filter { display: inline-flex; align-items: center; gap: 5px; color: #6b7280; font-size: 11px; white-space: nowrap; }
+.result-score-filter .ant-input-number { width: 74px; }
 .result-toolbar-hint { color: #8c8c8c; font-size: 11px; }
+.selection-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; padding: 5px 8px; color: #096dd9; font-size: 11px; border: 1px solid #bae7ff; background: #e6f7ff; }
+.selection-bar .ant-btn { padding: 0 5px; }
 .quality-summary-alert { margin-bottom: 8px; }
 .task-failure-alert { margin-bottom: 10px; }
 .running-state { display: flex; align-items: center; justify-content: center; flex-direction: column; min-height: 520px; gap: 12px; }
@@ -721,6 +923,7 @@ export default {
 .history-diff { display: flex; flex-wrap: wrap; gap: 3px; }
 .history-request { display: block; margin: 3px 0 5px; color: #8c8c8c; font-size: 11px; }
 .detail-scores { display: flex; gap: 24px; margin-bottom: 14px; }
+.detail-navigation { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 11px; }
 .detail-scores b { font-size: 18px; }
 .detail-scores + .ant-alert { margin-bottom: 18px; }
 .feedback-actions { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -735,13 +938,28 @@ export default {
 .optimization-summary span { display: flex; padding: 9px; color: #6b7280; font-size: 11px; flex-direction: column; }
 .optimization-summary b { color: #111827; font-size: 15px; }
 .detail-scores ~ h3 { margin-top: 18px; font-size: 13px; }
+.candidate-comparison { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #e5e7eb; }
+.candidate-comparison section { display: flex; min-width: 0; padding: 12px; border-right: 1px solid #e5e7eb; flex-direction: column; gap: 10px; }
+.candidate-comparison section:last-child { border-right: 0; }
+.candidate-comparison header { display: grid; gap: 2px; }
+.candidate-comparison header strong { font-size: 14px; }
+.candidate-comparison header small { min-height: 18px; color: #6b7280; }
+.candidate-comparison dl { display: grid; gap: 5px; margin: 0; }
+.candidate-comparison dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.candidate-comparison dt { color: #6b7280; font-size: 11px; }
+.candidate-comparison dd { margin: 0; font-weight: 600; }
+.candidate-comparison .condition-matrix { min-height: 54px; flex: 1; }
 .screener-page--dark { color: #e5e7eb; background: #111827; }
 .screener-page--dark .screener-layout { border-color: #30363d; background: #171b22; }
 .screener-page--dark .config-panel { border-color: #30363d; }
 .screener-page--dark .condition-row { border-color: #30363d; background: #11151b; }
+.screener-page--dark .condition-row--invalid { border-color: #d48806; }
+.screener-page--dark .selection-bar { color: #69c0ff; border-color: #164c73; background: #10293b; }
+.screener-page--dark .detail-navigation, .screener-page--dark .candidate-comparison, .screener-page--dark .candidate-comparison section { border-color: #30363d; }
+.screener-page--dark .candidate-comparison header small, .screener-page--dark .candidate-comparison dt { color: #9ca3af; }
 .screener-page--dark .run-summary { border-color: #30363d; }
 .screener-page--dark .run-summary > div { border-color: #30363d; }
 @media (max-width: 1100px) { .screener-layout { grid-template-columns: 360px minmax(0, 1fr); }.run-summary { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 900px) { .screener-header { align-items: flex-start; flex-direction: column; }.header-actions { width: 100%; flex-wrap: wrap; }.screener-layout { grid-template-columns: 1fr; }.config-panel { border-right: 0; border-bottom: 1px solid #dfe3e8; }.result-heading { align-items: flex-start; flex-direction: column; }.result-actions { flex-wrap: wrap; } }
-@media (max-width: 520px) { .screener-page { padding: 10px; }.pool-settings, .condition-controls, .condition-controls--compact, .run-settings, .run-summary { grid-template-columns: 1fr; }.wide-field, .range-setting { grid-column: auto; }.condition-field--lookback { width: auto; }.run-summary > div { border-right: 0; border-bottom: 1px solid #e5e7eb; } }
+@media (max-width: 900px) { .screener-header { align-items: flex-start; flex-direction: column; }.header-actions { width: 100%; flex-wrap: wrap; }.screener-layout { grid-template-columns: 1fr; }.config-panel { border-right: 0; border-bottom: 1px solid #dfe3e8; }.result-heading { align-items: flex-start; flex-direction: column; }.candidate-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }.candidate-comparison section:nth-child(2) { border-right: 0; }.candidate-comparison section:nth-child(-n+2) { border-bottom: 1px solid #e5e7eb; } }
+@media (max-width: 520px) { .screener-page { padding: 10px; }.pool-settings, .condition-controls, .condition-controls--compact, .run-settings, .run-summary { grid-template-columns: 1fr; }.wide-field, .range-setting { grid-column: auto; }.condition-field--lookback { width: auto; }.run-summary > div { border-right: 0; border-bottom: 1px solid #e5e7eb; }.result-toolbar-search { width: 100%; }.selection-bar { align-items: flex-start; flex-direction: column; }.candidate-comparison { grid-template-columns: 1fr; }.candidate-comparison section, .candidate-comparison section:nth-child(2) { border-right: 0; border-bottom: 1px solid #e5e7eb; }.candidate-comparison section:last-child { border-bottom: 0; }.detail-navigation .ant-btn { padding: 0 7px; }.detail-navigation span { text-align: center; } }
 </style>

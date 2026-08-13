@@ -72,11 +72,46 @@ test('stock screener keeps result operations reliable across refreshes and pages
   assert.match(screener, /resultLoadGeneration/)
   assert.match(screener, /handleRowSelection/)
   assert.match(screener, /selectedRowMap/)
-  assert.match(screener, /exportCurrentRows/)
+  assert.match(screener, /handleExportMenu/)
+  assert.match(screener, /exportRows/)
   assert.match(screener, /draftStorageKey/)
   assert.match(screener, /draftTimer: null/)
   assert.match(screener, /result\.intelligence && this\.result\.intelligence\.data_quality/)
   assert.match(domainApi, /retryTask \(taskId\)/)
+})
+
+test('stock screener implements the configuration and run-readiness improvements', () => {
+  assert.match(screener, /draftStateText/)
+  assert.match(screener, /confirmResetConfiguration/)
+  assert.match(screener, /manualSymbolList/)
+  assert.match(screener, /manualInvalidSymbols/)
+  assert.match(screener, /condition-row--invalid/)
+  assert.match(screener, /duplicateCondition/)
+  assert.match(screener, /runIssues/)
+  assert.match(screener, /focusFirstRunIssue/)
+  assert.match(screener, /readySummary/)
+})
+
+test('stock screener implements task restoration and server-backed result filtering', () => {
+  assert.match(screener, /restoreLastTask/)
+  assert.match(screener, /\$route && this\.\$route\.query && this\.\$route\.query\.task_id/)
+  assert.match(screener, /query: String\(this\.resultQuery \|\| ''\)\.trim\(\)/)
+  assert.match(screener, /min_decision_score: this\.resultMinDecisionScore/)
+  assert.match(screener, /min_match_score: this\.resultMinMatchScore/)
+  assert.match(screener, /resetResultFilters/)
+  assert.match(screener, /filteredCount/)
+})
+
+test('stock screener implements selection, export, comparison, details, and chart-review workflow', () => {
+  assert.match(screener, /selectCurrentPage/)
+  assert.match(screener, /selectTopCandidates/)
+  assert.match(screener, /exportSelected/)
+  assert.match(screener, /candidate-comparison/)
+  assert.match(screener, /dblclick: \(\) => this\.openDetails\(row\)/)
+  assert.match(screener, /moveDetail/)
+  assert.match(screener, /buildCandidateContext/)
+  assert.match(screener, /openCandidateReviewQueue/)
+  assert.match(screener, /source: 'screener'/)
 })
 
 test('stock screener exposes bounded, deterministic request and result APIs', () => {

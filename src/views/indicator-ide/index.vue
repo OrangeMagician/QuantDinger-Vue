@@ -215,6 +215,50 @@
           >
             <div class="ide-chart-fs-row">
               <div class="chart-panel">
+                <div v-if="screenerCandidateActive" class="screener-review-strip">
+                  <a-button
+                    class="screener-review-back"
+                    type="link"
+                    size="small"
+                    icon="arrow-left"
+                    :aria-label="$t('indicatorIde.screenerReview.return')"
+                    @click="returnToScreener"
+                  >
+                    {{ $t('indicatorIde.screenerReview.return') }}
+                  </a-button>
+                  <span class="screener-review-source"><a-icon type="filter" /> {{ $t('indicatorIde.screenerReview.source') }}</span>
+                  <div class="screener-review-candidate">
+                    <strong>{{ screenerCurrentCandidate.symbol }}</strong>
+                    <span v-if="screenerCurrentCandidate.name">{{ screenerCurrentCandidate.name }}</span>
+                  </div>
+                  <div class="screener-review-scores">
+                    <span>{{ $t('indicatorIde.screenerReview.decisionScore') }} <b>{{ formatCandidateScore(screenerCurrentCandidate.decisionScore) }}</b></span>
+                    <span>{{ $t('indicatorIde.screenerReview.matchScore') }} <b>{{ formatCandidateScore(screenerCurrentCandidate.matchScore) }}%</b></span>
+                  </div>
+                  <div class="screener-review-navigation">
+                    <a-tooltip :title="$t('indicatorIde.screenerReview.previous')">
+                      <a-button
+                        shape="circle"
+                        size="small"
+                        icon="left"
+                        :aria-label="$t('indicatorIde.screenerReview.previous')"
+                        :disabled="!screenerCandidatePosition.previous"
+                        @click="moveScreenerCandidate(-1)"
+                      />
+                    </a-tooltip>
+                    <span>{{ $t('indicatorIde.screenerReview.position', { current: screenerCandidatePosition.index + 1, total: screenerCandidatePosition.total }) }}</span>
+                    <a-tooltip :title="$t('indicatorIde.screenerReview.next')">
+                      <a-button
+                        shape="circle"
+                        size="small"
+                        icon="right"
+                        :aria-label="$t('indicatorIde.screenerReview.next')"
+                        :disabled="!screenerCandidatePosition.next"
+                        @click="moveScreenerCandidate(1)"
+                      />
+                    </a-tooltip>
+                  </div>
+                </div>
                 <div class="chart-panel-toolbar">
                   <div class="chart-panel-toolbar-top">
                     <span class="chart-panel-toolbar-title">{{ $t('indicatorIde.chartWindow') }}</span>
@@ -1079,6 +1123,7 @@ import { getPublicSettingsConfig } from '@/api/settings'
 import { computeChartLayers, createMultiPeriodRun, getMarketBars, getTask, syncTodayMarketBars } from '@/api/domain'
 import { normalizeCzscSymbol } from '@/utils/czscSymbols'
 import { extractIndicatorSignalLabels } from '@/utils/indicatorSignalOptions'
+import { candidatePosition, loadCandidateContext, saveCandidateContext } from '@/utils/screenerCandidateContext'
 import KlineChart from '@/views/indicator-analysis/components/KlineChart.vue'
 import QuickTradePanel from '@/components/QuickTradePanel/QuickTradePanel'
 import { Modal } from 'ant-design-vue'
@@ -1174,6 +1219,7 @@ export default {
       czscMultiPeriodGeneration: 0,
       syncingTodayKline: false,
       klineDataQuality: {},
+      screenerCandidateContext: null,
       quickTradeDrawerVisible: false,
       paramDrawerVisible: false,
       indicatorParamOverrides: {},
@@ -1423,6 +1469,17 @@ export default {
     czscMultiPeriodSymbolLabel () {
       const item = (this.watchlist || []).find(row => this.watchlistContextKey(row) === this.selectedWatchlistKey)
       return item && item.name ? `${this.symbol} ${item.name}` : this.symbol
+    },
+    screenerCandidatePosition () {
+      return candidatePosition(this.screenerCandidateContext, this.symbol)
+    },
+    screenerCandidateActive () {
+      const query = (this.$route && this.$route.query) || {}
+      return String(query.source || '') === 'screener' && this.screenerCandidatePosition.index >= 0
+    },
+    screenerCurrentCandidate () {
+      const position = this.screenerCandidatePosition
+      return position.index >= 0 ? this.screenerCandidateContext.candidates[position.index] : {}
     }
   },
   created: async function () {
@@ -1436,6 +1493,7 @@ export default {
     this.restoreIdeSelectionPreference()
     this.applyIndicatorRouteSelection()
     this.applyChartRouteContext()
+    this.restoreScreenerCandidateContext()
     this.autoSelectFirstIndicator()
     this.loadSignalAlertNotificationDefaults()
     this.loadSignalAlertTasks()
@@ -1484,6 +1542,46 @@ export default {
   methods: {
     handleKlineDataQuality (quality) {
       this.klineDataQuality = quality && typeof quality === 'object' ? quality : {}
+    },
+    restoreScreenerCandidateContext () {
+      const query = (this.$route && this.$route.query) || {}
+      if (String(query.source || '') !== 'screener') {
+        this.screenerCandidateContext = null
+        return
+      }
+      const context = loadCandidateContext()
+      const routeTaskId = String(query.task_id || '')
+      if (!context || (routeTaskId && String(context.taskId || '') !== routeTaskId)) {
+        this.screenerCandidateContext = null
+        return
+      }
+      this.screenerCandidateContext = context
+    },
+    formatCandidateScore (value) {
+      const number = Number(value)
+      return Number.isFinite(number) ? number.toFixed(1) : '-'
+    },
+    moveScreenerCandidate (offset) {
+      const position = this.screenerCandidatePosition
+      const candidate = offset < 0 ? position.previous : position.next
+      if (!candidate) return
+      this.screenerCandidateContext = { ...this.screenerCandidateContext, currentSymbol: candidate.symbol }
+      saveCandidateContext(this.screenerCandidateContext)
+      this.applySymbolSelection({ market: 'CNStock', symbol: candidate.symbol, name: candidate.name || '' })
+      const query = {
+        ...((this.$route && this.$route.query) || {}),
+        market: 'CNStock',
+        symbol: candidate.symbol,
+        timeframe: this.timeframe,
+        builtin: 'czsc',
+        source: 'screener',
+        task_id: this.screenerCandidateContext.taskId || ''
+      }
+      this.$router.replace({ path: '/indicator-ide', query }).catch(() => {})
+    },
+    returnToScreener () {
+      const taskId = String((this.screenerCandidateContext && this.screenerCandidateContext.taskId) || '')
+      this.$router.push({ path: '/market-screener', query: taskId ? { task_id: taskId } : {} })
     },
     async syncTodayKline () {
       if (this.market !== 'CNStock' || !this.symbol || this.syncingTodayKline) return
@@ -3905,6 +4003,16 @@ export default {
     '$route.query.indicatorId' () {
       this.applyIndicatorRouteSelection()
     },
+    '$route.query.symbol' () {
+      this.applyChartRouteContext()
+      this.restoreScreenerCandidateContext()
+    },
+    '$route.query.source' () {
+      this.restoreScreenerCandidateContext()
+    },
+    '$route.query.task_id' () {
+      this.restoreScreenerCandidateContext()
+    },
     chartVisibleIndicatorIds: {
       deep: true,
       handler () {
@@ -5702,6 +5810,26 @@ body.dark .ide-signal-alert-modal-wrap {
   display: flex;
   flex-direction: column;
   background: #fff;
+  .screener-review-strip {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: auto auto minmax(150px, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 42px;
+    padding: 5px 10px;
+    color: #374151;
+    border-bottom: 1px solid #bae7ff;
+    background: #f0faff;
+  }
+  .screener-review-back { padding: 0 4px; }
+  .screener-review-source { display: inline-flex; align-items: center; gap: 5px; color: #096dd9; font-size: 11px; white-space: nowrap; }
+  .screener-review-candidate { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+  .screener-review-candidate strong { font-size: 13px; white-space: nowrap; }
+  .screener-review-candidate span { overflow: hidden; color: #6b7280; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .screener-review-scores { display: flex; align-items: center; gap: 12px; color: #6b7280; font-size: 10px; white-space: nowrap; }
+  .screener-review-scores b { color: #111827; font-size: 12px; }
+  .screener-review-navigation { display: flex; align-items: center; gap: 7px; color: #6b7280; font-size: 11px; white-space: nowrap; }
   .chart-panel-toolbar {
     flex-shrink: 0;
     display: flex;
@@ -5799,6 +5927,31 @@ body.dark .ide-signal-alert-modal-wrap {
     width: 100% !important;
     flex: 1 1 100% !important;
     border-right: none !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .chart-panel {
+    .screener-review-strip {
+      grid-template-columns: auto minmax(130px, 1fr) auto;
+      gap: 7px;
+    }
+    .screener-review-source,
+    .screener-review-scores { display: none; }
+  }
+}
+
+@media (max-width: 560px) {
+  .chart-panel {
+    .screener-review-strip {
+      grid-template-columns: auto minmax(92px, 1fr) auto;
+      padding: 5px 6px;
+    }
+    .screener-review-back { width: 30px; overflow: hidden; padding: 0 7px; white-space: nowrap; }
+    .screener-review-back ::v-deep span { display: none; }
+    .screener-review-candidate { display: grid; gap: 0; }
+    .screener-review-candidate strong { font-size: 12px; }
+    .screener-review-navigation { gap: 4px; }
   }
 }
 
@@ -6088,6 +6241,16 @@ body.dark .ide-signal-alert-modal-wrap {
       background: #1a1a1a;
       border-bottom-color: #303030;
     }
+    .screener-review-strip {
+      color: rgba(255, 255, 255, 0.82);
+      border-bottom-color: #164c73;
+      background: #10293b;
+    }
+    .screener-review-source { color: #69c0ff; }
+    .screener-review-candidate span,
+    .screener-review-scores,
+    .screener-review-navigation { color: rgba(255, 255, 255, 0.5); }
+    .screener-review-scores b { color: rgba(255, 255, 255, 0.88); }
     .chart-panel-toolbar-title { color: rgba(255, 255, 255, 0.65); }
     .chart-panel-toolbar-controls .ide-toolbar-group {
       background: rgba(255, 255, 255, 0.04);
