@@ -158,6 +158,10 @@
         <div class="result-heading">
           <div><h2>{{ $t('marketScreener.results') }}</h2><span v-if="summary">{{ summaryText }}</span></div>
           <div class="result-actions">
+            <a-tag v-if="selectedRows.length" color="blue">{{ $t('marketScreener.selectedCount', { count: selectedRows.length }) }}</a-tag>
+            <a-button v-if="selectedRows.length" icon="close-circle" @click="clearSelection">{{ $t('marketScreener.clearSelection') }}</a-button>
+            <a-tooltip :title="$t('marketScreener.refreshResults')"><a-button icon="reload" :loading="loadingRows" :disabled="!task" @click="loadResultRows" /></a-tooltip>
+            <a-button icon="download" :loading="exportLoading" :disabled="!displayRows.length" @click="exportCurrentRows">{{ $t('marketScreener.exportResults') }}</a-button>
             <a-button icon="star" :disabled="!selectedRows.length" @click="addSelectedToWatchlist">{{ $t('marketScreener.batchWatchlist') }}</a-button>
             <a-button icon="fund" :disabled="!task || !selectedRows.length" :loading="validating" @click="validateSelection">{{ $t('marketScreener.validate') }}</a-button>
             <a-button type="primary" icon="audit" :disabled="!task || !selectedRows.length" :loading="submittingReview" @click="submitForReview">{{ $t('marketScreener.sendReview') }}</a-button>
@@ -171,6 +175,16 @@
           <span v-if="task && task.progress">{{ $t('marketScreener.progressDetail', { processed: task.progress.processed || 0, total: task.progress.total || 0, matched: task.progress.matched || 0, failed: task.progress.failed || 0, cached: task.progress.cache_hits || 0 }) }}</span>
           <a-button v-if="task" icon="close" @click="cancelCurrentTask">{{ $t('marketScreener.cancel') }}</a-button>
         </div>
+        <a-alert
+          v-if="task && terminalFailureStatuses.includes(task.status)"
+          class="task-failure-alert"
+          type="error"
+          show-icon
+          :message="$t('marketScreener.taskFailed')"
+          :description="task.error_message || task.errorMessage || $t('marketScreener.runFailed')"
+        >
+          <template slot="action"><a-button size="small" type="primary" :loading="retrying" @click="retryCurrentTask">{{ $t('marketScreener.retry') }}</a-button></template>
+        </a-alert>
 
         <template v-else>
           <div v-if="task && result" class="run-summary">
@@ -188,6 +202,22 @@
             <a-tab-pane key="failed" :tab="$t('marketScreener.tabFailed', { count: summary ? summary.failed || 0 : 0 })" />
             <a-tab-pane key="all" :tab="$t('marketScreener.tabAll')" />
           </a-tabs>
+          <div v-if="task" class="result-toolbar">
+            <a-select v-model="resultQuality" size="small" class="result-toolbar-select" @change="loadResultRows">
+              <a-select-option value="all">{{ $t('marketScreener.qualityAll') }}</a-select-option>
+              <a-select-option value="eligible">{{ $t('marketScreener.qualityEligible') }}</a-select-option>
+              <a-select-option value="blocked">{{ $t('marketScreener.qualityBlocked') }}</a-select-option>
+            </a-select>
+            <a-select v-model="resultSortBy" size="small" class="result-toolbar-select" @change="loadResultRows">
+              <a-select-option value="decision_score">{{ $t('marketScreener.sortDecision') }}</a-select-option>
+              <a-select-option value="match_score">{{ $t('marketScreener.sortMatch') }}</a-select-option>
+              <a-select-option value="technical_score">{{ $t('marketScreener.sortTechnical') }}</a-select-option>
+              <a-select-option value="bar_time">{{ $t('marketScreener.sortLatest') }}</a-select-option>
+              <a-select-option value="symbol">{{ $t('marketScreener.sortSymbol') }}</a-select-option>
+            </a-select>
+            <a-button size="small" icon="sort-ascending" @click="toggleResultSortOrder">{{ resultSortOrder === 'desc' ? $t('marketScreener.sortDesc') : $t('marketScreener.sortAsc') }}</a-button>
+          </div>
+          <a-alert v-if="resultQualitySummary" class="quality-summary-alert" type="info" show-icon :message="resultQualitySummary" />
           <a-empty v-if="!loadingRows && !displayRows.length" :description="$t('marketScreener.noResults')" />
           <a-table
             v-else
@@ -218,6 +248,7 @@
       <a-list :data-source="historyItems" item-layout="vertical">
         <a-list-item slot="renderItem" slot-scope="item">
           <a-list-item-meta :description="formatDate(item.created_at)"><span slot="title">{{ historyTitle(item) }}</span></a-list-item-meta>
+          <small v-if="item.request && item.request.timeframe" class="history-request">{{ item.request.timeframe }} · {{ item.request.condition_count || 0 }} {{ $t('marketScreener.conditionsCount') }} · {{ item.request.symbol_count || 0 }} {{ $t('marketScreener.symbolCount') }}</small>
           <div class="history-diff"><a-tag v-for="symbol in (item.added || []).slice(0, 8)" :key="`a-${symbol}`" color="green">+ {{ symbol }}</a-tag><a-tag v-for="symbol in (item.removed || []).slice(0, 8)" :key="`r-${symbol}`" color="red">- {{ symbol }}</a-tag></div>
           <a-button type="link" @click="openHistoricalTask(item.task_id)">{{ $t('marketScreener.openRun') }}</a-button>
         </a-list-item>
@@ -312,6 +343,7 @@ import {
   saveScreenPlan,
   saveScreenFeedback,
   rebalanceScreenPortfolioAccount,
+  retryTask,
   submitScreenReviewSignals,
   validateScreen
 } from '@/api/domain'
@@ -329,6 +361,11 @@ export default {
       validating: false,
       submittingReview: false,
       savingPlan: false,
+      retrying: false,
+      exportLoading: false,
+      draftTimer: null,
+      terminalFailureStatuses: ['FAILED', 'CANCELLED', 'TIMED_OUT'],
+      pendingDraft: null,
       catalog: {},
       classifications: [],
       pointInTimeUniverses: [],
@@ -354,8 +391,13 @@ export default {
       resultTotal: 0,
       resultPage: 1,
       resultPageSize: 50,
+      resultSortBy: 'decision_score',
+      resultSortOrder: 'desc',
+      resultQuality: 'all',
+      resultLoadGeneration: 0,
       selectedRowKeys: [],
       selectedRows: [],
+      selectedRowMap: {},
       plans: [],
       activePlanKey: undefined,
       planName: '',
@@ -429,6 +471,10 @@ export default {
     summary () { return this.result && this.result.summary },
     summaryText () { return this.summary ? this.$t('marketScreener.summary', { requested: this.summary.requested || 0, matched: this.summary.matched || 0 }) : '' },
     nearCount () { return this.summary ? Math.max(0, Number(this.summary.evaluated || 0) - Number(this.summary.matched || 0)) : 0 },
+    resultQualitySummary () {
+      const quality = (this.summary && this.summary.data_quality) || (this.result && this.result.intelligence && this.result.intelligence.data_quality)
+      return quality ? this.$t('marketScreener.qualitySummary', { eligible: quality.eligible || 0, blocked: quality.blocked || 0 }) : ''
+    },
     runDisabled () {
       const noUniverse = this.universeMode === 'watchlist' ? !this.watchlistSymbols.length : this.universeMode === 'manual' ? !this.manualSymbolList.length : false
       return noUniverse || !this.conditions.length || this.conditions.some(condition => !this.conditionComplete(condition))
@@ -444,7 +490,7 @@ export default {
       if (this.resultState === 'failed') return rows.filter(row => row.error)
       return rows
     },
-    rowSelection () { return { selectedRowKeys: this.selectedRowKeys, onChange: (keys, rows) => { this.selectedRowKeys = keys; this.selectedRows = rows } } },
+    rowSelection () { return { selectedRowKeys: this.selectedRowKeys, onChange: this.handleRowSelection } },
     paginationConfig () { return { current: this.resultPage, pageSize: this.resultPageSize, total: this.resultTotal || this.displayRows.length, showSizeChanger: true, pageSizeOptions: ['20', '50', '100'] } },
     builtinTemplates () {
       return [
@@ -461,8 +507,27 @@ export default {
     researchDiagnostics () { return (this.validationResult && this.validationResult.research_diagnostics) || {} },
     purgeSamples () { return ((this.validationResult && this.validationResult.walk_forward) || []).reduce((sum, item) => sum + Number(item.purged_samples || 0) + Number(item.embargoed_samples || 0), 0) }
   },
-  created () { this.loadReferenceData() },
+  created () { this.restoreDraft(); this.loadReferenceData() },
+  beforeDestroy () { if (this.draftTimer) clearTimeout(this.draftTimer); this.persistDraft() },
+  watch: {
+    universeMode: 'scheduleDraftSave',
+    manualSymbols: 'scheduleDraftSave',
+    logic: 'scheduleDraftSave',
+    timeframe: 'scheduleDraftSave',
+    limit: 'scheduleDraftSave',
+    pool: { deep: true, handler: 'scheduleDraftSave' },
+    conditions: { deep: true, handler: 'scheduleDraftSave' },
+    ranking: { deep: true, handler: 'scheduleDraftSave' },
+    portfolio: { deep: true, handler: 'scheduleDraftSave' }
+  },
   methods: {
+    draftStorageKey () { return 'qd_market_screener_draft_v1' },
+    draftDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit, ranking: { ...this.ranking }, portfolio: { ...this.portfolio }, savedAt: new Date().toISOString() } },
+    scheduleDraftSave () { if (this.draftTimer) clearTimeout(this.draftTimer); this.draftTimer = setTimeout(() => this.persistDraft(), 500) },
+    persistDraft () { try { window.localStorage.setItem(this.draftStorageKey(), JSON.stringify(this.draftDefinition())) } catch (_) {} },
+    restoreDraft () { try { const raw = window.localStorage.getItem(this.draftStorageKey()); if (raw) this.pendingDraft = JSON.parse(raw) } catch (_) { this.pendingDraft = null } },
+    applyPendingDraft () { if (!this.pendingDraft || !this.catalogItems.length) return; const draft = this.pendingDraft; this.pendingDraft = null; this.applyDefinition(draft); this.$message.info(this.$t('marketScreener.draftRestored')) },
+    clearDraft () { try { window.localStorage.removeItem(this.draftStorageKey()) } catch (_) {} },
     async loadReferenceData () {
       this.loadingCatalog = true
       try {
@@ -478,6 +543,7 @@ export default {
         this.plans = plans.data || []
         this.historyItems = (history.data && history.data.items) || []
         this.pointInTimeUniverses = ((universes.data && universes.data.items) || universes.data || []).filter(item => ['CNStock', 'Mixed'].includes(item.market))
+        this.applyPendingDraft()
         if (!this.conditions.length && this.catalogItems.length) this.applyBuiltinTemplate({ key: 'trend' })
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadFailed')) } finally { this.loadingCatalog = false }
     },
@@ -523,18 +589,19 @@ export default {
     moveCondition ({ from, to }) { if (to < 0 || to >= this.conditions.length) return; const next = [...this.conditions]; const moved = next.splice(from, 1)[0]; next.splice(to, 0, moved); this.conditions = next },
     planDefinition () { return { universeMode: this.universeMode, manualSymbols: this.manualSymbols, pool: { ...this.pool }, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, timeframe: this.timeframe, limit: this.limit, ranking: { ...this.ranking }, portfolio: { ...this.portfolio } } },
     openSavePlan () { const current = this.plans.find(item => item.plan_key === this.activePlanKey); this.planName = current ? current.name : ''; this.savePlanVisible = true },
-    async saveCurrentPlan () { this.savingPlan = true; try { const response = await saveScreenPlan({ plan_key: this.activePlanKey, name: this.planName, definition: this.planDefinition() }); this.activePlanKey = response.data.plan_key; this.savePlanVisible = false; await this.loadPlansOnly(); this.$message.success(this.$t('marketScreener.planSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.savingPlan = false } },
+    async saveCurrentPlan () { this.savingPlan = true; try { const response = await saveScreenPlan({ plan_key: this.activePlanKey, name: this.planName, definition: this.planDefinition() }); this.activePlanKey = response.data.plan_key; this.savePlanVisible = false; await this.loadPlansOnly(); this.clearDraft(); this.$message.success(this.$t('marketScreener.planSaved')) } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.savingPlan = false } },
     async loadPlansOnly () { const response = await listScreenPlans(); this.plans = response.data || [] },
-    loadPlan (key) { const plan = this.plans.find(item => item.plan_key === key); if (!plan) return; const value = plan.definition || {}; this.universeMode = value.universeMode || 'pool'; this.manualSymbols = value.manualSymbols || ''; this.pool = { ...this.pool, ...(value.pool || {}) }; this.logic = value.logic || 'and'; this.timeframe = value.timeframe || '1d'; this.limit = value.limit || 1000; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const saved of value.conditions || []) { const item = this.catalogItems.find(row => (saved.factor && (row.id === saved.factor || row.factor_id === saved.factor)) || (saved.signal_type && row.signal_type === saved.signal_type) || (saved.template_id && row.template_id === saved.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: saved.operator || this.conditions[index].operator, value: saved.value, mode: saved.mode || 'must', lookbackBars: saved.lookback_bars || 1 }) } },
+    loadPlan (key) { const plan = this.plans.find(item => item.plan_key === key); if (!plan) return; this.applyDefinition(plan.definition || {}); this.clearDraft() },
+    applyDefinition (value) { this.universeMode = value.universeMode || 'pool'; this.manualSymbols = value.manualSymbols || ''; this.pool = { ...this.pool, ...(value.pool || {}) }; this.logic = value.logic || 'and'; this.timeframe = value.timeframe || '1d'; this.limit = value.limit || 1000; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const saved of value.conditions || []) { const item = this.catalogItems.find(row => (saved.factor && (row.id === saved.factor || row.factor_id === saved.factor)) || (saved.signal_type && row.signal_type === saved.signal_type) || (saved.template_id && row.template_id === saved.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: saved.operator || this.conditions[index].operator, value: saved.value, mode: saved.mode || 'must', lookbackBars: saved.lookback_bars || 1 }) } },
     applyCompiledQuery (compiled) { const value = compiled || {}; this.universeMode = 'pool'; this.pool = { ...this.pool, ...(value.universe || {}) }; this.ranking = { ...this.ranking, ...(value.ranking || {}) }; this.portfolio = { ...this.portfolio, ...(value.portfolio || {}) }; this.conditions = []; for (const raw of value.conditions || []) { const item = this.catalogItems.find(row => (raw.factor && (row.id === raw.factor || row.factor_id === raw.factor)) || (raw.signal_type && row.signal_type === raw.signal_type) || (raw.template_id && row.template_id === raw.template_id)); if (!item) continue; this.addCondition(item); const index = this.conditions.length - 1; this.$set(this.conditions, index, { ...this.conditions[index], operator: raw.operator || this.conditions[index].operator, value: raw.value, mode: raw.mode || 'must' }) } this.clearPoolPreview() },
     async deleteActivePlan () { if (!this.activePlanKey) return; await deleteScreenPlan(this.activePlanKey); this.activePlanKey = undefined; await this.loadPlansOnly() },
     async runScreen () {
-      this.running = true; this.result = null; this.resultRows = []; this.selectedRowKeys = []; this.selectedRows = []
+      this.running = true; this.result = null; this.resultRows = []; this.clearSelection(); this.resultLoadGeneration += 1
       try {
         const payload = { operation: 'signal_factor_screener', timeframe: this.timeframe, conditions: this.conditions.map(this.conditionPayload), logic: this.logic, limit: this.limit, result_limit: 100, ranking: this.ranking, portfolio: this.portfolio }
         if (this.universeMode === 'pool') payload.universe = { ...this.pool, enabled: true }
         else payload.symbols = this.universeMode === 'watchlist' ? this.watchlistSymbols : this.manualSymbolList.map(this.normalizeSymbol)
-        const response = await createScreen(payload, `screen-${Date.now()}`)
+        const response = await createScreen(payload, `screen-${this.screenRequestDigest(payload)}`)
         if (!response || response.code !== 1) throw new Error(response && response.msg)
         this.task = response.data
         this.task = await this.waitTask(response.data.task_id)
@@ -543,11 +610,18 @@ export default {
       } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.running = false }
     },
     async waitTask (taskId, timeout = 3600000, trackCurrent = true) { try { const task = await watchResearchTask(taskId, value => { if (trackCurrent) this.task = value }, timeout); if (task.status === 'SUCCEEDED') return task; throw new Error(task.error_message || task.status) } catch (streamError) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const response = await getTask(taskId); if (!response || response.code !== 1) throw new Error(response && response.msg); if (trackCurrent) this.task = response.data; if (response.data.status === 'SUCCEEDED') return response.data; if (['FAILED', 'CANCELLED', 'TIMED_OUT'].includes(response.data.status)) throw new Error(response.data.error_message || response.data.status); await new Promise(resolve => setTimeout(resolve, 3000)) } throw streamError } },
-    async cancelCurrentTask () { if (!this.task) return; await cancelTask(this.task.task_id); this.$message.info(this.$t('marketScreener.cancelRequested')) },
-    async loadResultRows () { if (!this.task) return; this.loadingRows = true; this.selectedRowKeys = []; this.selectedRows = []; try { const response = await getScreenRows(this.task.task_id, { state: this.resultState, page: this.resultPage, page_size: this.resultPageSize }); const data = response.data || {}; this.resultRows = data.items || []; this.resultTotal = Number(data.total || 0) } catch (error) { this.resultRows = []; this.resultTotal = 0 } finally { this.loadingRows = false } },
-    handleTableChange (pagination) { this.resultPage = pagination.current; this.resultPageSize = pagination.pageSize; this.loadResultRows() },
-    async addResultToWatchlist (row) { try { await addWatchlist({ market: 'CNStock', symbol: String(row.symbol).split('.')[0], name: row.name || row.symbol }); this.$message.success(this.$t('marketScreener.addedWatchlist')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
-    async addSelectedToWatchlist () { const results = await Promise.allSettled(this.selectedRows.map(this.addResultToWatchlist)); const failed = results.filter(item => item.status === 'rejected').length; if (!failed) this.$message.success(this.$t('marketScreener.batchAdded', { count: results.length })) },
+    async cancelCurrentTask () { if (!this.task) return; try { await cancelTask(this.task.task_id); this.$message.info(this.$t('marketScreener.cancelRequested')) } catch (error) { this.$message.error(error.backendMessage || error.message) } },
+    async retryCurrentTask () { if (!this.task || this.retrying) return; this.retrying = true; this.running = true; try { const response = await retryTask(this.task.task_id); this.task = response.data || response; this.task = await this.waitTask(this.task.task_id); this.result = this.task.result && this.task.result.payload; this.resultPage = 1; await this.loadResultRows(); await this.reloadHistory() } catch (error) { this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.runFailed')) } finally { this.retrying = false; this.running = false } },
+    async loadResultRows () { if (!this.task) return; const generation = ++this.resultLoadGeneration; this.loadingRows = true; try { const response = await getScreenRows(this.task.task_id, { state: this.resultState, page: this.resultPage, page_size: this.resultPageSize, sort_by: this.resultSortBy, sort_order: this.resultSortOrder, quality: this.resultQuality }); if (generation !== this.resultLoadGeneration) return; const data = response.data || {}; this.resultRows = data.items || []; this.resultTotal = Number(data.total || 0); this.reconcileSelection() } catch (error) { if (generation === this.resultLoadGeneration) { this.resultRows = []; this.resultTotal = 0; this.$message.error(error.backendMessage || error.message || this.$t('marketScreener.loadResultsFailed')) } } finally { if (generation === this.resultLoadGeneration) this.loadingRows = false } },
+    handleTableChange (pagination, filters, sorter) { this.resultPage = pagination.current; this.resultPageSize = pagination.pageSize; if (sorter && sorter.field && ['symbol', 'match_score', 'technical_score', 'decision_score', 'bar_time'].includes(sorter.field)) { this.resultSortBy = sorter.field; this.resultSortOrder = sorter.order === 'ascend' ? 'asc' : 'desc' } this.loadResultRows() },
+    handleRowSelection (keys, rows) { for (const row of rows || []) this.$set(this.selectedRowMap, row.symbol, row); const currentKeys = new Set((this.resultRows || []).map(row => row.symbol)); for (const key of currentKeys) { if (!keys.includes(key)) this.$delete(this.selectedRowMap, key) } this.reconcileSelection() },
+    reconcileSelection () { this.selectedRowKeys = Object.keys(this.selectedRowMap); this.selectedRows = Object.values(this.selectedRowMap) },
+    clearSelection () { this.selectedRowKeys = []; this.selectedRows = []; this.selectedRowMap = {} },
+    toggleResultSortOrder () { this.resultSortOrder = this.resultSortOrder === 'desc' ? 'asc' : 'desc'; this.loadResultRows() },
+    screenRequestDigest (payload) { const source = JSON.stringify({ ...payload, universe: payload.universe || null, symbols: payload.symbols || null }); let hash = 2166136261; for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); return `${hash >>> 0}` },
+    async addResultToWatchlist (row, silent = false) { try { await addWatchlist({ market: 'CNStock', symbol: String(row.symbol).split('.')[0], name: row.name || row.symbol }); if (!silent) this.$message.success(this.$t('marketScreener.addedWatchlist')); return true } catch (error) { if (!silent) this.$message.error(error.backendMessage || error.message); throw error } },
+    async addSelectedToWatchlist () { const results = await Promise.allSettled(this.selectedRows.map(row => this.addResultToWatchlist(row, true))); const failed = results.filter(item => item.status === 'rejected').length; this.$message[failed ? 'warning' : 'success'](this.$t('marketScreener.batchAddedWithFailures', { count: results.length - failed, failed })) },
+    exportCurrentRows () { if (!this.displayRows.length || this.exportLoading) return; this.exportLoading = true; try { const columns = [{ key: 'symbol', label: this.$t('marketScreener.symbol') }, { key: 'name', label: this.$t('marketScreener.name') }, { key: 'match_score', label: this.$t('marketScreener.matchScore') }, { key: 'decision_score', label: this.$t('screenIntelligence.decisionScore') }, { key: 'technical_score', label: this.$t('marketScreener.technicalScore') }, { key: 'bar_time', label: this.$t('marketScreener.dataTime') }]; const quote = value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`; const csv = [columns.map(item => quote(item.label)).join(','), ...this.displayRows.map(row => columns.map(item => quote(row[item.key])).join(','))].join('\n'); const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `quantdinger-screen-${this.task && this.task.task_id || 'result'}.csv`; anchor.click(); URL.revokeObjectURL(url) } finally { this.exportLoading = false } },
     async validateSelection () { this.validating = true; this.optimizationResult = null; try { const response = await validateScreen(this.task.task_id, { symbols: this.selectedRows.slice(0, 100).map(row => row.symbol), forward_bars: [5, 10, 20], sample_step: 10, split_ratio: [0.6, 0.2, 0.2], walk_forward_folds: 3, embargo_bars: 5 }); this.validationTask = await this.waitTask(response.data.task_id, 3600000, false); this.validationResult = this.validationTask.result && this.validationTask.result.payload; this.validationVisible = true } catch (error) { this.$message.error(error.backendMessage || error.message) } finally { this.validating = false } },
     async optimizeValidatedPortfolio () {
       this.optimizing = true
@@ -627,6 +701,11 @@ export default {
 .run-settings { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; margin: 14px 0; }
 .result-heading { margin: 0 0 10px; }
 .result-heading > div:first-child span { color: #6b7280; font-size: 12px; }
+.result-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.result-toolbar-select { min-width: 128px; }
+.result-toolbar-hint { color: #8c8c8c; font-size: 11px; }
+.quality-summary-alert { margin-bottom: 8px; }
+.task-failure-alert { margin-bottom: 10px; }
 .running-state { display: flex; align-items: center; justify-content: center; flex-direction: column; min-height: 520px; gap: 12px; }
 .running-state .ant-progress { width: min(520px, 90%); }
 .running-state > span { color: #6b7280; font-size: 12px; }
@@ -640,6 +719,7 @@ export default {
 .condition-matrix { display: flex; flex-wrap: wrap; gap: 3px; max-height: 54px; overflow: hidden; }
 .condition-matrix .ant-tag { margin: 0; font-size: 11px; }
 .history-diff { display: flex; flex-wrap: wrap; gap: 3px; }
+.history-request { display: block; margin: 3px 0 5px; color: #8c8c8c; font-size: 11px; }
 .detail-scores { display: flex; gap: 24px; margin-bottom: 14px; }
 .detail-scores b { font-size: 18px; }
 .detail-scores + .ant-alert { margin-bottom: 18px; }

@@ -65,6 +65,27 @@ test('stock screener supports large-pool preview, saved plans, progress, and his
   assert.match(domainApi, /review-signals/)
 })
 
+test('stock screener keeps result operations reliable across refreshes and pages', () => {
+  assert.match(screener, /retryCurrentTask/)
+  assert.match(screener, /resultSortBy/)
+  assert.match(screener, /resultQuality/)
+  assert.match(screener, /resultLoadGeneration/)
+  assert.match(screener, /handleRowSelection/)
+  assert.match(screener, /selectedRowMap/)
+  assert.match(screener, /exportCurrentRows/)
+  assert.match(screener, /draftStorageKey/)
+  assert.match(screener, /draftTimer: null/)
+  assert.match(screener, /result\.intelligence && this\.result\.intelligence\.data_quality/)
+  assert.match(domainApi, /retryTask \(taskId\)/)
+})
+
+test('stock screener exposes bounded, deterministic request and result APIs', () => {
+  assert.match(screener, /screenRequestDigest\(payload\)/)
+  assert.match(screener, /page_size: this\.resultPageSize/)
+  assert.match(screener, /sort_by: this\.resultSortBy/)
+  assert.match(screener, /quality: this\.resultQuality/)
+})
+
 test('live strategy editor shows the concrete source compilation error', () => {
   assert.match(editor, /:description="sourceContractErrorMessage \|\| \$t\('strategyV2\.compileFailedHint'\)"/)
   assert.match(editor, /contractResult\.error\.backendMessage/)
