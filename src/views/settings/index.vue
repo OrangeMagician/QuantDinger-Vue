@@ -919,6 +919,11 @@ export default {
     },
     catalogVenueRows () {
       const labels = { binance: 'Binance', bitget: 'Bitget', bybit: 'Bybit', okx: 'OKX', gate: 'Gate.io', htx: 'HTX' }
+      const configured = new Set(
+        (this.catalogOverview && Array.isArray(this.catalogOverview.configured_exchanges))
+          ? this.catalogOverview.configured_exchanges
+          : Object.keys(labels)
+      )
       const coverage = {}
       for (const row of ((this.catalogOverview && this.catalogOverview.venues) || [])) {
         const key = String(row.exchange || '').toLowerCase()
@@ -930,11 +935,12 @@ export default {
         const attempts = contexts.filter(item => item.exchange === exchange)
         const successCount = attempts.filter(item => item.ok).length
         let status = 'never'
-        if (this.catalogRunning) status = 'running'
+        if (!configured.has(exchange)) status = 'disabled'
+        else if (this.catalogRunning) status = 'running'
         else if (attempts.length && successCount === attempts.length) status = 'success'
         else if (successCount > 0) status = 'partial'
         else if (attempts.length) status = 'failed'
-        const colors = { success: 'green', partial: 'orange', failed: 'red', running: 'blue', never: 'default' }
+        const colors = { success: 'green', partial: 'orange', failed: 'red', running: 'blue', never: 'default', disabled: 'default' }
         return {
           exchange,
           label: labels[exchange],

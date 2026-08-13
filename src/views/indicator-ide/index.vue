@@ -222,9 +222,9 @@
                       <a-tooltip v-if="market === 'CNStock' && klineDataQuality.bar_count" placement="bottom" :title="klineQualityTooltip">
                         <span
                           class="chart-panel-data-quality"
-                          :class="{ 'chart-panel-data-quality--warning': klineDataQuality.quality_status !== 'complete' }"
+                          :class="`chart-panel-data-quality--${klineQualityTone}`"
                         >
-                          <a-icon :type="klineDataQuality.quality_status === 'complete' ? 'check-circle' : 'warning'" />
+                          <a-icon :type="klineQualityIcon" />
                           {{ klineQualityText }}
                         </span>
                       </a-tooltip>
@@ -1315,15 +1315,43 @@ export default {
         count: Number(quality.bar_count || 0)
       })
     },
+    klineQualityStatusKey () {
+      const raw = String((this.klineDataQuality && this.klineDataQuality.quality_status) || '')
+      if (raw === 'limited_history') return 'limited'
+      return ['complete', 'limited', 'gapped', 'partial', 'invalid', 'empty'].includes(raw) ? raw : 'limited'
+    },
+    klineQualityTone () {
+      return {
+        complete: 'success',
+        limited: 'info',
+        empty: 'info',
+        partial: 'progress',
+        gapped: 'warning',
+        invalid: 'error'
+      }[this.klineQualityStatusKey] || 'info'
+    },
+    klineQualityIcon () {
+      return {
+        complete: 'check-circle',
+        limited: 'info-circle',
+        empty: 'info-circle',
+        partial: 'clock-circle',
+        gapped: 'warning',
+        invalid: 'close-circle'
+      }[this.klineQualityStatusKey] || 'info-circle'
+    },
     klineQualityTooltip () {
       const quality = this.klineDataQuality || {}
-      const statusKey = ['complete', 'limited', 'gapped', 'partial'].includes(quality.quality_status)
-        ? quality.quality_status
-        : 'limited'
       const temporary = quality.temporary_active ? this.$t('indicatorIde.klineQuality.temporary') : ''
       const gap = Number(quality.gap_count || 0) > 0 ? this.$t('indicatorIde.klineQuality.gaps', { count: quality.gap_count }) : ''
+      const sessions = Number(quality.missing_session_count || 0) > 0 ? this.$t('indicatorIde.klineQuality.missingSessions', { count: quality.missing_session_count }) : ''
       const partial = Number(quality.incomplete_bar_count || 0) > 0 ? this.$t('indicatorIde.klineQuality.incomplete', { count: quality.incomplete_bar_count }) : ''
-      return `${this.$t(`indicatorIde.klineQuality.${statusKey}`)}${temporary ? ` · ${temporary}` : ''}${gap ? ` · ${gap}` : ''}${partial ? ` · ${partial}` : ''}`
+      const invalidCount = ['invalid_timestamp_count', 'duplicate_timestamp_count', 'invalid_session_time_count', 'invalid_ohlc_count', 'negative_volume_count']
+        .reduce((total, key) => total + Number(quality[key] || 0), 0)
+      const invalid = invalidCount > 0 ? this.$t('indicatorIde.klineQuality.invalidDetails', { count: invalidCount }) : ''
+      return [this.$t(`indicatorIde.klineQuality.${this.klineQualityStatusKey}`), temporary, sessions, gap, partial, invalid]
+        .filter(Boolean)
+        .join(' · ')
     },
     selectedIndicatorObj () {
       return this.selectedIndicatorId ? this.indicators.find(i => i.id === this.selectedIndicatorId) : null
@@ -1466,10 +1494,14 @@ export default {
           throw new Error((response && response.msg) || this.$t('indicatorIde.syncTodayKlineFailed'))
         }
         const counts = response.data.bar_counts || {}
-        this.$message.success(this.$t('indicatorIde.syncTodayKlineSuccess', {
-          minute: Number(counts['1m'] || 0),
-          daily: Number(counts['1D'] || 0)
-        }))
+        if (response.data.canonical_complete) {
+          this.$message.success(this.$t('indicatorIde.syncTodayKlineCanonical'))
+        } else {
+          this.$message.success(this.$t('indicatorIde.syncTodayKlineSuccess', {
+            minute: Number(counts['1m'] || 0),
+            daily: Number(counts['1D'] || 0)
+          }))
+        }
         await this.$nextTick()
         const chart = this.$refs.klineChart
         if (chart && typeof chart.loadKlineData === 'function') {
@@ -3985,10 +4017,21 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chart-panel-data-quality--warning {
+.chart-panel-data-quality--warning,
+.chart-panel-data-quality--progress {
   border-color: #ffe58f;
   color: #ad6800;
   background: #fffbe6;
+}
+.chart-panel-data-quality--info {
+  border-color: #91caff;
+  color: #0958d9;
+  background: #e6f4ff;
+}
+.chart-panel-data-quality--error {
+  border-color: #ffa39e;
+  color: #a8071a;
+  background: #fff1f0;
 }
 .chart-panel-action-btn {
   height: 28px !important;
@@ -6059,10 +6102,21 @@ body.dark .ide-signal-alert-modal-wrap {
     color: #95de64;
     background: rgba(82, 196, 26, 0.1);
   }
-  .chart-panel-data-quality--warning {
+  .chart-panel-data-quality--warning,
+  .chart-panel-data-quality--progress {
     border-color: rgba(250, 173, 20, 0.42);
     color: #ffc53d;
     background: rgba(250, 173, 20, 0.1);
+  }
+  .chart-panel-data-quality--info {
+    border-color: rgba(64, 169, 255, 0.45);
+    color: #69c0ff;
+    background: rgba(24, 144, 255, 0.12);
+  }
+  .chart-panel-data-quality--error {
+    border-color: rgba(255, 120, 117, 0.48);
+    color: #ff7875;
+    background: rgba(245, 34, 45, 0.12);
   }
   .chart-panel-qt-btn.ant-btn-default {
     background: #262626;

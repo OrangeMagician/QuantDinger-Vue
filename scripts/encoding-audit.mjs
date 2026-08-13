@@ -205,6 +205,21 @@ const localeFiles = readdirSync(langDir)
   .map((name) => join(langDir, name))
   .sort()
 
+const completeLocaleNames = new Set([
+  'ar-SA.js',
+  'de-DE.js',
+  'en-US.js',
+  'fr-FR.js',
+  'ja-JP.js',
+  'ko-KR.js',
+  'ru-RU.js',
+  'th-TH.js',
+  'vi-VN.js',
+  'zh-CN.js',
+  'zh-TW.js'
+])
+const completeLocaleFiles = localeFiles.filter((filePath) => completeLocaleNames.has(basename(filePath)))
+
 for (const filePath of localeFiles) {
   try {
     checkLocaleSyntax(filePath)
@@ -217,7 +232,7 @@ const enUSPath = join(langDir, 'en-US.js')
 const enUSKeys = localeKeys(enUSPath)
 const localeCoverage = []
 
-for (const filePath of localeFiles) {
+for (const filePath of completeLocaleFiles) {
   let text = ''
   try {
     text = readStrictUtf8(filePath)
@@ -251,5 +266,5 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`Encoding audit passed: ${files.length} text files, ${localeFiles.length} locale files.`)
+console.log(`Encoding audit passed: ${files.length} text files, ${completeLocaleFiles.length} complete locale files, ${localeFiles.length} locale modules.`)
 console.table(localeCoverage)

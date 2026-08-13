@@ -90,6 +90,10 @@ test('A-share indicator chart can sync temporary current-day bars and reload in 
 test('indicator chart exposes detailed K-line quality and stable multi-period reuse', () => {
   assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.gaps/)
   assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.incomplete/)
+  assert.match(indicatorIdeSource, /raw === 'limited_history'/)
+  assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.missingSessions/)
+  assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.invalidDetails/)
+  assert.match(indicatorIdeSource, /chart-panel-data-quality--\$\{klineQualityTone\}/)
   assert.match(indicatorIdeSource, /czscMultiPeriodCache: \{\}/)
   assert.match(indicatorIdeSource, /Date\.now\(\) - cached\.createdAt < 120000/)
   assert.match(indicatorIdeSource, /indicator-multi-\$\{this\.market\}-\$\{this\.symbol\}/)
