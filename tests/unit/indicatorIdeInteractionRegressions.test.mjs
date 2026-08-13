@@ -87,6 +87,18 @@ test('A-share indicator chart can sync temporary current-day bars and reload in 
   assert.match(indicatorIdeSource, /syncingTodayKline: false/)
 })
 
+test('current-day K-line sync keeps one stable icon slot while loading', () => {
+  const start = indicatorIdeSource.indexOf('class="chart-panel-action-btn chart-panel-sync-kline-btn"')
+  const end = indicatorIdeSource.indexOf('</a-button>', start)
+  const syncButtonSource = indicatorIdeSource.slice(start, end)
+
+  assert.ok(start >= 0 && end > start)
+  assert.match(syncButtonSource, /:disabled="!symbol"/)
+  assert.match(syncButtonSource, /:aria-busy="syncingTodayKline \? 'true' : 'false'"/)
+  assert.match(syncButtonSource, /<a-icon type="sync" :class="\{ 'anticon-spin': syncingTodayKline \}" \/>/)
+  assert.doesNotMatch(syncButtonSource, /:loading=|v-if=/)
+})
+
 test('indicator chart reviews screener candidates in place and returns to the source task', () => {
   assert.match(indicatorIdeSource, /loadCandidateContext/)
   assert.match(indicatorIdeSource, /screener-review-strip/)

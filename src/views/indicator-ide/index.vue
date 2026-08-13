@@ -286,11 +286,11 @@
                         <a-button
                           size="small"
                           class="chart-panel-action-btn chart-panel-sync-kline-btn"
-                          :loading="syncingTodayKline"
                           :disabled="!symbol"
+                          :aria-busy="syncingTodayKline ? 'true' : 'false'"
                           @click="syncTodayKline"
                         >
-                          <a-icon v-if="!syncingTodayKline" type="sync" />
+                          <a-icon type="sync" :class="{ 'anticon-spin': syncingTodayKline }" />
                           <span>{{ $t('indicatorIde.syncTodayKline') }}</span>
                         </a-button>
                       </a-tooltip>

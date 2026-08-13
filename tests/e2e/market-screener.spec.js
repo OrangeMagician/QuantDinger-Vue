@@ -6,8 +6,8 @@ const gotoAppPage = async (page, path) => {
   await page.goto(path)
   if ((page.viewportSize()?.width || 0) > 768) return
   const closeNavigation = page.locator('.mobile-menu-close')
-  await closeNavigation.waitFor({ state: 'visible', timeout: 3000 })
-  await closeNavigation.click()
+  await closeNavigation.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
+  if (await closeNavigation.isVisible()) await closeNavigation.click()
 }
 
 test.beforeEach(async ({ page }) => {
@@ -82,6 +82,45 @@ test('manual symbol feedback blocks invalid runs without overflowing the viewpor
   const viewport = page.viewportSize()
   const width = await page.evaluate(() => document.documentElement.scrollWidth)
   expect(width).toBeLessThanOrEqual(viewport.width + 1)
+})
+
+test("syncing today's K-line keeps the icon and label in place", async ({ page }) => {
+  let releaseSync
+  const syncReleased = new Promise(resolve => { releaseSync = resolve })
+  let markSyncStarted
+  const syncStarted = new Promise(resolve => { markSyncStarted = resolve })
+  await page.route('**/api/v2/market/bars/sync-today', async route => {
+    markSyncStarted()
+    await syncReleased
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ok({ canonical_complete: false, bar_counts: { '1m': 120, '1D': 1 } }))
+    })
+  })
+  await gotoAppPage(page, '/#/indicator-ide?market=CNStock&symbol=600519.SH&timeframe=1D&builtin=czsc')
+
+  const button = page.locator('button.chart-panel-sync-kline-btn')
+  const layout = () => button.evaluate(element => {
+    const icon = element.querySelector('.anticon')
+    const label = element.querySelector('span:not(.anticon)')
+    return {
+      buttonWidth: element.offsetWidth,
+      iconOffset: icon.offsetLeft,
+      labelOffset: label.offsetLeft
+    }
+  })
+  await expect(button).toBeVisible()
+  const before = await layout()
+
+  await button.click()
+  await syncStarted
+  await expect(button).toHaveAttribute('aria-busy', 'true')
+  await expect(button.locator('.anticon-sync')).toHaveClass(/anticon-spin/)
+  expect(await layout()).toEqual(before)
+
+  releaseSync()
+  await expect(button).toHaveAttribute('aria-busy', 'false')
 })
 
 test('indicator chart switches screener candidates in place and returns to the task', async ({ page }) => {
