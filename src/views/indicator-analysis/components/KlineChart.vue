@@ -331,6 +331,7 @@ export default {
     const realtimeTimer = ref(null)
     const realtimeInterval = ref(5000)
     const realtimeFetchInFlight = ref(false)
+    const realtimeFailureCount = ref(0)
     let restPollingKickTimer = null
     let realtimeResyncTimer = null
     let realtimeChartRafId = null
@@ -348,10 +349,38 @@ export default {
     const MIN_INITIAL_KLINE_LIMIT = 480
     const MAX_INITIAL_KLINE_LIMIT = 900
     const HISTORY_PAGE_LIMIT = 500
+    const normalizeTimeframe = (value) => {
+      const raw = String(value || '1H').trim()
+      const aliases = {
+        '1d': '1D',
+        d: '1D',
+        day: '1D',
+        daily: '1D',
+        '1w': '1W',
+        w: '1W',
+        week: '1W',
+        weekly: '1W',
+        '1h': '1H',
+        '60m': '1H',
+        '60min': '1H',
+        hour: '1H',
+        '4h': '4H',
+        '240m': '4H',
+        '240min': '4H',
+        '1min': '1m',
+        minute: '1m',
+        '3min': '3m',
+        '5min': '5m',
+        '15min': '15m',
+        '30min': '30m'
+      }
+      return aliases[raw.toLowerCase()] || raw
+    }
+
     const marketRequestParams = (extra = {}) => ({
       market: props.market,
       symbol: props.symbol,
-      timeframe: props.timeframe,
+      timeframe: normalizeTimeframe(props.timeframe),
       exchange_id: props.exchangeId || undefined,
       market_type: props.marketType || undefined,
       instrument_id: props.instrumentId || undefined,
@@ -435,7 +464,7 @@ export default {
     }
 
     const getRealtimePollingInterval = () => {
-      const tf = String(props.timeframe || '1H')
+      const tf = normalizeTimeframe(props.timeframe)
       const cryptoMap = {
         '1m': 5000,
         '3m': 8000,
@@ -474,7 +503,7 @@ export default {
       '1W': 7 * 24 * 60 * 60 * 1000
     }
 
-    const getTimeframeMs = (tf = props.timeframe) => TIMEFRAME_MS[String(tf || '1H')] || 0
+    const getTimeframeMs = (tf = props.timeframe) => TIMEFRAME_MS[normalizeTimeframe(tf)] || 0
 
     const normalizeTimestampMs = (value) => {
       let timeValue = value
@@ -491,7 +520,7 @@ export default {
     const alignKlineTimestampMs = (value, tf = props.timeframe) => {
       const ts = normalizeTimestampMs(value)
       if (!ts) return null
-      const key = String(tf || '1H')
+      const key = normalizeTimeframe(tf)
       const interval = getTimeframeMs(key)
       if (!interval) return ts
       if (key === '1D') {
@@ -2882,6 +2911,7 @@ registerOverlay({
         })
 
         if (response.code === 1 && response.data && Array.isArray(response.data) && response.data.length > 0) {
+          realtimeFailureCount.value = 0
           const newData = formatKlineData(response.data)
           const existingData = [...klineData.value]
 
@@ -2936,8 +2966,11 @@ registerOverlay({
               maybeUpdateIndicators(false)
             }
           }
+        } else {
+          realtimeFailureCount.value = Math.min(6, realtimeFailureCount.value + 1)
         }
       } catch (err) {
+        realtimeFailureCount.value = Math.min(6, realtimeFailureCount.value + 1)
       } finally {
         realtimeFetchInFlight.value = false
       }
@@ -2958,7 +2991,8 @@ registerOverlay({
         clearTimeout(restPollingKickTimer)
         restPollingKickTimer = null
       }
-      realtimeInterval.value = getRealtimePollingInterval()
+      const baseInterval = getRealtimePollingInterval()
+      realtimeInterval.value = Math.min(baseInterval * (2 ** Math.min(realtimeFailureCount.value, 4)), 300000)
 
       if (props.realtimeEnabled && props.symbol && klineData.value.length > 0) {
         const kickDelay = Number(options.kickDelay)
@@ -3106,10 +3140,12 @@ registerOverlay({
     }
 
     const handleWsReconnected = () => {
+      realtimeFailureCount.value = 0
       stopRestPolling()
     }
 
     const handleWsError = () => {
+      realtimeFailureCount.value = Math.min(6, realtimeFailureCount.value + 1)
       wsActive.value = false
       startRestPolling({ kick: true, kickDelay: 0 })
     }

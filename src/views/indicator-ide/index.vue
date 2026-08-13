@@ -1170,6 +1170,7 @@ export default {
         { label: '5m', value: '5m' },
         { label: '1m', value: '1m' }
       ],
+      czscMultiPeriodCache: {},
       czscMultiPeriodGeneration: 0,
       syncingTodayKline: false,
       klineDataQuality: {},
@@ -1316,9 +1317,13 @@ export default {
     },
     klineQualityTooltip () {
       const quality = this.klineDataQuality || {}
-      const statusKey = quality.quality_status === 'complete' ? 'complete' : 'limited'
+      const statusKey = ['complete', 'limited', 'gapped', 'partial'].includes(quality.quality_status)
+        ? quality.quality_status
+        : 'limited'
       const temporary = quality.temporary_active ? this.$t('indicatorIde.klineQuality.temporary') : ''
-      return `${this.$t(`indicatorIde.klineQuality.${statusKey}`)}${temporary ? ` · ${temporary}` : ''}`
+      const gap = Number(quality.gap_count || 0) > 0 ? this.$t('indicatorIde.klineQuality.gaps', { count: quality.gap_count }) : ''
+      const partial = Number(quality.incomplete_bar_count || 0) > 0 ? this.$t('indicatorIde.klineQuality.incomplete', { count: quality.incomplete_bar_count }) : ''
+      return `${this.$t(`indicatorIde.klineQuality.${statusKey}`)}${temporary ? ` · ${temporary}` : ''}${gap ? ` · ${gap}` : ''}${partial ? ` · ${partial}` : ''}`
     },
     selectedIndicatorObj () {
       return this.selectedIndicatorId ? this.indicators.find(i => i.id === this.selectedIndicatorId) : null
@@ -1787,6 +1792,7 @@ export default {
       this.czscMultiPeriodLoading = false
       this.czscMultiPeriodError = ''
       this.czscMultiPeriodResult = null
+      this.czscMultiPeriodCache = {}
     },
     marketRequestForCzsc (timeframe, limit = 1000) {
       const params = { market: this.market, symbol: this.symbol, timeframe, limit }
@@ -1818,6 +1824,13 @@ export default {
         this.czscMultiPeriodError = this.$t('indicatorIde.czsc.multiPeriodSelectAtLeast')
         return
       }
+      const cacheKey = `${this.market}:${this.symbol}:${selected.map(item => String(item).toLowerCase()).sort().join(',')}`
+      const cached = this.czscMultiPeriodCache[cacheKey]
+      if (cached && Date.now() - cached.createdAt < 120000) {
+        this.czscMultiPeriodResult = cached.result
+        this.czscMultiPeriodLoading = false
+        return
+      }
       this.czscMultiPeriodLoading = true
       try {
         if (this.market === 'CNStock') {
@@ -1825,12 +1838,15 @@ export default {
             symbol: normalizeCzscSymbol(this.symbol),
             timeframes: selected,
             limit: 1000
-          }, `indicator-multi-${this.market}-${this.symbol}-${selected.join('-')}-${Date.now()}`)
+          }, `indicator-multi-${this.market}-${this.symbol}-${selected.map(item => String(item).toLowerCase()).sort().join('-')}`)
           if (!response || response.code !== 1 || !response.data || !response.data.task_id) {
             throw new Error(response && response.msg || this.$t('trendChart.multiFailed'))
           }
           const task = await this.waitForCzscMultiPeriodTask(response.data.task_id, generation)
-          if (generation === this.czscMultiPeriodGeneration) this.czscMultiPeriodResult = task.result && task.result.payload
+          if (generation === this.czscMultiPeriodGeneration) {
+            this.czscMultiPeriodResult = task.result && task.result.payload
+            this.$set(this.czscMultiPeriodCache, cacheKey, { createdAt: Date.now(), result: this.czscMultiPeriodResult })
+          }
           return
         }
         const rows = await Promise.all(selected.map(timeframe => this.loadCzscMultiPeriodBars(timeframe, generation)))
@@ -1846,6 +1862,7 @@ export default {
           },
           signal_tree: rows
         }
+        this.$set(this.czscMultiPeriodCache, cacheKey, { createdAt: Date.now(), result: this.czscMultiPeriodResult })
       } catch (error) {
         if (generation === this.czscMultiPeriodGeneration) this.czscMultiPeriodError = error.backendMessage || error.message || String(error)
       } finally {

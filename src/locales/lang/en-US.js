@@ -7613,5 +7613,9 @@ export default {
   "indicatorIde.klineQuality.summary": "{source} · through {date} · {count} bars",
   "indicatorIde.klineQuality.complete": "The requested range is complete",
   "indicatorIde.klineQuality.limited": "Available history is shorter than requested",
-  "indicatorIde.klineQuality.temporary": "Includes temporary server bars"
+  "indicatorIde.klineQuality.gapped": "The returned series contains gaps",
+  "indicatorIde.klineQuality.partial": "The latest period is still forming",
+  "indicatorIde.klineQuality.temporary": "Includes temporary server bars",
+  "indicatorIde.klineQuality.gaps": "{count} data gaps detected",
+  "indicatorIde.klineQuality.incomplete": "{count} incomplete bars"
 }

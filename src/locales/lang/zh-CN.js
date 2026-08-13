@@ -7401,5 +7401,9 @@ export default {
   "indicatorIde.klineQuality.summary": "{source} · 截止 {date} · {count} 根",
   "indicatorIde.klineQuality.complete": "当前请求范围数据完整",
   "indicatorIde.klineQuality.limited": "可用历史少于请求数量",
-  "indicatorIde.klineQuality.temporary": "包含服务器临时行情"
+  "indicatorIde.klineQuality.gapped": "返回序列存在数据缺口",
+  "indicatorIde.klineQuality.partial": "最新周期尚未完成",
+  "indicatorIde.klineQuality.temporary": "包含服务器临时行情",
+  "indicatorIde.klineQuality.gaps": "发现 {count} 个数据缺口",
+  "indicatorIde.klineQuality.incomplete": "有 {count} 根未完成周期柱"
 }

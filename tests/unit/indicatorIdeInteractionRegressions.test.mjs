@@ -87,6 +87,14 @@ test('A-share indicator chart can sync temporary current-day bars and reload in 
   assert.match(indicatorIdeSource, /syncingTodayKline: false/)
 })
 
+test('indicator chart exposes detailed K-line quality and stable multi-period reuse', () => {
+  assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.gaps/)
+  assert.match(indicatorIdeSource, /indicatorIde\.klineQuality\.incomplete/)
+  assert.match(indicatorIdeSource, /czscMultiPeriodCache: \{\}/)
+  assert.match(indicatorIdeSource, /Date\.now\(\) - cached\.createdAt < 120000/)
+  assert.match(indicatorIdeSource, /indicator-multi-\$\{this\.market\}-\$\{this\.symbol\}/)
+})
+
 test('hidden quick trade panel does not poll an invalid market during indicator initialization', () => {
   assert.match(
     indicatorIdeSource,
