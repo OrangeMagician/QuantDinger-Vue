@@ -7449,5 +7449,15 @@ export default {
   "indicatorIde.klineQuality.gaps": "发现 {count} 个数据缺口",
   "indicatorIde.klineQuality.missingSessions": "缺少 {count} 个交易日",
   "indicatorIde.klineQuality.invalidDetails": "发现 {count} 项异常时间或 OHLCV 数据",
-  "indicatorIde.klineQuality.incomplete": "有 {count} 根未完成周期柱"
+  "indicatorIde.klineQuality.incomplete": "有 {count} 根未完成周期柱",
+  "indicatorIde.klineQuality.detailsTitle": "K 线数据质量明细",
+  "indicatorIde.klineQuality.clickForDetails": "点击查看异常明细",
+  "indicatorIde.klineQuality.noIssueDetails": "当前响应没有可展开的异常明细",
+  "indicatorIde.klineQuality.moreIssues": "另有 {count} 项异常未展开",
+  "indicatorIde.klineQuality.rowIndex": "第 {index} 行",
+  "indicatorIde.klineQuality.issue.invalid_timestamp": "时间戳无效",
+  "indicatorIde.klineQuality.issue.duplicate_timestamp": "时间戳重复",
+  "indicatorIde.klineQuality.issue.invalid_session_time": "非交易时段",
+  "indicatorIde.klineQuality.issue.invalid_ohlc": "OHLC 异常",
+  "indicatorIde.klineQuality.issue.invalid_volume": "成交量异常"
 }

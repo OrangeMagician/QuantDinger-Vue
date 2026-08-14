@@ -263,15 +263,47 @@
                   <div class="chart-panel-toolbar-top">
                     <span class="chart-panel-toolbar-title">{{ $t('indicatorIde.chartWindow') }}</span>
                     <div class="chart-panel-toolbar-top-actions">
-                      <a-tooltip v-if="market === 'CNStock' && klineDataQuality.bar_count" placement="bottom" :title="klineQualityTooltip">
+                      <a-popover
+                        v-if="market === 'CNStock' && klineDataQuality.bar_count"
+                        placement="bottomRight"
+                        trigger="click"
+                        overlay-class-name="kline-quality-popover"
+                        :overlay-style="{ maxWidth: 'calc(100vw - 16px)' }"
+                        :title="$t('indicatorIde.klineQuality.detailsTitle')"
+                      >
+                        <template slot="content">
+                          <div class="kline-quality-details" style="width: calc(100vw - 48px); max-width: 520px;">
+                            <p class="kline-quality-details__summary">{{ klineQualityTooltip }}</p>
+                            <div v-if="klineQualityIssues.length" class="kline-quality-details__list">
+                              <div
+                                v-for="(issue, index) in klineQualityIssues"
+                                :key="`${issue.kind}-${issue.row_index}-${issue.timestamp}-${index}`"
+                                class="kline-quality-details__item"
+                              >
+                                <span class="kline-quality-details__time">{{ formatKlineQualityIssueTime(issue) }}</span>
+                                <strong>{{ klineQualityIssueLabel(issue) }}</strong>
+                                <code>{{ formatKlineQualityIssueValues(issue) }}</code>
+                              </div>
+                            </div>
+                            <p v-else class="kline-quality-details__empty">{{ $t('indicatorIde.klineQuality.noIssueDetails') }}</p>
+                            <p v-if="klineQualityIssuesTruncated" class="kline-quality-details__more">
+                              {{ $t('indicatorIde.klineQuality.moreIssues', { count: klineQualityIssuesTruncated }) }}
+                            </p>
+                          </div>
+                        </template>
                         <span
                           class="chart-panel-data-quality"
                           :class="`chart-panel-data-quality--${klineQualityTone}`"
+                          role="button"
+                          tabindex="0"
+                          :aria-label="`${klineQualityText}，${$t('indicatorIde.klineQuality.clickForDetails')}`"
+                          @keydown.enter="$event.currentTarget.click()"
+                          @keydown.space.prevent="$event.currentTarget.click()"
                         >
                           <a-icon :type="klineQualityIcon" />
                           {{ klineQualityText }}
                         </span>
-                      </a-tooltip>
+                      </a-popover>
                       <a-button
                         size="small"
                         class="chart-panel-action-btn chart-panel-signal-alert-btn"
@@ -1399,6 +1431,13 @@ export default {
         .filter(Boolean)
         .join(' · ')
     },
+    klineQualityIssues () {
+      const issues = this.klineDataQuality && this.klineDataQuality.quality_issues
+      return Array.isArray(issues) ? issues : []
+    },
+    klineQualityIssuesTruncated () {
+      return Math.max(0, Number((this.klineDataQuality && this.klineDataQuality.quality_issues_truncated) || 0))
+    },
     selectedIndicatorObj () {
       return this.selectedIndicatorId ? this.indicators.find(i => i.id === this.selectedIndicatorId) : null
     },
@@ -1542,6 +1581,28 @@ export default {
   methods: {
     handleKlineDataQuality (quality) {
       this.klineDataQuality = quality && typeof quality === 'object' ? quality : {}
+    },
+    klineQualityIssueLabel (issue) {
+      const kind = String((issue && issue.kind) || 'unknown')
+      const key = `indicatorIde.klineQuality.issue.${kind}`
+      return this.$te(key) ? this.$t(key) : kind
+    },
+    formatKlineQualityIssueTime (issue) {
+      const iso = String((issue && issue.datetime) || '')
+      if (iso) {
+        const parsed = moment.parseZone(iso)
+        if (parsed.isValid()) return parsed.format('YYYY-MM-DD HH:mm:ss')
+      }
+      const index = Number(issue && issue.row_index)
+      return Number.isInteger(index)
+        ? this.$t('indicatorIde.klineQuality.rowIndex', { index: index + 1 })
+        : '-'
+    },
+    formatKlineQualityIssueValues (issue) {
+      const values = issue && issue.values && typeof issue.values === 'object' ? issue.values : {}
+      const entries = Object.entries(values)
+      if (!entries.length) return '-'
+      return entries.map(([field, value]) => `${field}=${value == null || value === '' ? '-' : value}`).join('  ')
     },
     restoreScreenerCandidateContext () {
       const query = (this.$route && this.$route.query) || {}
@@ -4124,6 +4185,54 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+.chart-panel-data-quality:focus-visible {
+  outline: 2px solid var(--primary-color, #1677ff);
+  outline-offset: 2px;
+}
+.kline-quality-details {
+  max-height: 360px;
+  overflow: auto;
+}
+.kline-quality-details__summary,
+.kline-quality-details__empty,
+.kline-quality-details__more {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.kline-quality-details__list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.kline-quality-details__item {
+  display: grid;
+  grid-template-columns: 132px 92px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.kline-quality-details__time { color: rgba(0, 0, 0, 0.65); }
+.kline-quality-details__item strong { color: #a8071a; }
+.kline-quality-details__item code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: rgba(0, 0, 0, 0.78);
+  font-family: SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+}
+.kline-quality-details__more { margin-top: 8px; color: #ad6800; }
+@media (max-width: 600px) {
+  .kline-quality-details__item {
+    grid-template-columns: minmax(112px, 1fr) minmax(100px, 1fr);
+  }
+  .kline-quality-details__item code { grid-column: 1 / -1; }
 }
 .chart-panel-data-quality--warning,
 .chart-panel-data-quality--progress {

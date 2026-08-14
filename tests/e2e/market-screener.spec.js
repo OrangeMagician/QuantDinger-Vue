@@ -123,6 +123,68 @@ test("syncing today's K-line keeps the icon and label in place", async ({ page }
   await expect(button).toHaveAttribute('aria-busy', 'false')
 })
 
+test('K-line quality status expands concrete anomaly rows', async ({ page }) => {
+  const start = Date.parse('2026-08-11T09:31:00+08:00') / 1000
+  const bars = Array.from({ length: 30 }, (_, index) => ({
+    time: start + index * 60,
+    trade_date: '2026-08-11',
+    open: 10 + index * 0.01,
+    high: 10.2 + index * 0.01,
+    low: 9.8 + index * 0.01,
+    close: 10.1 + index * 0.01,
+    volume: 1000 + index,
+    temporary: true,
+    complete: true,
+    source_timeframe: '1m'
+  }))
+  const issueTime = Date.parse('2026-08-11T09:33:00+08:00') / 1000
+  await page.route('**/api/indicator/kline**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      code: 1,
+      msg: 'success',
+      data: bars,
+      meta: {
+        bar_count: bars.length,
+        requested_bar_count: 30,
+        has_more: true,
+        source_timeframe: '1m',
+        latest_trade_date: '2026-08-11',
+        quality_status: 'invalid',
+        temporary_active: true,
+        duplicate_timestamp_count: 1,
+        invalid_ohlc_count: 1,
+        negative_volume_count: 1,
+        quality_issues: [
+          { kind: 'duplicate_timestamp', row_index: 3, timestamp: issueTime, datetime: '2026-08-11T09:33:00+08:00', values: { time: issueTime, close: 10.12 } },
+          { kind: 'invalid_ohlc', row_index: 7, timestamp: issueTime + 240, datetime: '2026-08-11T09:37:00+08:00', values: { open: 10.1, high: 9.5, low: 9.8, close: 10 } },
+          { kind: 'invalid_volume', row_index: 9, timestamp: issueTime + 360, datetime: '2026-08-11T09:39:00+08:00', values: { volume: -1 } }
+        ],
+        quality_issues_truncated: 0
+      }
+    })
+  }))
+
+  await gotoAppPage(page, '/#/indicator-ide?market=CNStock&symbol=600519.SH&timeframe=1m&builtin=czsc')
+  const quality = page.locator('.chart-panel-data-quality')
+  await expect(quality).toBeVisible()
+  await quality.click()
+
+  await expect(page.getByText('K-line data quality details')).toBeVisible()
+  await expect(page.getByText('Duplicate timestamp')).toBeVisible()
+  await expect(page.getByText('Invalid OHLC')).toBeVisible()
+  await expect(page.getByText('Invalid volume')).toBeVisible()
+  await expect(page.getByText('2026-08-11 09:33:00')).toBeVisible()
+  await expect(page.getByText('volume=-1')).toBeVisible()
+
+  const popover = page.locator('.kline-quality-popover')
+  const box = await popover.boundingBox()
+  const viewport = page.viewportSize()
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
+})
+
 test('indicator chart switches screener candidates in place and returns to the task', async ({ page }) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('qd_screener_candidate_context_v1', JSON.stringify({

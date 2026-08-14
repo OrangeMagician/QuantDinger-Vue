@@ -7661,5 +7661,15 @@ export default {
   "indicatorIde.klineQuality.gaps": "{count} data gaps detected",
   "indicatorIde.klineQuality.missingSessions": "{count} trading sessions are missing",
   "indicatorIde.klineQuality.invalidDetails": "{count} timestamp or OHLCV anomalies detected",
-  "indicatorIde.klineQuality.incomplete": "{count} incomplete bars"
+  "indicatorIde.klineQuality.incomplete": "{count} incomplete bars",
+  "indicatorIde.klineQuality.detailsTitle": "K-line data quality details",
+  "indicatorIde.klineQuality.clickForDetails": "Click to view anomaly details",
+  "indicatorIde.klineQuality.noIssueDetails": "No anomaly details are available for this response",
+  "indicatorIde.klineQuality.moreIssues": "{count} additional anomalies are not expanded",
+  "indicatorIde.klineQuality.rowIndex": "Row {index}",
+  "indicatorIde.klineQuality.issue.invalid_timestamp": "Invalid timestamp",
+  "indicatorIde.klineQuality.issue.duplicate_timestamp": "Duplicate timestamp",
+  "indicatorIde.klineQuality.issue.invalid_session_time": "Outside trading session",
+  "indicatorIde.klineQuality.issue.invalid_ohlc": "Invalid OHLC",
+  "indicatorIde.klineQuality.issue.invalid_volume": "Invalid volume"
 }
