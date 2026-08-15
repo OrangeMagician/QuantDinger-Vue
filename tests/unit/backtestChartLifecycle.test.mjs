@@ -19,8 +19,19 @@ test('backtest center compiles a source manifest before accepting runtime contro
 })
 
 test('backtest center submits only the Strategy API V2 request contract', () => {
-  assert.match(source, /runStrategyBacktest\(\{[\s\S]*?sourceId: this\.form\.sourceId[\s\S]*?startDate:[\s\S]*?endDate:[\s\S]*?params: this\.params/)
+  assert.match(source, /runStrategyBacktest\(\{[\s\S]*?sourceId: this\.isTemplateSource \? undefined : this\.form\.sourceId[\s\S]*?code: this\.isTemplateSource \? this\.source\.code : undefined[\s\S]*?startDate:[\s\S]*?endDate:[\s\S]*?params: this\.params/)
   assert.doesNotMatch(source, /strategy_config|script_params|strict_mode|strategy_code/)
+})
+
+test('backtest center exposes runnable built-in templates without saving draft strategies', () => {
+  assert.match(source, /getScriptTemplateList\(\)/)
+  assert.match(source, /id: `template:\$\{item\.key\}`/)
+  assert.match(source, /is_template: true/)
+  assert.match(source, /compileScriptSource\(\{ code: selected\.code/)
+  assert.match(source, /strategyName: this\.isTemplateSource \? this\.sourceDisplayName\(this\.source\) : undefined/)
+  assert.match(source, /!item\.is_template && item\.engine !== 'czsc'/)
+  assert.match(source, /trading-assistant\.template\.\$\{item\.template_key\}/)
+  assert.doesNotMatch(source, /createScriptSource/)
 })
 
 test('closed trades expose lifecycle, prices, wallet equity, and profit tone', () => {

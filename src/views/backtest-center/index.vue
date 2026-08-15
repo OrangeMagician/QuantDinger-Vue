@@ -42,7 +42,7 @@
             @change="selectSource"
           >
             <a-select-option v-for="item in availableSources" :key="item.id" :value="item.id">
-              {{ item.name }} · {{ sourceTypeLabel(item) }}
+              {{ sourceDisplayName(item) }} · {{ sourceTypeLabel(item) }}
             </a-select-option>
           </a-select>
 
@@ -370,6 +370,7 @@ import {
   compileScriptSource,
   getScriptSourceDetail,
   getScriptSourceList,
+  getScriptTemplateList,
   getStrategyFactorResearchHistory,
   getStrategyFactorResearchRun,
   getStrategyBacktestHistory,
@@ -393,6 +394,7 @@ import {
   formatCzscSymbolLabel,
   normalizeCzscSymbol
 } from '@/utils/czscSymbols'
+import { normalizeScriptTemplate } from '@/views/strategy-ide/components/scriptTemplateCatalog'
 import PortfolioResult from './PortfolioResult.vue'
 import FactorResearchResult from './FactorResearchResult.vue'
 import EngineFactorResult from './EngineFactorResult.vue'
@@ -404,6 +406,7 @@ export default {
     return {
       mode: ['factor', 'factor-research'].includes(String(this.$route.query.view || '')) ? 'factor' : 'portfolio',
       sources: [],
+      templates: [],
       czscFactors: [],
       portfolioHistory: [],
       factorHistory: [],
@@ -465,7 +468,10 @@ export default {
     availableSources () {
       const runnable = item => item.engine === 'czsc' || item.asset_type === 'graph_strategy' || item.code_hidden || String(item.code || '').trim()
       if (this.mode !== 'factor') return this.sources.filter(item => !item.research_asset && runnable(item))
-      return this.sources.filter(item => item.research_asset || (item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy' && runnable(item)))
+      return this.sources.filter(item => item.research_asset || (!item.is_template && item.engine !== 'czsc' && item.asset_type === 'portfolio_strategy' && runnable(item)))
+    },
+    isTemplateSource () {
+      return Boolean(this.source && this.source.is_template)
     },
     isCzscSource () {
       return Boolean(this.source && this.source.engine === 'czsc' && this.source.source_kind !== 'graph' && this.source.asset_type !== 'graph_strategy')
@@ -793,10 +799,11 @@ export default {
     async loadSources () {
       await registerCzscStrategies().catch(() => null)
       const factorRequest = getFactorCatalog().catch(() => ({ data: {} }))
-      const [nativeResponse, czscResponse, factorResponse] = await Promise.all([
+      const [nativeResponse, czscResponse, factorResponse, templateResponse] = await Promise.all([
         getScriptSourceList(),
         listUnifiedStrategies({ engine: 'czsc' }).catch(() => ({ data: [] })),
-        factorRequest
+        factorRequest,
+        getScriptTemplateList().catch(() => ({ data: { items: [] } }))
       ])
       const nativeSources = ((nativeResponse.data && nativeResponse.data.items) || [])
         .filter(item => String(item.engine || '').toLowerCase() !== 'czsc' || item.source_kind === 'graph' || item.asset_type === 'graph_strategy')
@@ -845,7 +852,27 @@ export default {
           universe: { reference: 'CNStock' }
         }
       }
-      this.sources = [...nativeSources, ...czscSources, researchSource]
+      const savedTemplateKeys = new Set(nativeSources.map(item => String(item.template_key || '')).filter(Boolean))
+      this.templates = (((templateResponse.data && templateResponse.data.items) || [])
+        .map(normalizeScriptTemplate)
+        .filter(Boolean)
+        .filter(item => !savedTemplateKeys.has(item.key))
+        .map(item => ({
+          id: `template:${item.key}`,
+          name: item.title,
+          description: item.desc,
+          code: item.code,
+          asset_type: item.assetType,
+          source_kind: 'code',
+          template_key: item.key,
+          param_schema: { params: item.params },
+          title_i18n_key: item.titleI18nKey,
+          engine: 'native',
+          engine_origin: 'native',
+          execution_engine: 'native',
+          is_template: true
+        })))
+      this.sources = [...nativeSources, ...czscSources, ...this.templates, researchSource]
       if (!this.czscFactors.some(item => (item.factor_id || item.id) === this.factorForm.factorId) && this.czscFactors.length) {
         this.factorForm.factorId = this.czscFactors[0].factor_id || this.czscFactors[0].id
       }
@@ -911,6 +938,19 @@ export default {
         }
         return
       }
+      if (selected && selected.is_template) {
+        const compiled = await compileScriptSource({ code: selected.code, symbol: this.form.symbol, timeframe: this.form.timeframe })
+        this.source = selected
+        this.manifest = compiled.data && compiled.data.manifest
+        this.backtestRangePolicy = compiled.data && compiled.data.backtestRangePolicy
+        await this.hydrateManifestSymbolNames()
+        this.applyBacktestRangePolicy()
+        this.params = this.paramDefinitions.reduce((output, item) => {
+          output[item.name] = item.default
+          return output
+        }, {})
+        return
+      }
       const response = await getScriptSourceDetail(sourceId)
       const compiled = await compileScriptSource({ sourceId, symbol: this.form.symbol, timeframe: this.form.timeframe })
       const sourceEngine = String((response.data && response.data.engine) || selected && selected.engine || 'native').toLowerCase()
@@ -931,10 +971,19 @@ export default {
       }, {})
     },
     sourceTypeLabel (item) {
+      if (item.is_template) return this.$t('trading-assistant.editor.templateTab')
       if (item.research_asset) return this.$t('strategyV2.factorResearch.independentMode')
       if (String(item.template_key || '').startsWith('robot_v2_')) return this.$t('strategyV2.robot')
       const kind = this.$t(item.asset_type === 'portfolio_strategy' ? 'strategyV2.portfolio' : 'strategyV2.cta')
       return item.engine === 'czsc' || item.engine_origin === 'czsc' ? `${kind} · CZSC` : kind
+    },
+    sourceDisplayName (item) {
+      if (item && item.title_i18n_key && this.$te(item.title_i18n_key)) return this.$t(item.title_i18n_key)
+      if (item && item.is_template) {
+        const key = `trading-assistant.template.${item.template_key}`
+        if (this.$te(key)) return this.$t(key)
+      }
+      return (item && item.name) || '-'
     },
     formatInstrument (item) {
       const marketType = String(item.market_type || item.marketType || '').toLowerCase()
@@ -1066,7 +1115,9 @@ export default {
           : this.isGraphSource
             ? await this.runGraphBacktest()
           : await runStrategyBacktest({
-            sourceId: this.form.sourceId,
+            sourceId: this.isTemplateSource ? undefined : this.form.sourceId,
+            code: this.isTemplateSource ? this.source.code : undefined,
+            strategyName: this.isTemplateSource ? this.sourceDisplayName(this.source) : undefined,
             symbol: this.form.symbol,
             timeframe: this.form.timeframe,
             startDate: this.form.startDate.format('YYYY-MM-DD'),
